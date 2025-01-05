@@ -1,0 +1,47 @@
+body {
+  background-color: rgb(29, 29, 29);
+  color: #fff;
+}
+
+.btn.btn-default,
+.form-control {
+  background-color: rgb(52, 52, 52);
+  border: none;
+  color: #fff;
+}
+
+
+.btn.btn-default:hover,
+.btn.btn-default:active,
+.btn.btn-default.active,
+.btn.btn-default.active:hover,
+.btn.btn-default:focus {
+  background-color: rgb(41, 36, 36);
+  border: none !important;
+  color: #fff;
+}
+
+.btn.btn-default.active:hover {
+  background-color: rgb(16, 14, 14);
+  border: none !important;
+  color: #fff;
+}
+
+.btn-back{
+  position: fixed;
+  top: 25px;
+  left: 25px;
+  border-radius: 26px;
+  padding: 5px 15px;
+}
+
+
+.hide{
+    display: none;
+    transition: all 1s ease-out;
+}
+
+.show{
+    display: block;
+    transition: all 1s ease-out;
+}
