@@ -33,12 +33,16 @@ let initialAccBalance = 0,
     lossTradeCount = 0,
     currentProfitLossAmount = 0,
     lostCountInRow = 0,
-    tickCount = 0
+    tickCount = 0,
+    profit10 = 0,
+    profit25 = 0,
+    profit50 = 0,
+    profit100 = 0
 ;
 
-console.log("init - ", initialStakeInputElement.value);
-console.log("stopLossInputElement - ", stopLossInputElement.value);
-console.log("targetProfitInputElement - ", targetProfitInputElement.value);
+// console.log("init - ", initialStakeInputElement.value);
+// console.log("stopLossInputElement - ", stopLossInputElement.value);
+// console.log("targetProfitInputElement - ", targetProfitInputElement.value);
 
 if (initialStakeInputElement.value == "") {
   initialStakeInputElement.value = initialStake;
@@ -93,6 +97,8 @@ function setTimer(time) {
     } else {
       $(".countdownlabel").removeClass("hide");
       $(".countdownlabel").addClass("show");
+      $(".tickCountLabel").removeClass("show");
+      $(".tickCountLabel").addClass("hide");
       document.getElementById("countdown").innerHTML = timeleft;
     }
     timeleft -= 1;
@@ -103,6 +109,10 @@ function setTickCountDown(tickCount, tick) {
   if (tickCount > tick) {
     $(".tickCountLabel").removeClass("hide");
     $(".tickCountLabel").addClass("show");
+
+    $(".countdownlabel").removeClass("show");
+    $(".countdownlabel").addClass("hide");
+
     document.getElementById("tickCountdown").innerHTML = tickCount - tick;
   } else if (tickCount == tick) {
     document.getElementById("countdown").innerHTML = "";
@@ -164,7 +174,7 @@ const getRandomMarket = (array, current) => {
     randomMarket = array[randomIndex];
   } while (randomMarket === current);
 
-  return randomMarket;
+  return randomMarket.value;
 };
 
 function predictNexrEvenOdd(arr) {
@@ -209,3 +219,88 @@ function getRandomNumber(min, max) {
   }
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
+
+function reportUpdate (totalTradeCount, winCount, lossCount, totalProfit, totalLoss, currentProfitLossAmount, curruntLoss, initialAccBalance) {
+  // const totalResults = document.getElementById('totalResults'); // For displaying WebSocket messages
+
+  // document.getElementById('initialAccBalance').innerHTML = response.authorize.balance;
+  document.getElementById('totalTradeCount').innerHTML = totalTradeCount;
+  document.getElementById('winCount').innerHTML = winCount;
+  document.getElementById('lossCount').innerHTML = lossCount;
+  let newAccBalance = initialAccBalance + currentProfitLossAmount;
+
+
+  if(totalProfit < 0){
+      document.getElementById('totalProfit').innerHTML = `<span style="color: red; font-weight: 900;">$${totalProfit}</span>`;
+  } else if(totalProfit == 0){
+      document.getElementById('totalProfit').innerHTML = `<span>$${totalProfit}</span>`;
+  } else {
+      document.getElementById('totalProfit').innerHTML = `<span style="color: green; font-weight: 900;">$${totalProfit}</span>`;
+  }
+
+
+  if(newAccBalance < initialAccBalance){
+      document.getElementById('newAccBalance').innerHTML = `<span style="color: red; font-weight: 900;">$${newAccBalance}</span>`;
+  } else if(newAccBalance == initialAccBalance){
+      document.getElementById('newAccBalance').innerHTML = `<span>$${newAccBalance}</span>`;
+  } else {
+      document.getElementById('newAccBalance').innerHTML = `<span style="color: green; font-weight: 900;">$${newAccBalance}</span>`;
+  }
+
+
+  if(totalLoss < 0){
+      document.getElementById('totalLoss').innerHTML = `<span style="color: red; font-weight: 900;">$${totalLoss}</span>`;
+  } else if(totalLoss == 0){
+      document.getElementById('totalLoss').innerHTML = `<span>$${totalLoss}</span>`;
+  } else {
+      document.getElementById('totalLoss').innerHTML = `<span style="color: green; font-weight: 900;">$${totalLoss}</span>`;
+  }
+
+  if(currentProfitLossAmount < 0){
+      document.getElementById('currentProfitLossAmount').innerHTML = `<span style="color: red; font-weight: 900;">$${currentProfitLossAmount}</span>`;
+  } else if(currentProfitLossAmount == 0){
+      document.getElementById('currentProfitLossAmount').innerHTML = `<span>$${currentProfitLossAmount}</span>`;
+  } else {
+      document.getElementById('currentProfitLossAmount').innerHTML = `<span style="color: green; font-weight: 900;">$${currentProfitLossAmount}</span>`;
+  }
+
+  if(curruntLoss < 0){
+      document.getElementById('curruntLoss').innerHTML = `<span style="color: red; font-weight: 900;">$${curruntLoss}</span>`;
+  } else if(curruntLoss == 0){
+      document.getElementById('curruntLoss').innerHTML = `<span>$${curruntLoss}</span>`;
+  } else {
+      document.getElementById('curruntLoss').innerHTML = `<span style="color: green; font-weight: 900;">$${curruntLoss}</span>`;
+  }
+
+  console.log('---------------------------------------------------');
+
+  if(currentProfitLossAmount >= profit10 || currentProfitLossAmount >= profit25 || currentProfitLossAmount >= profit50 || currentProfitLossAmount >= profit100){
+    $(".percentage").removeClass("hide");
+    $(".percentage").addClass("show");
+
+    if(currentProfitLossAmount >= profit100){
+      document.getElementById('percentage').innerHTML = `100% profit covered`;
+    } else if(currentProfitLossAmount >= profit50){
+      document.getElementById('percentage').innerHTML = `50% profit covered`;
+    } else if(currentProfitLossAmount >= profit25){
+      document.getElementById('percentage').innerHTML = `25% profit covered`;
+    } else if(currentProfitLossAmount >= profit10){
+      document.getElementById('percentage').innerHTML = `10% profit covered`;
+    }
+  } else {
+    $(".percentage").removeClass("show");
+    $(".percentage").addClass("hide");
+  }
+
+  
+  scrollToBottom();
+
+};
+
+function scrollToBottom(){
+  infoOutput.scrollTop = infoOutput.scrollHeight + 100;
+};
+
+function profitPercentageCalculate(amount,percentage){
+  return amount * (percentage/100);
+};

@@ -5,7 +5,7 @@ body {
 
 .params {
   max-width: 400px;
-  margin: auto;
+  /* margin: auto; */
   display: grid;
   row-gap: 20px;
 }
@@ -90,4 +90,9 @@ pre,
 .tickCountLabel .number {
   font-size: 48px;
   color: #9a9a9a;
+}
+
+.percentage{
+  font-weight: 900;
+  color: green;
 }
