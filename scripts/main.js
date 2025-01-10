@@ -25,6 +25,17 @@ let stopLoss = 100;
 let targetProfit = 100;
 let initialStake = 0.35;
 
+let initialAccBalance = 0, 
+    totalTradeCount = 0,
+    totalProfitAmount = 0,
+    totalLossAmount = 0,
+    winTradeCount = 0,
+    lossTradeCount = 0,
+    currentProfitLossAmount = 0,
+    lostCountInRow = 0,
+    tickCount = 0
+;
+
 console.log("init - ", initialStakeInputElement.value);
 console.log("stopLossInputElement - ", stopLossInputElement.value);
 console.log("targetProfitInputElement - ", targetProfitInputElement.value);

@@ -40,17 +40,7 @@ function startWebSocket() {
     // initialStakeInputElement.value = 1;
 
 
-    let initialAccBalance = 0, 
-        totalTradeCount = 0,
-        newProfit = 0,
-        totalProfitAmount = 0,
-        totalLossAmount = 0,
-        winTradeCount = 0,
-        lossTradeCount = 0,
-        lossAmount = 0,
-        lostCountInRow = 0,
-        tickCount = 0
-        ;
+    
 
 
     apiToken = accountSelectElement.value;
@@ -60,6 +50,7 @@ function startWebSocket() {
     initialStakeInputElement.value.length > 0 ? initialStake = initialStakeInputElement.value : initialStake = initialStake;
 
     let newStake = initialStake;
+    let curruntLoss = 0;
 
 
     ws.onopen = function () {
@@ -134,38 +125,38 @@ function startWebSocket() {
     
                         infoOutput.innerHTML += `Trade Result: <span style="color: ${profit > 0 ? 'green' : 'red'}; font-weight: 900;">${result}</span>, Profit: <span style="color: ${profit > 0 ? 'green' : 'red'}; font-weight: 900;">$${profit.toFixed(2)}</span>\n-------------------------------------\n`;
     
-                        lossAmount = lossAmount + profit;
-                        newProfit = totalProfitAmount + totalLossAmount;
+
+                        console.log('profit - ', profit);
+
+                        currentProfitLossAmount = currentProfitLossAmount + profit;
+                        curruntLoss = curruntLoss + profit;
+                        if(curruntLoss >= 0){curruntLoss = 0;}
 
                         if( profit > 0){
                             totalProfitAmount = totalProfitAmount + profit;
-                            winTradeCount = winTradeCount+1;  
+                            winTradeCount = winTradeCount+1;
                             lostCountInRow = 0;
                         } else if( profit < 0){
                             totalLossAmount = totalLossAmount + profit;
                             lossTradeCount = lossTradeCount+1;
                             lostCountInRow = lostCountInRow + 1;
-
                         }
 
                         stakeChange(result);
 
-                        if(lossAmount > 0){lossAmount = 0;}
-
-                        const spanColor = newProfit > 0 ? 'green' : 'red';
-                        reportUpdate(totalTradeCount, winTradeCount, lossTradeCount, totalProfitAmount, totalLossAmount, lossAmount, newProfit, initialAccBalance);
+                        reportUpdate(totalTradeCount, winTradeCount, lossTradeCount, totalProfitAmount, totalLossAmount, currentProfitLossAmount, curruntLoss, initialAccBalance);
     
                         isTradeOpen = false;
 
 
-                        if(lossAmount < 0){
+                        if(curruntLoss < 0){
                             if(lostCountInRow >= 2){
-                                if(lostCountInRow >= 3){
-                                    market = getRandomMarket(marketArray, market);
-                                }
                                 let t = getRandomNumber(2,15) * 1000;
                                 setTimer(t);
                                 setTimeout(() => {
+                                    // if(lostCountInRow >= 3){
+                                    //     market = getRandomMarket(marketArray, market);
+                                    // }
                                     reset();
                                 }, t);
                             } else {
@@ -247,7 +238,7 @@ function startWebSocket() {
             contract_id: contractId,
         };
         
-        console.log('Waiting for the results...');
+        // console.log('Waiting for the results...');
         
         ws.send(JSON.stringify(contractDetailsRequest));
     }
@@ -275,14 +266,14 @@ function startWebSocket() {
         ws.send(JSON.stringify(ticksHistoryRequest));
     };
 
-    const reportUpdate = (totalTradeCount, winCount, lossCount, totalProfit, totalLoss, currentLossAmount, currentProfitAmount, initialAccBalance) => {
+    const reportUpdate = (totalTradeCount, winCount, lossCount, totalProfit, totalLoss, currentProfitLossAmount, curruntLoss, initialAccBalance) => {
         // const totalResults = document.getElementById('totalResults'); // For displaying WebSocket messages
 
         // document.getElementById('initialAccBalance').innerHTML = response.authorize.balance;
         document.getElementById('totalTradeCount').innerHTML = totalTradeCount;
         document.getElementById('winCount').innerHTML = winCount;
         document.getElementById('lossCount').innerHTML = lossCount;
-        let newAccBalance = initialAccBalance + currentProfitAmount;
+        let newAccBalance = initialAccBalance + currentProfitLossAmount;
 
 
         if(totalProfit < 0){
@@ -311,22 +302,21 @@ function startWebSocket() {
             document.getElementById('totalLoss').innerHTML = `<span style="color: green; font-weight: 900;">$${totalLoss}</span>`;
         }
 
-        if(currentLossAmount < 0){
-            document.getElementById('currentLossAmount').innerHTML = `<span style="color: red; font-weight: 900;">$${currentLossAmount}</span>`;
-        } else if(currentLossAmount == 0){
-            document.getElementById('currentLossAmount').innerHTML = `<span>$${currentLossAmount}</span>`;
+        if(currentProfitLossAmount < 0){
+            document.getElementById('currentProfitLossAmount').innerHTML = `<span style="color: red; font-weight: 900;">$${currentProfitLossAmount}</span>`;
+        } else if(currentProfitLossAmount == 0){
+            document.getElementById('currentProfitLossAmount').innerHTML = `<span>$${currentProfitLossAmount}</span>`;
         } else {
-            document.getElementById('currentLossAmount').innerHTML = `<span style="color: green; font-weight: 900;">$${currentLossAmount}</span>`;
+            document.getElementById('currentProfitLossAmount').innerHTML = `<span style="color: green; font-weight: 900;">$${currentProfitLossAmount}</span>`;
         }
 
-        if(currentProfitAmount < 0){
-            document.getElementById('currentProfitAmount').innerHTML = `<span style="color: red; font-weight: 900;">$${currentProfitAmount}</span>`;
-        } else if(currentProfitAmount == 0){
-            document.getElementById('currentProfitAmount').innerHTML = `<span>$${currentProfitAmount}</span>`;
+        if(curruntLoss < 0){
+            document.getElementById('curruntLoss').innerHTML = `<span style="color: red; font-weight: 900;">$${curruntLoss}</span>`;
+        } else if(curruntLoss == 0){
+            document.getElementById('curruntLoss').innerHTML = `<span>$${curruntLoss}</span>`;
         } else {
-            document.getElementById('currentProfitAmount').innerHTML = `<span style="color: green; font-weight: 900;">$${currentProfitAmount}</span>`;
+            document.getElementById('curruntLoss').innerHTML = `<span style="color: green; font-weight: 900;">$${curruntLoss}</span>`;
         }
-
 
         infoOutput.scrollTop = infoOutput.scrollHeight;
 
