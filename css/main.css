@@ -75,16 +75,19 @@ pre,
   width: 100%;
 }
 
-.countdownlabel {
+.countdownlabel,
+.tickCountLabel {
   position: absolute;
   right: 10%;
   bottom: 25%;
 }
 
-.countdownlabel .text {
+.countdownlabel .text ,
+.tickCountLabel .text {
   color: #676767;
 }
-.countdownlabel .number {
+.countdownlabel .number ,
+.tickCountLabel .number {
   font-size: 48px;
   color: #9a9a9a;
 }

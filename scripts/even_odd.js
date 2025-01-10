@@ -1,6 +1,6 @@
 let isRunning = false, intervalId;
-accountSelectElement.value = 'iVOpdm24hBhw3JI';
-marketSelectElement.value = 'R_50';
+// accountSelectElement.value = 'iVOpdm24hBhw3JI';
+// marketSelectElement.value = 'R_50';
 
 scriptButton.addEventListener('click', runScript);
 
@@ -36,8 +36,8 @@ function webSocketConnectionStop(){
 function startWebSocket() {
     ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=1089");
     let response = null, tradeProposal, lastTradeId ;
-    const martingaleValue = 2.071115;
-    initialStakeInputElement.value = 1;
+    const martingaleValue = 2.071120;
+    // initialStakeInputElement.value = 1;
 
 
     let initialAccBalance = 0, 
@@ -48,7 +48,8 @@ function startWebSocket() {
         winTradeCount = 0,
         lossTradeCount = 0,
         lossAmount = 0,
-        lostCountInRow = 0
+        lostCountInRow = 0,
+        tickCount = 0
         ;
 
 
@@ -120,7 +121,7 @@ function startWebSocket() {
                 infoOutput.innerHTML += `Trade started:\nContract ID = ${lastTradeId}, Stake = ${response.buy.buy_price}, Market = ${market}\n`;
                 console.log('Trade Successful:', response);
 
-                setTimeout(() => {fetchTradeDetails(lastTradeId);}, 1000);
+                setTimeout(() => {fetchTradeDetails(lastTradeId);}, 500);
             }
 
             if(response.msg_type === 'proposal_open_contract'){
@@ -180,7 +181,10 @@ function startWebSocket() {
                         }
 
                     }else{
-                        setTimeout(() => {fetchTradeDetails(lastTradeId);}, 3000); 
+                        setTimeout(() => {
+                            setTickCountDown(contract.tick_count, contract.tick_stream.length);
+                            fetchTradeDetails(lastTradeId);
+                        }, 1000); 
                     }
                 }
             };
@@ -202,7 +206,7 @@ function startWebSocket() {
     const placeTrade = (digitArray, newStake) => {
         let nextNumberIs = predictNexrEvenOdd(digitArray);
         let tradeState = '';
-        const randomNum = getRandomNumber(5, 10);
+        tickCount = getRandomNumber(5, 10);
         nextNumberIs == 'even' ? tradeState = 'DIGITEVEN' : 'DIGITODD';
 
         newStake = Number(newStake);
@@ -213,7 +217,7 @@ function startWebSocket() {
             basis: 'stake',
             contract_type: tradeState, // Use 'DIGITEVEN' for even and 'DIGITODD' for odd
             currency: 'USD',
-            duration: randomNum,
+            duration: tickCount,
             duration_unit: 't',
             symbol: market,
         };
