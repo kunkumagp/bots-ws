@@ -18,6 +18,7 @@ const scriptButton = document.getElementById("scriptButton");
 const infoOutput = document.getElementById("info_output");
 
 const stopLossInputElement = document.getElementById("stop_loss");
+const savingsElement = document.getElementById("savings");
 const targetProfitInputElement = document.getElementById("target_profit");
 const initialStakeInputElement = document.getElementById("initial_stake");
 
@@ -41,21 +42,17 @@ let initialAccBalance = 0,
     profit100 = 0
 ;
 
-// console.log("init - ", initialStakeInputElement.value);
-// console.log("stopLossInputElement - ", stopLossInputElement.value);
-// console.log("targetProfitInputElement - ", targetProfitInputElement.value);
+// if (initialStakeInputElement.value == "") {
+//   initialStakeInputElement.value = initialStake;
+// }
 
-if (initialStakeInputElement.value == "") {
-  // initialStakeInputElement.value = initialStake;
-}
+// if (stopLossInputElement.value == "") {
+//   stopLossInputElement.value = stopLoss;
+// }
 
-if (stopLossInputElement.value == "") {
-  stopLossInputElement.value = stopLoss;
-}
-
-if (targetProfitInputElement.value == "") {
-  // targetProfitInputElement.value = targetProfit;
-}
+// if (targetProfitInputElement.value == "") {
+//   targetProfitInputElement.value = targetProfit;
+// }
 
 // initialStakeInputElement.value = initialStake;
 // stopLossInputElement.value = stopLoss;
