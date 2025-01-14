@@ -46,7 +46,7 @@ let initialAccBalance = 0,
 // console.log("targetProfitInputElement - ", targetProfitInputElement.value);
 
 if (initialStakeInputElement.value == "") {
-  initialStakeInputElement.value = initialStake;
+  // initialStakeInputElement.value = initialStake;
 }
 
 if (stopLossInputElement.value == "") {
@@ -54,7 +54,7 @@ if (stopLossInputElement.value == "") {
 }
 
 if (targetProfitInputElement.value == "") {
-  targetProfitInputElement.value = targetProfit;
+  // targetProfitInputElement.value = targetProfit;
 }
 
 // initialStakeInputElement.value = initialStake;

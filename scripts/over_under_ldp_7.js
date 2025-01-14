@@ -43,10 +43,10 @@ function startWebSocket() {
     
     if(targetProfitInputElement.value.length > 0){
         targetProfit = targetProfitInputElement.value;
-        profit10 = profitPercentageCalculate(targetProfit,10);
-        profit25 = profitPercentageCalculate(targetProfit,25);
-        profit50 = profitPercentageCalculate(targetProfit,50);
-        profit100 = profitPercentageCalculate(targetProfit,100);
+        profit10 = profitPercentageCalculate(initialAccBalance,10);
+        profit25 = profitPercentageCalculate(initialAccBalance,25);
+        profit50 = profitPercentageCalculate(initialAccBalance,50);
+        profit100 = profitPercentageCalculate(initialAccBalance,100);
     } else {
         targetProfit = targetProfit
     }

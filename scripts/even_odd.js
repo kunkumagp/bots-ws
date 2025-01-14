@@ -71,33 +71,10 @@ function startWebSocket() {
     const martingaleMultiplier = 2.071120;
     let tradeType = 'even';
     // initialStakeInputElement.value = 1;
-
-
-
-    
-
+    let newStake = 0;
+    let curruntLoss = 0;
 
     apiToken = accountSelectElement.value;
-    market = marketSelectElement.value;
-    stopLossInputElement.value.length > 0 ?  stopLoss = stopLossInputElement.value:stopLoss = stopLoss;
-
-    if(targetProfitInputElement.value.length > 0){
-        targetProfit = targetProfitInputElement.value;
-        profit10 = profitPercentageCalculate(targetProfit,10);
-        profit25 = profitPercentageCalculate(targetProfit,25);
-        profit50 = profitPercentageCalculate(targetProfit,50);
-        profit100 = profitPercentageCalculate(targetProfit,100);
-    } else {
-        targetProfit = targetProfit
-    }
-
-    // targetProfitInputElement.value.length > 0 ? targetProfit = targetProfitInputElement.value : targetProfit = targetProfit;
-    initialStakeInputElement.value.length > 0 ? initialStake = initialStakeInputElement.value : initialStake = initialStake;
-
-    let newStake = initialStake;
-    let curruntLoss = 0;
-    
-
 
     ws.onopen = function () {
         // Authenticate
@@ -130,15 +107,16 @@ function startWebSocket() {
                 initialAccBalance = response.authorize.balance;
                 document.getElementById('initialAccBalance').innerHTML = `$${initialAccBalance}`;
                 localStorage.setItem("accountDetails", response.authorize);
-
+                resetParams();
                 // console.log('stopLoss - ', stopLoss);
                 // console.log('targetProfit - ', targetProfit);
                 // console.log('initialStake - ', initialStake);
-                // console.log('newStake - ', newStake);
+                console.log('newStake - ', newStake);
+                console.log('profit10 - ', profit10);
 
                 // placeTrade(newStake);
                
-                setNewStake();
+                // setNewStake();
                 requestTicksHistory(market);    
 
 
@@ -151,8 +129,12 @@ function startWebSocket() {
 
 
             if (response.msg_type === 'proposal') {
-                tradeProposal = response;
-                makeTheTrade();
+                if(newAccBalance > 0 && response.echo_req.amount > newAccBalance){
+                    webSocketConnectionStop();
+                } else {
+                    tradeProposal = response;
+                    makeTheTrade();
+                }
             };
 
             if (response.msg_type === 'buy') {
@@ -217,7 +199,7 @@ function startWebSocket() {
 
                         if(curruntLoss < 0){
                             if(lostCountInRow > 3){ 
-                                t = getRandomNumber(10,60) * 1000; 
+                                // t = getRandomNumber(10,60) * 1000; 
                                 // market = getRandomMarket(marketArray, market);
                             }
                             else if(lostCountInRow > 2){ 
@@ -225,7 +207,7 @@ function startWebSocket() {
                                 // market = getRandomMarket(marketArray, market); 
                             }
                             else if(lostCountInRow == 2){ 
-                                t = getRandomNumber(2,15) * 1000; 
+                                // t = getRandomNumber(2,15) * 1000; 
                             }
                             // t = getRandomNumber(2,8) * 1000; 
 
@@ -253,9 +235,9 @@ function startWebSocket() {
                             // }
                             
                         } else {
-                            if(currentProfitLossAmount >= (newAccBalance * (25 / 100))){
+                            if(currentProfitLossAmount >= profit10){
                                 // webSocketConnectionStop();
-                                t = getRandomNumber(2,15) * 1000; 
+                                t = getRandomNumber(60,120) * 1000; 
                                 setTimer(t);
                                 setTimeout(() => {
                                     restart();
@@ -282,6 +264,40 @@ function startWebSocket() {
 
         }
 
+    };
+
+    const resetParams = () => {
+        market = marketSelectElement.value;
+        stopLossInputElement.value.length > 0 ?  stopLoss = stopLossInputElement.value:stopLoss = stopLoss;
+        profit10 = profitPercentageCalculate(initialAccBalance,10);
+        profit25 = profitPercentageCalculate(initialAccBalance,25);
+        profit50 = profitPercentageCalculate(initialAccBalance,50);
+        profit100 = profitPercentageCalculate(initialAccBalance,100);
+        
+        targetProfitInputElement.value=profit10.toFixed(2);
+
+        let calculatedStake = Math.floor((initialAccBalance * (1/100)) - 1);
+        let inputStake = initialStakeInputElement.value;
+
+        console.log('calculatedStake - ', calculatedStake);
+        console.log('inputStake - ', inputStake);
+        
+
+        if(inputStake.length > 0){
+            initialStake = initialStakeInputElement.value;
+        } else {
+            if(calculatedStake < 1){
+                initialStake = 0.35;
+            } else {
+                initialStake = calculatedStake;
+                initialStakeInputElement.value = initialStake;
+            }
+        }
+
+
+        // initialStakeInputElement.value.length > 0 ? initialStake = initialStakeInputElement.value : initialStake = initialStake;
+        newStake = initialStake;
+        currentProfitLossAmount = 0;
     };
 
 
