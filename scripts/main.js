@@ -24,6 +24,7 @@ const initialStakeInputElement = document.getElementById("initial_stake");
 let stopLoss = 100;
 let targetProfit = 100;
 let initialStake = 0.35;
+let newAccBalance = 0;
 
 let initialAccBalance = 0, 
     totalTradeCount = 0,
@@ -181,9 +182,20 @@ function predictNexrEvenOdd(arr) {
   if (arr.length < 2) {
     return "Insufficient data to predict";
   }
-  const lastNumber = arr[arr.length - 1];
-  const secondLastNumber = arr[arr.length - 2];
+
+  const lastNumber = arr[arr.length - 1].toString().slice(-1); // Get the last digit
+  const secondLastNumber = arr[arr.length - 2].toString().slice(-1); // Get the last digit
+
+  // const lastNumber = arr[arr.length - 1];
+  // const secondLastNumber = arr[arr.length - 2];
   const difference = lastNumber - secondLastNumber;
+
+  // console.log('lastNumber - ',lastNumber);
+  // console.log('secondLastNumber - ',secondLastNumber);
+  // console.log('difference - ',difference);
+  // console.log(difference % 2 === 0);
+  // console.log(lastNumber % 2 === 0);
+  
 
   if (difference % 2 === 0) {
     return lastNumber % 2 === 0 ? "even" : "odd";
@@ -227,7 +239,7 @@ function reportUpdate (totalTradeCount, winCount, lossCount, totalProfit, totalL
   document.getElementById('totalTradeCount').innerHTML = totalTradeCount;
   document.getElementById('winCount').innerHTML = winCount;
   document.getElementById('lossCount').innerHTML = lossCount;
-  let newAccBalance = initialAccBalance + currentProfitLossAmount;
+  newAccBalance = initialAccBalance + currentProfitLossAmount;
 
 
   if(totalProfit < 0){
@@ -304,3 +316,54 @@ function scrollToBottom(){
 function profitPercentageCalculate(amount,percentage){
   return amount * (percentage/100);
 };
+
+
+
+
+function calculateInitialStake(capital, martingaleMultiplier, steps) {
+  let initialStake = capital;
+  
+  // Iteratively adjust the initial stake to ensure the 10th step fits within the capital
+  while (true) {
+      let currentStake = initialStake;
+      let totalLoss = 0;
+      let valid = true;
+
+      for (let i = 0; i < steps; i++) {
+          totalLoss += currentStake;
+
+          // Check if the 10th step exceeds the capital
+          if (i === steps - 1 && totalLoss > capital) {
+              valid = false;
+              break;
+          }
+
+          currentStake *= martingaleMultiplier;
+      }
+
+      if (valid) break;
+
+      initialStake -= 0.0001; // Adjust downward to find the correct stake
+  }
+
+  return parseFloat(initialStake.toFixed(4));
+}
+
+function calculateMartingaleSteps(capital, initialStake, martingaleMultiplier, steps) {
+  const results = [];
+  let currentStake = initialStake;
+  let totalLoss = 0;
+
+  for (let i = 0; i < steps; i++) {
+      results.push({
+          step: i + 1,
+          stakeValue: parseFloat(currentStake.toFixed(2)),
+          lossValue: parseFloat((totalLoss + currentStake).toFixed(2))
+      });
+
+      totalLoss += currentStake;
+      currentStake *= martingaleMultiplier;
+  }
+
+  return results;
+}

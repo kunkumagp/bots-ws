@@ -2,6 +2,38 @@ let isRunning = false, intervalId;
 // accountSelectElement.value = 'iVOpdm24hBhw3JI';
 // marketSelectElement.value = 'R_50';
 
+
+
+
+
+
+
+// // Example Usage
+// const initialCapital = 500; // Initial capital
+// const martingaleMultiplier = 2.071115; // Martingale multiplier
+// const steps = 10; // Number of steps
+
+// // Calculate the initial stake for the given capital
+// let initStake = calculateInitialStake(initialCapital, martingaleMultiplier, steps);
+// console.log("Initial Stake:", initStake);
+
+// // Calculate the Martingale steps
+// let results = calculateMartingaleSteps(initialCapital, initStake, martingaleMultiplier, steps);
+// console.log("Initial Martingale Steps:", results);
+
+// // Add new capital and recalculate
+// const newCapital = 2000; // Add $2000 more capital
+// initStake = calculateInitialStake(newCapital, martingaleMultiplier, steps);
+// console.log("Updated Initial Stake with New Capital:", initStake);
+
+// // Recalculate the Martingale steps with the updated capital
+// results = calculateMartingaleSteps(newCapital, initStake, martingaleMultiplier, steps);
+// console.log("Updated Martingale Steps with New Capital:", results);
+
+
+
+
+
 scriptButton.addEventListener('click', runScript);
 
 function runScript() {
@@ -36,7 +68,8 @@ function webSocketConnectionStop(){
 function startWebSocket() {
     ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=1089");
     let response = null, tradeProposal, lastTradeId ;
-    const martingaleValue = 2.071120;
+    const martingaleMultiplier = 2.071120;
+    let tradeType = 'even';
     // initialStakeInputElement.value = 1;
 
 
@@ -87,6 +120,9 @@ function startWebSocket() {
     ws.onmessage = function (event) {
         response = JSON.parse(event.data);
 
+        // console.log('response - ', response);
+        
+
         if(response != null){
 
             if (response.msg_type === 'authorize') {
@@ -101,6 +137,8 @@ function startWebSocket() {
                 // console.log('newStake - ', newStake);
 
                 // placeTrade(newStake);
+               
+                setNewStake();
                 requestTicksHistory(market);    
 
 
@@ -121,11 +159,21 @@ function startWebSocket() {
                 if(response.buy == undefined || response.buy.contract_id == undefined){
                     requestTicksHistory(market);
                 } else {
+                    
                     lastTradeId = response.buy.contract_id; 
                     totalTradeCount = totalTradeCount + 1;
                     isTradeOpen = true;
+
+                    let tradeType;
+
+                    if (response.buy.shortcode.includes('DIGITEVEN')) {
+                        tradeType = 'Even';
+                    } else if (response.buy.shortcode.includes('DIGITODD')) {
+                        tradeType = 'Odd';
+                    }
+                    
     
-                    infoOutput.innerHTML += `Trade started:\nContract ID = ${lastTradeId}, Stake = ${response.buy.buy_price}, Market = ${market}\n`;
+                    infoOutput.innerHTML += `Trade started:\nContract ID = ${lastTradeId}, Stake = ${response.buy.buy_price}, Market = ${market}, Teade Type = ${tradeType}\n`;
                     console.log('Trade Successful:', response);
                     scrollToBottom();
     
@@ -158,34 +206,66 @@ function startWebSocket() {
                             lostCountInRow = lostCountInRow + 1;
                         }
 
-
                         stakeChange(result);
 
                         reportUpdate(totalTradeCount, winTradeCount, lossTradeCount, totalProfitAmount, totalLossAmount, currentProfitLossAmount, curruntLoss, initialAccBalance);
+                        newAccBalance = initialAccBalance + currentProfitLossAmount;
     
                         isTradeOpen = false;
 
-                        let t = getRandomNumber(2,15) * 1000;
+                        let t = 0;
 
                         if(curruntLoss < 0){
-                            if(lostCountInRow > 2){
-                                market = getRandomMarket(marketArray, market);
-                                // marketSelectElement.value = market;
+                            if(lostCountInRow > 3){ 
+                                t = getRandomNumber(10,60) * 1000; 
+                                // market = getRandomMarket(marketArray, market);
+                            }
+                            else if(lostCountInRow > 2){ 
+                                t = getRandomNumber(10,30) * 1000; 
+                                // market = getRandomMarket(marketArray, market); 
+                            }
+                            else if(lostCountInRow == 2){ 
+                                t = getRandomNumber(2,15) * 1000; 
+                            }
+                            // t = getRandomNumber(2,8) * 1000; 
+
+                            setTimer(t);
+                            setTimeout(() => {
+                                reset();
+                            }, t);
+
+
+                            // if(lostCountInRow > 2){
+                            //     t = getRandomNumber(10,30) * 1000;
+                            //     market = getRandomMarket(marketArray, market);
+                            //     // marketSelectElement.value = market;
+                            //     setTimer(t);
+                            //     setTimeout(() => {
+                            //         reset();
+                            //     }, t);
+                            // } else if(lostCountInRow == 2){
+                            //     setTimer(t);
+                            //     setTimeout(() => {
+                            //         reset();
+                            //     }, t);
+                            // } else {
+                            //     reset();
+                            // }
+                            
+                        } else {
+                            if(currentProfitLossAmount >= (newAccBalance * (25 / 100))){
+                                // webSocketConnectionStop();
+                                t = getRandomNumber(2,15) * 1000; 
                                 setTimer(t);
                                 setTimeout(() => {
-                                    reset();
-                                }, t);
-                            } else if(lostCountInRow == 2){
-                                setTimer(t);
-                                setTimeout(() => {
-                                    reset();
+                                    restart();
                                 }, t);
                             } else {
                                 reset();
                             }
-                            
-                        } else {
-                            reset();
+
+                            // reset();
+
                         }
 
                     }else{
@@ -212,10 +292,28 @@ function startWebSocket() {
 
 
     const placeTrade = (digitArray, newStake) => {
-        let nextNumberIs = predictNexrEvenOdd(digitArray);
+        // let nextNumberIs = predictNexrEvenOdd(digitArray);
         let tradeState = '';
         tickCount = getRandomNumber(5, 10);
-        nextNumberIs == 'even' ? tradeState = 'DIGITEVEN' : 'DIGITODD';
+        // nextNumberIs == 'even' ? tradeState = 'DIGITEVEN' : 'DIGITODD';
+
+        // if(nextNumberIs == 'even'){
+        //     tradeState = 'DIGITEVEN';
+        // } else if(nextNumberIs == 'odd'){
+        //     tradeState = 'DIGITODD';
+        // }
+
+        if(tradeType == 'even'){
+            tradeState = 'DIGITEVEN';
+            tradeType = 'odd';
+        } else if(tradeType == 'odd'){
+            tradeState = 'DIGITODD';
+            tradeType = 'even';
+
+        }
+
+        // tradeState = 'DIGITEVEN';
+
 
         newStake = Number(newStake);
 
@@ -269,14 +367,48 @@ function startWebSocket() {
         requestTicksHistory(market);
     };
 
+    const restart = () => {
+
+        webSocketConnectionStop();
+        setTimeout(() => {
+            webSocketConnectionStart();
+        }, 1000);
+    };
+
     const stakeChange = (status) => {
         if(status == "Loss"){
-            newStake = newStake * martingaleValue;
+            newStake = newStake * martingaleMultiplier;
         } else if(status == "Win"){
             newStake = initialStake;
+            // setNewStake();
         }
         
     };
+
+    const setNewStake = () => {
+        let martingaleSteps = 12;
+        newAccBalance = initialAccBalance + currentProfitLossAmount;
+        // console.log('initialAccBalance - ', initialAccBalance);
+        // console.log('currentProfitLossAmount - ', currentProfitLossAmount);
+        // console.log('newAccBalance - ', newAccBalance);
+        // console.log('martingaleMultiplier - ', martingaleMultiplier);
+        
+        let calculatedStake = (calculateInitialStake(newAccBalance, martingaleMultiplier, martingaleSteps)) - 0.02;
+
+        // if(calculatedStake < 0.35 ){newStake = 0.35;} 
+        // else if(calculatedStake > 0.35 && calculatedStake < 1){newStake = calculatedStake}
+        // if(calculatedStake > 1){newStake =  Math.floor(calculatedStake)}
+
+
+        console.log("Updated Initial Stake with New Capital:", calculatedStake);
+
+        let results = calculateMartingaleSteps(newAccBalance, calculatedStake, martingaleMultiplier, martingaleSteps);
+        console.log("Updated Martingale Steps with New Capital:", results);
+        initialStakeInputElement.value = newStake;
+        console.log('newStake - ', newStake);
+
+    };
+
 
     const requestTicksHistory = (symbol) => {
         const ticksHistoryRequest = {

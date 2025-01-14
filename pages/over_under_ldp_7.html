@@ -15,7 +15,7 @@
   <body>
     <a class="btn btn-default btn-back" href="../index.html">< Back</a>
     <div class="container" style="text-align: center">
-      <h1>Even Odd</h1>
+      <h1>Over Under LDP 7</h1>
 
       <div class="row">
         <div class="col-md-6">
@@ -35,19 +35,19 @@
             <div class="form-field">
               <div class="form-title">Stop Loss :</div>
               <div class="form-element">
-                <input type="text" id="stop_loss" class="form-control" value="" />
+                <input type="text" id="stop_loss" class="form-control" />
               </div>
             </div>
             <div class="form-field">
               <div class="form-title">Target Profit :</div>
               <div class="form-element">
-                <input type="text" id="target_profit" class="form-control" value="" />
+                <input type="text" id="target_profit" class="form-control" />
               </div>
             </div>
             <div class="form-field">
               <div class="form-title">Initial Stake :</div>
               <div class="form-element">
-                <input type="text" id="initial_stake" class="form-control" value=""/>
+                <input type="text" id="initial_stake" class="form-control" value="1" />
               </div>
             </div>
             <div class="form-field">
@@ -60,21 +60,17 @@
         <div class="col-md-6">
           <pre
             style="text-align: left"
-          >Initial Account Balance : <span id="initialAccBalance">$0</span><br/>New Balance : <span id="newAccBalance">$0</span><span class="hide percentage" id="percentage"></span><br/>-----------------------------<br/><br/>Total Trade Count: <span id="totalTradeCount">0</span> <br/>Win Count: <span id="winCount">0</span> <br/>Loss Count: <span id="lossCount">0</span> <br/>-----------------------------<br/><br/>Total Profit: <span id="totalProfit">$0</span> <br/>Total Loss: <span id="totalLoss">$0</span> <br/>-----------------------------<br/><br/>Current Profit / Loss Amount: <span id="currentProfitLossAmount">$0</span> <br/>Current Loss Amount: <span id="curruntLoss">$0</span> <br/></pre>
+          >Initial Account Balance : <span id="initialAccBalance">$0</span><br/>New Balance : <span id="newAccBalance">$0</span>|<span class="hide percentage" id="percentage">$0</span><br/>-----------------------------<br/><br/>Total Trade Count: <span id="totalTradeCount">0</span> <br/>Win Count: <span id="winCount">0</span> <br/>Loss Count: <span id="lossCount">0</span> <br/>-----------------------------<br/><br/>Total Profit: <span id="totalProfit">$0</span> <br/>Total Loss: <span id="totalLoss">$0</span> <br/>-----------------------------<br/><br/>Current Profit / Loss Amount: <span id="currentProfitLossAmount">$0</span> <br/>Current Loss Amount: <span id="curruntLoss">$0</span> <br/></pre>
           <div class="countdownlabel hide">
-            <div class="text">Bot will run again in </div>
-            <div class="number"  id="countdown"></div>
-          </div>
-          <div class="tickCountLabel hide">
-            <div class="text">Trade will close in tick</div>
-            <div class="number"  id="tickCountdown"></div>
+            <div class="text">Bot will run again in</div>
+            <div class="number"  id="countdown">5</div>
           </div>
         </div>
 
       </div>
     </div>
 
-    <div class="container" style="text-align: center">
+    <div class="container" style="margin-top: 25px; text-align: center">
       <div class="row">
         <div class="col-md-12">
           <pre id="info_output" style="text-align: left; max-height: 52vh;"></pre>
@@ -83,6 +79,6 @@
     </div>
 
     <script src="../scripts/main.js"></script>
-    <script src="../scripts/even_odd.js"></script>
+    <script src="../scripts/over_under_ldp_7.js"></script>
   </body>
 </html>
