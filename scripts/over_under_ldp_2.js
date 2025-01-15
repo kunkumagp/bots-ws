@@ -35,6 +35,7 @@ function startWebSocket() {
     ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=1089");
     let response = null, tradeProposal, lastTradeId ;
     const martingaleValue = 3.5143;
+    marketSelectElement.value = 'R_50';
 
 
     apiToken = accountSelectElement.value;
@@ -108,7 +109,7 @@ function startWebSocket() {
 
                 infoOutput.innerHTML += `Trade started:\nContract ID = ${lastTradeId}, Stake = ${response.buy.buy_price}, Market = ${market}\n`;
                 console.log('Trade Successful:', response);
-
+scrollToBottom();
                 setTimeout(() => {fetchTradeDetails(lastTradeId);}, 1000);
             }
 
@@ -155,7 +156,16 @@ function startWebSocket() {
                             }
                             
                         } else {
-                            reset();
+                            if(currentProfitLossAmount >= targetProfitInputElement.value){
+                                t = getRandomNumber(120,420) * 1000; 
+                                setTimer(t);
+                                setTimeout(() => {
+                                    restart();
+                                }, t);
+                            } else {
+                                reset();
+                            }
+                            
                         }
 
 
@@ -173,6 +183,13 @@ function startWebSocket() {
     };
 
 
+    const restart = () => {
+        currentProfitLossAmount = 0;
+        webSocketConnectionStop();
+        setTimeout(() => {
+            webSocketConnectionStart();
+        }, 1000);
+    };
 
     const getAuthentication = () => {
         ws.send(JSON.stringify({ authorize: apiToken }));

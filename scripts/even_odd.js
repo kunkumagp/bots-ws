@@ -278,13 +278,14 @@ function startWebSocket() {
         profit100 = profitPercentageCalculate(capital,100);
         
         targetProfitInputElement.value=profit10.toFixed(2);
+       
+        // capital = 300;
 
         console.log('capital - ', capital);
-        // capital = 200;
 
         // let calculatedStake = Math.floor((capital * (0.5/100)) - 0.5);
         // let calculatedStake = (capital * (1/100)) - 1.5;
-        let calculatedStake = (capital * (1/100)) - 1;
+        let calculatedStake = (capital * (1/100)) - 3.5;
         let inputStake = initialStakeInputElement.value;
 
         console.log('calculatedStake - ', calculatedStake);
