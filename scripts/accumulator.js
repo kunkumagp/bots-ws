@@ -271,8 +271,10 @@ function startWebSocket() {
     const stakeChange = (status) => {
         if(status == "Loss"){
             newStake = newStake * martingaleMultiplier;
+            targetProfit = newStake * (15 / 100);
         } else if(status == "Win"){
             newStake = initialStake;
+            targetProfit = targetProfitInputElement.value;
             // setNewStake();
         }
         
