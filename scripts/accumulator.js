@@ -1,5 +1,9 @@
 let isRunning = false, intervalId;
 
+targetProfitInputElement.addEventListener('change', ()=>{
+    targetProfit = targetProfitInputElement.value;
+});
+
 
 scriptButton.addEventListener('click', runScript);
 
@@ -48,9 +52,10 @@ function startWebSocket() {
     marketSelectElement.value = market;
     newStake = initialStakeInputElement.value;
 
-    let targetProfit = targetProfitInputElement.value;
+    targetProfit = targetProfitInputElement.value;
 
     percentageValue = growthRateInputElement.value;
+
 
     ws.onopen = function () {
         // Authenticate
@@ -264,7 +269,7 @@ function startWebSocket() {
     const stakeChange = (status) => {
         if(status == "Loss"){
             newStake = newStake * martingaleMultiplier;
-            targetProfit = newStake * (15 / 100);
+            targetProfit = newStake * targetProfit;
         } else if(status == "Win"){
             newStake = initialStake;
             targetProfit = targetProfitInputElement.value;
