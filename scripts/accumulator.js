@@ -48,7 +48,7 @@ function startWebSocket() {
     initialStake = 1;
 
     apiToken = accountSelectElement.value;
-    market = getRandomMarket(marketArray, market); 
+    // market = getRandomMarket(marketArray, market); 
     marketSelectElement.value = market;
     newStake = initialStakeInputElement.value;
 
@@ -92,12 +92,17 @@ function startWebSocket() {
                 profit100 = profitPercentageCalculate(initialAccBalance,100);
 
 
-                // placeTrade(newStake);
-                placeTrade();
+                
+                // placeTrade();
                
                 // setNewStake();
                 // requestTicksHistory(market);    
 
+                runMarketAnalysisWithHistory();
+
+                setTimeout(() => {
+                    placeTrade();
+                }, 5000);
             }
 
 
@@ -169,7 +174,7 @@ function startWebSocket() {
                         if(profit < 0){
                             setTimeout(() => {
                                 reset();
-                            }, 500); 
+                            }, 10000); 
                         } else {
                             reset();
                         }
@@ -187,6 +192,9 @@ function startWebSocket() {
 
 
         }
+
+        runMarketAnalysisWithHistory();
+
 
     };
 
@@ -302,3 +310,4 @@ function weClose() {
         ws = null;
     }
 }
+

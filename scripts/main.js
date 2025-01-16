@@ -367,3 +367,95 @@ function calculateMartingaleSteps(capital, initialStake, martingaleMultiplier, s
 
   return results;
 }
+
+
+function analyzeMarketsWithHistory(callback) {
+  const markets = ['R_10', 'R_25', 'R_50', 'R_75', 'R_100'];
+  const marketVolatility = {};
+  let processedMarkets = 0;
+
+  // Fetch historical ticks for a specific market
+  function fetchHistoricalTicks(market) {
+      const marketWs = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=1089");
+
+      marketWs.onopen = () => {
+          const ticksHistoryRequest = {
+              ticks_history: market,
+              end: 'latest',
+              count: 100, // Number of historical ticks
+              style: 'ticks'
+          };
+          marketWs.send(JSON.stringify(ticksHistoryRequest));
+      };
+
+      marketWs.onmessage = (msg) => {
+          const data = JSON.parse(msg.data);
+          if (data.history && data.history.prices) {
+              marketWs.close();
+              calculateVolatility(market, data.history.prices);
+          } else if (data.error) {
+              console.error(`Error fetching data for ${market}: ${data.error.message}`);
+              marketWs.close();
+              calculateVolatility(market, []); // Handle as empty data
+          }
+      };
+
+      marketWs.onerror = (err) => {
+          console.error(`WebSocket error for ${market}: ${err.message}`);
+          marketWs.close();
+          calculateVolatility(market, []); // Handle as empty data
+      };
+  }
+
+  // Calculate the standard deviation for the given tick data
+  function calculateVolatility(market, tickData) {
+      if (tickData.length === 0) {
+          marketVolatility[market] = Infinity; // Mark as invalid
+      } else {
+          const priceChanges = tickData.map((tick, index) => {
+              if (index === 0) return 0; // No change for the first tick
+              return Math.abs(tick - tickData[index - 1]);
+          }).slice(1); // Remove the first entry (0)
+
+          const mean = priceChanges.reduce((sum, value) => sum + value, 0) / priceChanges.length;
+          const variance = priceChanges.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) / priceChanges.length;
+          const standardDeviation = Math.sqrt(variance);
+          marketVolatility[market] = standardDeviation;
+      }
+
+      processedMarkets += 1;
+
+      // When all markets are processed, return results via callback
+      if (processedMarkets === markets.length) {
+          const sortedMarkets = Object.entries(marketVolatility).sort((a, b) => a[1] - b[1]);
+          const mostStable = sortedMarkets[0];
+          const mostVolatile = sortedMarkets[sortedMarkets.length - 1];
+
+          console.log('Market Volatility Analysis:', marketVolatility);
+          console.log(`Most Stable Market: ${mostStable[0]}, Volatility: ${mostStable[1]}`);
+          console.log(`Most Volatile Market: ${mostVolatile[0]}, Volatility: ${mostVolatile[1]}`);
+
+          if (callback) {
+              callback({
+                  mostStable: { market: mostStable[0], volatility: mostStable[1] },
+                  mostVolatile: { market: mostVolatile[0], volatility: mostVolatile[1] },
+                  marketVolatility,
+              });
+          }
+      }
+  }
+
+  // Start fetching historical ticks for all markets
+  for (const market of markets) {
+      fetchHistoricalTicks(market);
+  }
+}
+
+// Example: Use the function with a callback
+function runMarketAnalysisWithHistory() {
+  analyzeMarketsWithHistory((result) => {
+      market = result.mostStable.market;
+      // infoOutput.innerHTML += `Most Stable Market: ${result.mostStable.market}, Volatility: ${result.mostStable.volatility}\n`;
+      // infoOutput.innerHTML += `Most Volatile Market: ${result.mostVolatile.market}, Volatility: ${result.mostVolatile.volatility}\n`;
+  });
+}
