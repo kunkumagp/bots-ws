@@ -260,13 +260,6 @@ function startWebSocket() {
         placeTrade();
     };
 
-    const restart = () => {
-
-        webSocketConnectionStop();
-        setTimeout(() => {
-            webSocketConnectionStart();
-        }, 1000);
-    };
 
     const stakeChange = (status) => {
         if(status == "Loss"){
@@ -280,29 +273,6 @@ function startWebSocket() {
         
     };
 
-    const setNewStake = () => {
-        let martingaleSteps = 12;
-        newAccBalance = initialAccBalance + currentProfitLossAmount;
-        // console.log('initialAccBalance - ', initialAccBalance);
-        // console.log('currentProfitLossAmount - ', currentProfitLossAmount);
-        // console.log('newAccBalance - ', newAccBalance);
-        // console.log('martingaleMultiplier - ', martingaleMultiplier);
-        
-        let calculatedStake = (calculateInitialStake(newAccBalance, martingaleMultiplier, martingaleSteps)) - 0.02;
-
-        // if(calculatedStake < 0.35 ){newStake = 0.35;} 
-        // else if(calculatedStake > 0.35 && calculatedStake < 1){newStake = calculatedStake}
-        // if(calculatedStake > 1){newStake =  Math.floor(calculatedStake)}
-
-
-        console.log("Updated Initial Stake with New Capital:", calculatedStake);
-
-        let results = calculateMartingaleSteps(newAccBalance, calculatedStake, martingaleMultiplier, martingaleSteps);
-        console.log("Updated Martingale Steps with New Capital:", results);
-        initialStakeInputElement.value = newStake;
-        console.log('newStake - ', newStake);
-
-    };
 
 
     const requestTicksHistory = (symbol) => {
