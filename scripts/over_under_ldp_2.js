@@ -147,6 +147,7 @@ scrollToBottom();
                         if(curruntLoss < 0){
                             if(lostCountInRow >= 2){
                                 let t = getRandomNumber(2,15) * 1000;
+                                market = getRandomMarket(marketArray, market);
                                 setTimer(t);
                                 setTimeout(() => {
                                     reset();
