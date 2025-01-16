@@ -35,15 +35,18 @@ function webSocketConnectionStop(){
 function startWebSocket() {
     ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=1089");
     let response = null, tradeProposal, lastTradeId ;
-    const martingaleMultiplier = 2.071120;
+    const martingaleMultiplier = 10;
     let tradeType = 'even';
     // initialStakeInputElement.value = 1;
     let newStake = 0;
     let curruntLoss = 0;
+    let percentageValue = null;
 
     apiToken = accountSelectElement.value;
     market = getRandomMarket(marketArray, market); 
     marketSelectElement.value = market;
+
+    percentageValue = growthRateInputElement.value;
 
     ws.onopen = function () {
         // Authenticate
@@ -76,15 +79,11 @@ function startWebSocket() {
                 document.getElementById('initialAccBalance').innerHTML = `$${initialAccBalance}`;
                 localStorage.setItem("accountDetails", response.authorize);
                 // placeTrade(newStake);
+                placeTrade();
                
                 // setNewStake();
                 // requestTicksHistory(market);    
 
-            }
-
-            if (response.msg_type === 'history') {
-                const lastDigitList = response.history.prices;
-                placeTrade(lastDigitList, newStake);
             }
 
 
@@ -106,16 +105,7 @@ function startWebSocket() {
                     totalTradeCount = totalTradeCount + 1;
                     isTradeOpen = true;
 
-                    let tradeType;
-
-                    if (response.buy.shortcode.includes('DIGITEVEN')) {
-                        tradeType = 'Even';
-                    } else if (response.buy.shortcode.includes('DIGITODD')) {
-                        tradeType = 'Odd';
-                    }
-                    
-    
-                    infoOutput.innerHTML += `Trade started:\nContract ID = ${lastTradeId}, Stake = ${response.buy.buy_price}, Market = ${market}, Teade Type = ${tradeType}\n`;
+                    infoOutput.innerHTML += `Trade started:\nContract ID = ${lastTradeId}, Stake = ${response.buy.buy_price}, Market = ${market}\n`;
                     console.log('Trade Successful:', response);
                     scrollToBottom();
     
@@ -157,63 +147,10 @@ function startWebSocket() {
 
                         let t = 0;
 
-                        if(curruntLoss < 0){
-
-                            if(lostCountInRow > 3){ 
-                                // t = getRandomNumber(10,60) * 1000; 
-                                // market = getRandomMarket(marketArray, market);
-                            }
-                            else if(lostCountInRow > 2){ 
-                                t = getRandomNumber(10,30) * 1000; 
-                                // market = getRandomMarket(marketArray, market); 
-                            }
-                            else if(lostCountInRow == 2){ 
-                                // t = getRandomNumber(2,15) * 1000; 
-                            }
-                            // t = getRandomNumber(2,8) * 1000; 
-
-                            setTimer(t);
-                            setTimeout(() => {
-                                reset();
-                            }, t);
-
-
-                            // if(lostCountInRow > 2){
-                            //     t = getRandomNumber(10,30) * 1000;
-                            //     market = getRandomMarket(marketArray, market);
-                            //     // marketSelectElement.value = market;
-                            //     setTimer(t);
-                            //     setTimeout(() => {
-                            //         reset();
-                            //     }, t);
-                            // } else if(lostCountInRow == 2){
-                            //     setTimer(t);
-                            //     setTimeout(() => {
-                            //         reset();
-                            //     }, t);
-                            // } else {
-                            //     reset();
-                            // }
-                            
-                        } else {
-                            if(currentProfitLossAmount >= profit10){
-                                // webSocketConnectionStop();
-                                t = getRandomNumber(120,180) * 1000; 
-                                setTimer(t);
-                                setTimeout(() => {
-                                    restart();
-                                }, t);
-                            } else {
-                                reset();
-                            }
-
-                            // reset();
-
-                        }
+                        reset();
 
                     }else{
                         setTimeout(() => {
-                            setTickCountDown(contract.tick_count, contract.tick_stream.length);
                             fetchTradeDetails(lastTradeId);
                         }, 1000); 
                     }
@@ -234,42 +171,25 @@ function startWebSocket() {
     };
 
 
-    const placeTrade = (digitArray, newStake) => {
-        // let nextNumberIs = predictNexrEvenOdd(digitArray);
-        let tradeState = '';
-        tickCount = getRandomNumber(5, 10);
-        // nextNumberIs == 'even' ? tradeState = 'DIGITEVEN' : 'DIGITODD';
-
-        // if(nextNumberIs == 'even'){
-        //     tradeState = 'DIGITEVEN';
-        // } else if(nextNumberIs == 'odd'){
-        //     tradeState = 'DIGITODD';
-        // }
-
-        if(tradeType == 'even'){
-            tradeState = 'DIGITEVEN';
-            tradeType = 'odd';
-        } else if(tradeType == 'odd'){
-            tradeState = 'DIGITODD';
-            tradeType = 'even';
-
-        }
-
-        // tradeState = 'DIGITEVEN';
-
+    const placeTrade = () => {
+       
 
         newStake = Number(newStake);
 
         const tradeRequest = {
-            proposal: 1,
-            amount: newStake.toFixed(2),
-            basis: 'stake',
-            contract_type: tradeState, // Use 'DIGITEVEN' for even and 'DIGITODD' for odd
-            currency: 'USD',
-            duration: tickCount,
-            duration_unit: 't',
-            symbol: market,
-        };
+            buy: 1,
+            price: newStake, // Stake amount
+            parameters: {
+                amount: newStake, // Stake amount
+                basis: 'stake', // Define stake basis
+                contract_type: 'ACCU', // Accumulator contract type
+                currency: 'USD', // Currency for trading
+                duration_unit: 't', // Tick duration
+                symbol: market, // Underlying market
+                growth_rate: percentageValue, // Choose one from growth_rate_range
+            },
+        }
+        ;
     
         // Send the trade request to the WebSocket
         console.log('Sending Rise/Fall trade request:', tradeRequest);

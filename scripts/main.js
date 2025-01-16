@@ -17,10 +17,13 @@ const marketSelectElement = document.getElementById("market");
 const scriptButton = document.getElementById("scriptButton");
 const infoOutput = document.getElementById("info_output");
 
+
+
 const stopLossInputElement = document.getElementById("stop_loss");
 const savingsElement = document.getElementById("savings");
 const targetProfitInputElement = document.getElementById("target_profit");
 const initialStakeInputElement = document.getElementById("initial_stake");
+const growthRateInputElement = document.getElementById("growth_rate");
 
 let stopLoss = 100;
 let targetProfit = 100;
