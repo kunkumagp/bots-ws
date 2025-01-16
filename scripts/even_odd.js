@@ -190,61 +190,13 @@ function startWebSocket() {
     
                         isTradeOpen = false;
 
-                        let t = 0;
+                        let t = getRandomNumber(5,15) * 1000; 
+                        // market = getRandomMarket(marketArray, market);
 
-                        if(curruntLoss < 0){
-
-                            if(lostCountInRow > 3){ 
-                                // t = getRandomNumber(10,60) * 1000; 
-                                // market = getRandomMarket(marketArray, market);
-                            }
-                            else if(lostCountInRow > 2){ 
-                                t = getRandomNumber(10,30) * 1000; 
-                                // market = getRandomMarket(marketArray, market); 
-                            }
-                            else if(lostCountInRow == 2){ 
-                                // t = getRandomNumber(2,15) * 1000; 
-                            }
-                            // t = getRandomNumber(2,8) * 1000; 
-
-                            setTimer(t);
-                            setTimeout(() => {
-                                reset();
-                            }, t);
-
-
-                            // if(lostCountInRow > 2){
-                            //     t = getRandomNumber(10,30) * 1000;
-                            //     market = getRandomMarket(marketArray, market);
-                            //     // marketSelectElement.value = market;
-                            //     setTimer(t);
-                            //     setTimeout(() => {
-                            //         reset();
-                            //     }, t);
-                            // } else if(lostCountInRow == 2){
-                            //     setTimer(t);
-                            //     setTimeout(() => {
-                            //         reset();
-                            //     }, t);
-                            // } else {
-                            //     reset();
-                            // }
-                            
-                        } else {
-                            if(currentProfitLossAmount >= profit10){
-                                // webSocketConnectionStop();
-                                t = getRandomNumber(120,180) * 1000; 
-                                setTimer(t);
-                                setTimeout(() => {
-                                    restart();
-                                }, t);
-                            } else {
-                                reset();
-                            }
-
-                            // reset();
-
-                        }
+                        setTimer(t);
+                        setTimeout(() => {
+                            reset();
+                        }, t);
 
                     }else{
                         setTimeout(() => {
@@ -294,11 +246,18 @@ function startWebSocket() {
             initialStake = 0.35;
         } else {
             initialStake = calculatedStake;
-            initialStakeInputElement.value = initialStake;
         }
+
+        if(initialStakeInputElement.value.length == 0){
+            initialStakeInputElement.value = initialStake;
+        } else {
+            initialStake = initialStakeInputElement.value;
+        }
+
         newStake = initialStake;
+
         console.log('newStake - ', newStake);
-        console.log('initialStake - ', initialStake);
+        console.log('initialStakeInputElement - ', initialStakeInputElement.value);
 
         // if(inputStake.length > 0){
         //     initialStake = initialStakeInputElement.value;
@@ -313,7 +272,9 @@ function startWebSocket() {
 
         // initialStakeInputElement.value = calculatedStake;
 
-        // initialStakeInputElement.value.length > 0 ? initialStake = initialStakeInputElement.value : initialStake = initialStake;
+        initialStakeInputElement.value.length > 0 ? initialStake = initialStakeInputElement.value : initialStake = initialStake;
+        console.log('initialStake - ', initialStake);
+
         currentProfitLossAmount = 0;
     };
 
