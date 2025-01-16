@@ -294,11 +294,18 @@ function startWebSocket() {
             initialStake = 0.35;
         } else {
             initialStake = calculatedStake;
-            initialStakeInputElement.value = initialStake;
         }
+
+        if(initialStakeInputElement.value.length == 0){
+            initialStakeInputElement.value = initialStake;
+        } else {
+            initialStake = initialStakeInputElement.value;
+        }
+
         newStake = initialStake;
+
         console.log('newStake - ', newStake);
-        console.log('initialStake - ', initialStake);
+        console.log('initialStakeInputElement - ', initialStakeInputElement.value);
 
         // if(inputStake.length > 0){
         //     initialStake = initialStakeInputElement.value;
@@ -313,7 +320,9 @@ function startWebSocket() {
 
         // initialStakeInputElement.value = calculatedStake;
 
-        // initialStakeInputElement.value.length > 0 ? initialStake = initialStakeInputElement.value : initialStake = initialStake;
+        initialStakeInputElement.value.length > 0 ? initialStake = initialStakeInputElement.value : initialStake = initialStake;
+        console.log('initialStake - ', initialStake);
+
         currentProfitLossAmount = 0;
     };
 
