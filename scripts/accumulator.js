@@ -78,10 +78,6 @@ function startWebSocket() {
     ws.onmessage = function (event) {
         response = JSON.parse(event.data);
 
-        console.log('response - ', response);
-
-       
-
         if(response != null){
 
             if (response.msg_type === 'authorize') {
@@ -136,9 +132,6 @@ function startWebSocket() {
                     const contract = response.proposal_open_contract;
                     const profit = contract.profit;
 
-                    console.log('profit - ', profit);
-                    console.log('targetProfit - ', targetProfit);
-
                     if(profit > targetProfit){
                         console.log(`Take Profit reached: ${profit}`);
                         closeContract(contract.contract_id);
@@ -173,7 +166,14 @@ function startWebSocket() {
 
                         let t = 0;
 
-                        reset();
+                        if(profit < 0){
+                            setTimeout(() => {
+                                reset();
+                            }, 500); 
+                        } else {
+                            reset();
+                        }
+                        
 
                     }else{
                         setTimeout(() => {
@@ -270,6 +270,9 @@ function startWebSocket() {
         if(status == "Loss"){
             newStake = newStake * martingaleMultiplier;
             targetProfit = newStake * targetProfit;
+            console.log('targetProfit - ', targetProfit);
+            console.log('newStake - ', newStake);
+
         } else if(status == "Win"){
             newStake = initialStake;
             targetProfit = targetProfitInputElement.value;
