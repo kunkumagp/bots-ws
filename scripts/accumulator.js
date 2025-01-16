@@ -41,10 +41,14 @@ function startWebSocket() {
     let newStake = 0;
     let curruntLoss = 0;
     let percentageValue = null;
+    initialStake = 1;
 
     apiToken = accountSelectElement.value;
     market = getRandomMarket(marketArray, market); 
     marketSelectElement.value = market;
+    newStake = initialStakeInputElement.value;
+
+    let targetProfit = targetProfitInputElement.value;
 
     percentageValue = growthRateInputElement.value;
 
@@ -69,6 +73,8 @@ function startWebSocket() {
     ws.onmessage = function (event) {
         response = JSON.parse(event.data);
 
+        console.log('response - ', response);
+
        
 
         if(response != null){
@@ -78,6 +84,13 @@ function startWebSocket() {
                 initialAccBalance = response.authorize.balance;
                 document.getElementById('initialAccBalance').innerHTML = `$${initialAccBalance}`;
                 localStorage.setItem("accountDetails", response.authorize);
+
+                profit10 = profitPercentageCalculate(initialAccBalance,10);
+                profit25 = profitPercentageCalculate(initialAccBalance,25);
+                profit50 = profitPercentageCalculate(initialAccBalance,50);
+                profit100 = profitPercentageCalculate(initialAccBalance,100);
+
+
                 // placeTrade(newStake);
                 placeTrade();
                
@@ -116,9 +129,17 @@ function startWebSocket() {
             if(response.msg_type === 'proposal_open_contract'){
                 if(response.proposal_open_contract.contract_id === lastTradeId){
                     const contract = response.proposal_open_contract;
+                    const profit = contract.profit;
+
+                    console.log('profit - ', profit);
+                    console.log('targetProfit - ', targetProfit);
+
+                    if(profit > targetProfit){
+                        console.log(`Take Profit reached: ${profit}`);
+                        closeContract(contract.contract_id);
+                    }
 
                     if (contract.is_sold) {
-                        const profit = contract.profit;
                         const result = profit > 0 ? 'Win' : 'Loss';
     
                         infoOutput.innerHTML += `Trade Result: <span style="color: ${profit > 0 ? 'green' : 'red'}; font-weight: 900;">${result}</span>, Profit: <span style="color: ${profit > 0 ? 'green' : 'red'}; font-weight: 900;">$${profit.toFixed(2)}</span>\n-------------------------------------\n`;
@@ -170,6 +191,15 @@ function startWebSocket() {
         ws.send(JSON.stringify({ authorize: apiToken }));
     };
 
+    const closeContract = (contractId) => {
+        const sellRequest = {
+            sell: contractId,
+            price: 0, // Accept any price (market sell)
+        };
+    
+        console.log('Closing contract:', sellRequest);
+        ws.send(JSON.stringify(sellRequest));
+    };
 
     const placeTrade = () => {
        
@@ -227,7 +257,7 @@ function startWebSocket() {
     }
 
     const reset = (time) => {
-        requestTicksHistory(market);
+        placeTrade();
     };
 
     const restart = () => {
