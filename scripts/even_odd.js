@@ -302,27 +302,13 @@ function startWebSocket() {
             initialStake = initialStakeInputElement.value;
         }
 
-        newStake = initialStake;
 
-        console.log('newStake - ', newStake);
-        console.log('initialStakeInputElement - ', initialStakeInputElement.value);
-
-        // if(inputStake.length > 0){
-        //     initialStake = initialStakeInputElement.value;
-        // } else {
-        //     if(calculatedStake < 1){
-        //         initialStake = 0.35;
-        //     } else {
-        //         initialStake = calculatedStake;
-        //         initialStakeInputElement.value = initialStake;
-        //     }
-        // }
-
-        // initialStakeInputElement.value = calculatedStake;
 
         initialStakeInputElement.value.length > 0 ? initialStake = initialStakeInputElement.value : initialStake = initialStake;
         console.log('initialStake - ', initialStake);
-
+        newStake = initialStake;
+        console.log('newStake - ', newStake);
+        console.log('initialStakeInputElement - ', initialStakeInputElement.value);
         currentProfitLossAmount = 0;
     };
 
@@ -336,7 +322,7 @@ function startWebSocket() {
     const placeTrade = (digitArray, newStake) => {
         // let nextNumberIs = predictNexrEvenOdd(digitArray);
         let tradeState = '';
-        tickCount = getRandomNumber(5, 10);
+        tickCount = getRandomNumber(5, 8);
         // nextNumberIs == 'even' ? tradeState = 'DIGITEVEN' : 'DIGITODD';
 
         // if(nextNumberIs == 'even'){
