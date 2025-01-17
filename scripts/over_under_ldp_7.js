@@ -34,7 +34,7 @@ function webSocketConnectionStop(){
 function startWebSocket() {
     ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=1089");
     let response = null, tradeProposal, lastTradeId ;
-    const martingaleValue = 2.5;
+    const martingaleValue = 2.6;
     const predictionDigits = [7, 8, 9];
 
     apiToken = accountSelectElement.value;

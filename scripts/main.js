@@ -29,6 +29,7 @@ let stopLoss = 100;
 let targetProfit = 100;
 let initialStake = 0.35;
 let newAccBalance = 0;
+let percentageValue = 0;
 
 let initialAccBalance = 0, 
     totalTradeCount = 0,
@@ -455,6 +456,7 @@ function analyzeMarketsWithHistory(callback) {
 function runMarketAnalysisWithHistory() {
   analyzeMarketsWithHistory((result) => {
       market = result.mostStable.market;
+      mostStableMarket = result.mostStable.market;
       // infoOutput.innerHTML += `Most Stable Market: ${result.mostStable.market}, Volatility: ${result.mostStable.volatility}\n`;
       // infoOutput.innerHTML += `Most Volatile Market: ${result.mostVolatile.market}, Volatility: ${result.mostVolatile.volatility}\n`;
   });

@@ -5,6 +5,11 @@ targetProfitInputElement.addEventListener('change', ()=>{
 });
 
 
+growthRateInputElement.addEventListener('change', ()=>{
+    percentageValue = growthRateInputElement.value;
+});
+
+
 scriptButton.addEventListener('click', runScript);
 
 function runScript() {
@@ -44,7 +49,7 @@ function startWebSocket() {
     // initialStakeInputElement.value = 1;
     let newStake = 0;
     let curruntLoss = 0;
-    let percentageValue = null;
+    let mostStableMarket = null;
     initialStake = 1;
 
     apiToken = accountSelectElement.value;
@@ -102,7 +107,7 @@ function startWebSocket() {
 
                 setTimeout(() => {
                     placeTrade();
-                }, 5000);
+                }, 10000);
             }
 
 
@@ -162,7 +167,7 @@ function startWebSocket() {
                             lostCountInRow = lostCountInRow + 1;
                         }
 
-                        stakeChange(result);
+                        stakeChange(curruntLoss);
 
                         reportUpdate(totalTradeCount, winTradeCount, lossTradeCount, totalProfitAmount, totalLossAmount, currentProfitLossAmount, curruntLoss, initialAccBalance);
                         newAccBalance = initialAccBalance + currentProfitLossAmount;
@@ -170,6 +175,10 @@ function startWebSocket() {
                         isTradeOpen = false;
 
                         let t = 0;
+
+                        if(lostCountInRow >= 2){
+                            runMarketAnalysisWithHistory();
+                        }
 
                         if(profit < 0){
                             setTimeout(() => {
@@ -189,11 +198,7 @@ function startWebSocket() {
             };
 
 
-
-
         }
-
-        runMarketAnalysisWithHistory();
 
 
     };
@@ -274,18 +279,20 @@ function startWebSocket() {
     };
 
 
-    const stakeChange = (status) => {
-        if(status == "Loss"){
-            newStake = newStake * martingaleMultiplier;
-            targetProfit = newStake * targetProfit;
-            console.log('targetProfit - ', targetProfit);
-            console.log('newStake - ', newStake);
-
-        } else if(status == "Win"){
+    const stakeChange = (curruntLoss) => {
+        if(curruntLoss < 0){
+            // newStake = newStake * martingaleMultiplier;
+            // targetProfit = newStake * targetProfit;
+            // 
+            newStake = initialStake * 5;
+            targetProfit = newStake * targetProfitInputElement.value;
+        } else {
             newStake = initialStake;
             targetProfit = targetProfitInputElement.value;
-            // setNewStake();
         }
+        console.log('curruntLoss - ', curruntLoss);
+        console.log('newStake - ', newStake);
+        console.log('targetProfit - ', targetProfit);
         
     };
 
