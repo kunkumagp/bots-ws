@@ -7,7 +7,7 @@ body {
   max-width: 400px;
   /* margin: auto; */
   display: grid;
-  row-gap: 20px;
+  row-gap: 10px;
 }
 
 pre,
@@ -82,17 +82,90 @@ pre,
   bottom: 25%;
 }
 
-.countdownlabel .text ,
+.countdownlabel .text,
 .tickCountLabel .text {
   color: #676767;
 }
-.countdownlabel .number ,
+.countdownlabel .number,
 .tickCountLabel .number {
   font-size: 48px;
   color: #9a9a9a;
 }
 
-.percentage{
+.percentage {
   font-weight: 900;
   color: green;
+}
+
+@media screen and (max-width: 991px) {
+  .params {
+    max-width: unset;
+    display: grid;
+    row-gap: 10px;
+  }
+}
+
+.account-info,
+.result-notification {
+  background-color: rgb(52, 52, 52);
+  border: none;
+  color: #fff;
+  padding: 9.5px;
+}
+
+.account-info .field {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.line-break {
+  border-bottom: 1px #fff;
+  border-bottom-style: dashed;
+  margin: 10px 0;
+}
+
+.flash-notification {
+  height: 30px;
+  padding: 40px 0;
+  color: #676767;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.flash-notification .number {
+  font-size: 24px;
+  color: #9a9a9a;
+  margin: 0 10px;
+}
+
+.result-notification .stake-info {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px;
+  border: 1px solid #373737;
+}
+
+.result-notification .stake-info:hover {
+  background-color: #373737;
+  cursor: pointer;
+}
+
+.result-notification .stake-info .detailt {
+  color: #8e8e8e;
+}
+
+.result-notification .stake-info .detailt .contract-info {
+  color: #cdcdcd;
+}
+
+.result-notification .stake-info .detailt .contract-info .green {
+  color: #00d300;
+  font-weight: 900;
+}
+
+.result-notification .stake-info .detailt .contract-info .red {
+  color: #d30000;
+  font-weight: 900;
 }

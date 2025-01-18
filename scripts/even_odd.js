@@ -85,6 +85,7 @@ function startWebSocket() {
     };
 
     ws.onclose = function () {
+        setTimer(0);
         console.log('Connection closed');
         infoOutput.innerHTML += 'Connection closed\n-----------------------------\n\n';
         console.log('-----------------------------\n');
@@ -99,9 +100,6 @@ function startWebSocket() {
     ws.onmessage = function (event) {
         response = JSON.parse(event.data);
 
-        // console.log('response - ', response);
-       
-
         if(response != null){
 
             if (response.msg_type === 'authorize') {
@@ -110,9 +108,7 @@ function startWebSocket() {
                 document.getElementById('initialAccBalance').innerHTML = `$${initialAccBalance}`;
                 localStorage.setItem("accountDetails", response.authorize);
                 resetParams();
-                // placeTrade(newStake);
                
-                // setNewStake();
                 requestTicksHistory(market);    
 
             }
@@ -193,13 +189,14 @@ function startWebSocket() {
                         let t = 0;
 
                         if(curruntLoss < 0){
+                            t = 2000; 
 
                             if(lostCountInRow > 3){ 
-                                // t = getRandomNumber(10,60) * 1000; 
+                                t = getRandomNumber(30,120) * 1000; 
                                 // market = getRandomMarket(marketArray, market);
                             }
                             else if(lostCountInRow > 2){ 
-                                t = getRandomNumber(10,30) * 1000; 
+                                // t = getRandomNumber(10,30) * 1000; 
                                 // market = getRandomMarket(marketArray, market); 
                             }
                             else if(lostCountInRow == 2){ 
@@ -233,13 +230,18 @@ function startWebSocket() {
                         } else {
                             if(currentProfitLossAmount >= profit10){
                                 // webSocketConnectionStop();
-                                t = getRandomNumber(120,180) * 1000; 
+                                // t = getRandomNumber(120,180) * 1000; 
+                                t = 10 * 1000; 
                                 setTimer(t);
                                 setTimeout(() => {
                                     restart();
                                 }, t);
                             } else {
-                                reset();
+                                t = 2000; 
+                                setTimer(t);
+                                setTimeout(() => {
+                                    reset();
+                                }, t);
                             }
 
                             // reset();
@@ -266,9 +268,18 @@ function startWebSocket() {
         let capital = null;
 
         if(savingsElement.value.length > 0){
-            capital = initialAccBalance - savingsElement.value;
+
+            console.log('initialAccBalance - ', initialAccBalance);
+            console.log('reduse amount - ', (initialAccBalance * (savingsElement.value / 100)));
+
+            let reduseBalance = initialAccBalance - (initialAccBalance * (savingsElement.value / 100)) ;
+            capital = reduseBalance * (5/100);
+
+            console.log('capital - ', capital);
+
         } else {
-            capital = initialAccBalance;
+            // capital = initialAccBalance;
+            capital = initialAccBalance * (5/100);
         }
         market = marketSelectElement.value;
         // stopLossInputElement.value.length > 0 ?  stopLoss = stopLossInputElement.value:stopLoss = stopLoss;
@@ -290,14 +301,22 @@ function startWebSocket() {
 
         console.log('calculatedStake - ', calculatedStake);
         
-        if(calculatedStake < 0.35){
-            initialStake = 0.35;
-        } else {
-            initialStake = calculatedStake;
-        }
+        // if(calculatedStake < 0.35){
+        //     initialStake = 0.35;
+        // } else {
+        //     initialStake = calculatedStake;
+        // }
+
+        // initialStake = Math.floor(profit10);
+
+        // console.log('profit10 - ', profit10);
+        // console.log('initialStake - ', profit10);
+        // console.log('initialStake - ', (profit10).toFixed(2) );
+
+        initialStake = profitPercentageCalculate(capital,11).toFixed(2);
 
         if(initialStakeInputElement.value.length == 0){
-            initialStakeInputElement.value = initialStake;
+            // initialStakeInputElement.value = initialStake;
         } else {
             initialStake = initialStakeInputElement.value;
         }
@@ -306,7 +325,7 @@ function startWebSocket() {
 
         initialStakeInputElement.value.length > 0 ? initialStake = initialStakeInputElement.value : initialStake = initialStake;
         console.log('initialStake - ', initialStake);
-        newStake = initialStake;
+        initialStake < 0.35 ? newStake = 0.35 : newStake = initialStake;
         console.log('newStake - ', newStake);
         console.log('initialStakeInputElement - ', initialStakeInputElement.value);
         currentProfitLossAmount = 0;
@@ -344,6 +363,7 @@ function startWebSocket() {
 
 
         newStake = Number(newStake);
+        tickCount = 1;
 
         const tradeRequest = {
             proposal: 1,
@@ -392,15 +412,19 @@ function startWebSocket() {
     }
 
     const reset = (time) => {
-        requestTicksHistory(market);
+        if(isRunning){
+            requestTicksHistory(market);
+        }
     };
 
     const restart = () => {
-
-        webSocketConnectionStop();
-        setTimeout(() => {
-            webSocketConnectionStart();
-        }, 1000);
+        if(isRunning){
+            webSocketConnectionStop();
+            setTimeout(() => {
+                webSocketConnectionStart();
+            }, 1000);
+        }
+        
     };
 
     const stakeChange = (status) => {

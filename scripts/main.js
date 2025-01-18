@@ -1,5 +1,6 @@
 const accounts = [
   { name: "KunkumaGP", value: "lkUxtOopvUhCpIX" },
+  { name: "KUNKUMAGP Real", value: "Y71P0GIOxz3YYvr" },
   { name: "Kunkuma Trading", value: "hJfU1x5xpoSTwHe" },
   { name: "W H K G Prasanna 85", value: "iVOpdm24hBhw3JI" }
 ];
@@ -90,21 +91,28 @@ initialStakeInputElement.addEventListener("change", () => {
 
 function setTimer(time) {
   var timeleft = time / 1000;
-  var downloadTimer = setInterval(function () {
-    if (timeleft <= 0) {
-      clearInterval(downloadTimer);
-      document.getElementById("countdown").innerHTML = "Now";
-      $(".countdownlabel").removeClass("show");
-      $(".countdownlabel").addClass("hide");
-    } else {
-      $(".countdownlabel").removeClass("hide");
-      $(".countdownlabel").addClass("show");
-      $(".tickCountLabel").removeClass("show");
-      $(".tickCountLabel").addClass("hide");
-      document.getElementById("countdown").innerHTML = timeleft;
-    }
-    timeleft -= 1;
-  }, 1000);
+  if(time == 0){
+    timeleft = 0;
+    $(".countdownlabel").removeClass("show");
+    $(".countdownlabel").addClass("hide");
+  } else {
+    var downloadTimer = setInterval(function () {
+      if (timeleft <= 0) {
+        clearInterval(downloadTimer);
+        document.getElementById("countdown").innerHTML = "Now";
+        $(".countdownlabel").removeClass("show");
+        $(".countdownlabel").addClass("hide");
+      } else {
+        $(".countdownlabel").removeClass("hide");
+        $(".countdownlabel").addClass("show");
+        $(".tickCountLabel").removeClass("show");
+        $(".tickCountLabel").addClass("hide");
+        document.getElementById("countdown").innerHTML = timeleft;
+      }
+      timeleft -= 1;
+    }, 1000);
+  }
+  
 }
 
 function setTickCountDown(tickCount, tick) {
