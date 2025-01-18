@@ -180,7 +180,7 @@ function startWebSocket() {
                         let t = 0;
 
                         if(curruntLoss < 0){
-                            t = 2000; 
+                            t = getRandomNumber(1,5) * 1000; 
 
                             if(lostCountInRow > 3){ 
                                 t = getRandomNumber(30,120) * 1000; 
