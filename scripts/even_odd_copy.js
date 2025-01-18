@@ -105,7 +105,6 @@ function startWebSocket() {
                         tradeType = "Odd";
                     }
 
-                    // infoOutput.innerHTML += `Trade started:\nContract ID = ${lastTradeId}, Stake = ${response.buy.buy_price}, Market = ${market}, Teade Type = ${tradeType}\n`;
                     setResultNotification(
                         lastTradeId,
                         tradeType,
