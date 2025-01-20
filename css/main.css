@@ -145,6 +145,7 @@ pre,
   justify-content: space-between;
   padding: 10px;
   border: 1px solid #373737;
+  overflow: auto;
 }
 
 .result-notification .stake-info:hover {
@@ -160,12 +161,12 @@ pre,
   color: #cdcdcd;
 }
 
-.result-notification .stake-info .detailt .contract-info .green {
+.green {
   color: #00d300;
-  font-weight: 900;
+  font-weight: 700;
 }
 
-.result-notification .stake-info .detailt .contract-info .red {
+.red {
   color: #d30000;
-  font-weight: 900;
+  font-weight: 700;
 }
