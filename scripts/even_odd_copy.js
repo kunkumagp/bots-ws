@@ -300,7 +300,7 @@ function startWebSocket() {
                             if (currentProfitAmount >= targetAmount) {
                                 resetSubValues();
                                 // t = 60000 * 60;
-                                t = 20000;
+                                t = 60000 * 15;
                                 setTimer(t);
                                 setTimeout(() => {
                                     restartTheBot();
@@ -399,8 +399,8 @@ function startWebSocket() {
         // initialStake < 0.35 ? (newStake = 0.35) : (newStake = initialStake);
 
         fullAmount = Math.floor(updatedAccountBalance);
-        targetAmount = Math.floor(((fullAmount / 100).toFixed(2) * 2));
-        amountForTrading = Math.floor(((fullAmount / 100).toFixed(2) * 1.5));
+        targetAmount = Math.floor(((fullAmount / 100).toFixed(2) * 5));
+        amountForTrading = Math.floor(((fullAmount / 100).toFixed(2) * 3));
 
         console.log('updatedAccountBalance - ', fullAmount );
         console.log('targetAmount - ', targetAmount);
@@ -409,7 +409,9 @@ function startWebSocket() {
         setAccountInfo("amountPutForTrading", `$ ${fullAmount}`);
         setAccountInfo("percentage10", `$ ${targetAmount}`);
 
-        newStake = amountForTrading;
+        amountForTrading < 0.35 ? (newStake = 0.35) : (newStake = amountForTrading);
+
+        // newStake = amountForTrading;
 
     }
 
