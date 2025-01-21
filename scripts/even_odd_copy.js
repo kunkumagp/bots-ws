@@ -12,6 +12,8 @@ let fullAmount = 0;
 let targetAmount = 0;
 let amountForTrading = 0;
 
+let automation = false;
+
 apiToken = 'iVOpdm24hBhw3JI';
 
 
@@ -68,6 +70,9 @@ function startWebSocket() {
         console.log("Connection closed");
         setFlashNotification("Connection closed", 0);
         console.log("-----------------------------\n");
+        if(automation){
+            webSocketConnectionStart();
+        }
     };
 
     ws.onerror = function (err) {
@@ -147,6 +152,8 @@ function startWebSocket() {
                     // setAccountInfo('percentage10', `$ ${targetProfit.toFixed(2)}`)
                     console.log("Trade Successful:", response);
                     // scrollToBottom();
+
+                    automation = true;
 
                     setTimeout(() => {
                         fetchTradeDetails(lastTradeId);
