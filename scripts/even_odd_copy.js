@@ -70,9 +70,7 @@ function startWebSocket() {
         console.log("Connection closed");
         setFlashNotification("Connection closed", 0);
         console.log("-----------------------------\n");
-        if(automation){
-            webSocketConnectionStart();
-        }
+        
     };
 
     ws.onerror = function (err) {
@@ -289,7 +287,7 @@ function startWebSocket() {
                                 // t = getRandomNumber(30, 120) * 1000;
                                 // market = getRandomMarket(marketArray, market);
                             } else if (lostCountInRow > 2) {
-                                t = getRandomNumber(10,30) * 1000;
+                                t = getRandomNumber(5,15) * 1000;
                                 market = getRandomMarket(marketArray, market);
                             } else if (lostCountInRow == 2) {
                                 // t = getRandomNumber(2,15) * 1000;
@@ -375,6 +373,10 @@ function startWebSocket() {
 
         setAccountInfo("currentProfitAmount", `-`);
         setAccountInfo("currentLossAmount", `-`);
+
+        if(automation){
+            webSocketConnectionStart();
+        }
         
     };
 
