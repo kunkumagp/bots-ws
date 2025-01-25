@@ -71,7 +71,9 @@ function startWebSocket() {
         console.log("Connection closed");
         setFlashNotification("Connection closed", 0);
         console.log("-----------------------------\n");
-        
+        setTimeout(() => {
+            startWebSocket();
+        }, 5000);
     };
 
     ws.onerror = function (err) {
@@ -208,8 +210,8 @@ function startWebSocket() {
 
                         updatedAccountBalance = updatedAccountBalance + profit;
 
-                        console.log('initialAccBalance - ', initialAccBalance);
-                        console.log('updatedAccountBalance - ', updatedAccountBalance);
+                        // console.log('initialAccBalance - ', initialAccBalance);
+                        // console.log('updatedAccountBalance - ', updatedAccountBalance);
 
 
                         let updatedAccountBalanceDisplay = null;
@@ -283,58 +285,75 @@ function startWebSocket() {
                         stakeChange(result);
 
                         isTradeOpen = false;
-                        let t = 0;
+                        let t = 3000;
 
-                        if (currentLossAmount < 0) {
-                            // t = getRandomNumber(1, 5) * 1000;
+                        // if (currentLossAmount < 0) {
+                        //     // t = getRandomNumber(1, 5) * 1000;
 
-                            // if (lostCountInRow > 3) {
-                            //     // t = getRandomNumber(30, 120) * 1000;
-                            //     // market = getRandomMarket(marketArray, market);
-                            // } else if (lostCountInRow > 2) {
-                            //     // t = getRandomNumber(5,15) * 1000;
-                            //     t = 5000
-                            //     market = getRandomMarket(marketArray, market);
-                            // } else if (lostCountInRow == 2) {
-                            //     // t = getRandomNumber(2,15) * 1000;
-                            // }
+                        //     // if (lostCountInRow > 3) {
+                        //     //     // t = getRandomNumber(30, 120) * 1000;
+                        //     //     // market = getRandomMarket(marketArray, market);
+                        //     // } else if (lostCountInRow > 2) {
+                        //     //     // t = getRandomNumber(5,15) * 1000;
+                        //     //     t = 5000
+                        //     //     market = getRandomMarket(marketArray, market);
+                        //     // } else if (lostCountInRow == 2) {
+                        //     //     // t = getRandomNumber(2,15) * 1000;
+                        //     // }
 
 
-                            if (lostCountInRow > 2) {
-                                t = 5000
-                                market = getRandomMarket(marketArray, market);
-                            }
+                        //     if (lostCountInRow > 2) {
+                        //         t = 5000
+                        //         market = getRandomMarket(marketArray, market);
+                        //     }
 
+                        //     setTimer(t);
+                        //     setTimeout(() => {
+                        //         // restart();
+                        //         // resetSubValues();
+                        //         // resetParams();
+                        //         // requestTicksHistory();
+                        //         placeTrade();
+                        //     }, t);
+                        // } else {
+                        //     if (currentProfitAmount >= targetAmount) {
+                        //         let minutes = 5
+                        //         console.log(`Wait for ${minutes} minutes...`);
+                        //         resetSubValues();
+                        //         // t = 60000 * 60;
+                        //         let newTime = (60000 * minutes);
+                        //         setTimer(newTime);
+                        //         setTimeout(() => {
+                        //             restartTheBot();
+                        //         }, newTime);
+                        //     } else {
+                        //         // t = 2000;
+                        //         resetSubValues();
+                        //         console.log('New trade....');
+
+                        //         setTimer(t);
+                        //         setTimeout(() => {
+                        //             restart();
+                        //         }, t);
+                        //     }
+                        // }
+
+                        if (profit < 0) {
+                            market = getRandomMarket(marketArray, market);
+                            console.log('new market - ', market);
+                            
+                            t = getRandomNumber(5, 15) * 1000;
                             setTimer(t);
                             setTimeout(() => {
-                                // restart();
-                                // resetSubValues();
-                                // resetParams();
-                                // requestTicksHistory();
                                 placeTrade();
                             }, t);
                         } else {
-                            if (currentProfitAmount >= targetAmount) {
-                                let minutes = 5
-                                console.log(`Wait for ${minutes} minutes...`);
-                                resetSubValues();
-                                // t = 60000 * 60;
-                                let newTime = (60000 * minutes);
-                                setTimer(newTime);
-                                setTimeout(() => {
-                                    restartTheBot();
-                                }, newTime);
-                            } else {
-                                // t = 2000;
-                                resetSubValues();
-                                console.log('New trade....');
-
-                                setTimer(t);
-                                setTimeout(() => {
-                                    restart();
-                                }, t);
-                            }
+                            setTimer(t);
+                            setTimeout(() => {
+                                placeTrade();
+                            }, t);
                         }
+
 
                     } else {
                         setTimeout(() => {
@@ -351,11 +370,15 @@ function startWebSocket() {
     };
 
     const stakeChange = (status) => {
+        // console.log('last trade status - ', status);
+        
         if (status == "Loss") {
             newStake = newStake * martingaleMultiplier;
         } else if (status == "Win") {
             newStake = initialStake;
         }
+        // console.log('new stake - ', newStake);
+
     };
 
     const fetchTradeDetails = (contractId) => {
@@ -427,7 +450,7 @@ function startWebSocket() {
 
         const targets = calculateTargets(fullAmount, fullAmount);
 
-        console.log(targets);
+        // console.log(targets);
 
         if(targets.length > 0){
             // targetAmount = Math.floor(((fullAmount / 100).toFixed(2) * 5));
@@ -444,11 +467,11 @@ function startWebSocket() {
         targetProfitInputElement.value > 0 ? targetAmount = targetProfitInputElement.value : targetAmount = autoGeneratedTargetAmount;
         initialStakeInputElement.value > 0 ? amountForTrading = initialStakeInputElement.value : amountForTrading = autoGeneratedAmountForTrading;
 
-        console.log(targets);
+        // console.log(targets);
 
-        console.log('updatedAccountBalance - ', fullAmount );
-        console.log('targetAmount - ', targetAmount);
-        console.log('amountForTrading - ', amountForTrading);
+        // console.log('updatedAccountBalance - ', fullAmount );
+        // console.log('targetAmount - ', targetAmount);
+        // console.log('amountForTrading - ', amountForTrading);
 
         setAccountInfo("amountPutForTrading", `$ ${fullAmount}`);
         setAccountInfo("percentage10", `$ ${targetAmount}`);
@@ -461,7 +484,7 @@ function startWebSocket() {
 
 
     function calculateTargets(capital, maxValue) {
-        console.log(capital, maxValue);
+        // console.log(capital, maxValue);
         const results = [];
         let rangeStart = 200;
         const increment = 200;
@@ -522,8 +545,8 @@ function startWebSocket() {
             }
 
             newStake = Number(newStake);
-            // tickCount = 1;
-            tickCount = getRandomNumber(5, 8);
+            tickCount = 1;
+            // tickCount = getRandomNumber(5, 8);
 
             const tradeRequest = {
                 proposal: 1,
