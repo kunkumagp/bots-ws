@@ -315,7 +315,7 @@ function startWebSocket() {
                             }, t);
                         } else {
                             if (currentProfitAmount >= targetAmount) {
-                                let minutes = 5
+                                let minutes = 30;
                                 console.log(`Wait for ${minutes} minutes...`);
                                 resetSubValues();
                                 // t = 60000 * 60;
