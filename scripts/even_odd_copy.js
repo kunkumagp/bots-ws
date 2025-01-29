@@ -286,54 +286,17 @@ function startWebSocket() {
                         let t = 0;
 
                         if (currentLossAmount < 0) {
-                            // t = getRandomNumber(1, 5) * 1000;
-
-                            // if (lostCountInRow > 3) {
-                            //     // t = getRandomNumber(30, 120) * 1000;
-                            //     // market = getRandomMarket(marketArray, market);
-                            // } else if (lostCountInRow > 2) {
-                            //     // t = getRandomNumber(5,15) * 1000;
-                            //     t = 5000
-                            //     market = getRandomMarket(marketArray, market);
-                            // } else if (lostCountInRow == 2) {
-                            //     // t = getRandomNumber(2,15) * 1000;
-                            // }
-
-
-                            if (lostCountInRow > 2) {
-                                t = 5000
-                                market = getRandomMarket(marketArray, market);
-                            }
+                            t = getRandomNumber(1, 5) * 1000;
 
                             setTimer(t);
                             setTimeout(() => {
-                                // restart();
-                                // resetSubValues();
-                                // resetParams();
-                                // requestTicksHistory();
                                 placeTrade();
                             }, t);
                         } else {
-                            if (currentProfitAmount >= targetAmount) {
-                                let minutes = 30;
-                                console.log(`Wait for ${minutes} minutes...`);
-                                resetSubValues();
-                                // t = 60000 * 60;
-                                let newTime = (60000 * minutes);
-                                setTimer(newTime);
-                                setTimeout(() => {
-                                    restartTheBot();
-                                }, newTime);
-                            } else {
-                                // t = 2000;
-                                resetSubValues();
-                                console.log('New trade....');
-
-                                setTimer(t);
-                                setTimeout(() => {
-                                    restart();
-                                }, t);
-                            }
+                            setTimer(t);
+                            setTimeout(() => {
+                                restart();
+                            }, t);
                         }
 
                     } else {
@@ -522,8 +485,8 @@ function startWebSocket() {
             }
 
             newStake = Number(newStake);
-            // tickCount = 1;
-            tickCount = getRandomNumber(5, 8);
+            tickCount = 1;
+            // tickCount = getRandomNumber(1, 3);
 
             const tradeRequest = {
                 proposal: 1,
