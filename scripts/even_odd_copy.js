@@ -1,7 +1,8 @@
 let isRunning = false,
     intervalId;
 
-const martingaleMultiplier = 2.07112;
+// const martingaleMultiplier = 2.07112;
+const martingaleMultiplier = 1.9;
 let tradeType = "even";
 let tradingCapital = 0;
 let tradeProposal, lastTradeId;
@@ -301,7 +302,7 @@ function startWebSocket() {
 
 
                             if (lostCountInRow > 2) {
-                                t = 5000
+                                t = 60000
                                 market = getRandomMarket(marketArray, market);
                             }
 
@@ -315,7 +316,7 @@ function startWebSocket() {
                             }, t);
                         } else {
                             if (currentProfitAmount >= targetAmount) {
-                                let minutes = 5
+                                let minutes = 1
                                 console.log(`Wait for ${minutes} minutes...`);
                                 resetSubValues();
                                 // t = 60000 * 60;
