@@ -41,6 +41,14 @@ pre,
   padding: 5px 15px;
 }
 
+.btn[disabled],
+.btn[disabled]:hover
+{
+  background-color: rgb(33 33 33);
+  border: none !important;
+  color: #808080;
+}
+
 .hide {
   display: none;
   transition: all 1s ease-out;
