@@ -25,8 +25,8 @@ const martingaleMultiplier = 2.07112;
 
 let isRunning = false, intervalId;
 
-let targetPercentage = 1;
-let amountPercentage = 1.5;
+let targetPercentage = 5;
+let amountPercentage = 6;
 
 let initialAccountBalance = 0;
 let updatedAccountBalance = 0;
@@ -58,9 +58,11 @@ let authSuccess = false;
 let isTradeOpen = false;
 let automation = false;
 let tradeProposal = null;
+let connectionOpen = false;
+let isBotRunning = false;
 
 let stopTimer = false;
-let ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=1089");
+let ws;
 
 accounts.forEach((item) => {
     const option = document.createElement("option");
@@ -87,27 +89,42 @@ accountSelectElement.addEventListener("change", () => {
 
 market = marketSelectElement.value;
 
-ws.onopen = function () {
-    console.log("Connection open");
-    getAuthentication();
 
-};
+authenticateButton.addEventListener("click", authenticate);
+if(isBotRunning){
+    scriptButton.addEventListener("click", stopBot);
+} else {
+    scriptButton.addEventListener("click", botRun);
+}
 
-ws.onclose = function () {
-    console.log("Connection closed");
-    console.log("-----------------------------\n");
-};
+ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=1089");
 
-ws.onerror = function (err) {
-    console.error("WebSocket error:", err);
-};
 
-ws.onmessage = function (event) {
+function authenticate() {
 
-    if(isWithinTimeRange()){
-        wsResponse = JSON.parse(event.data);
+    ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=1089");
 
-        if (wsResponse != null) {
+    if(!connectionOpen){
+
+        ws.onopen = function () {
+            console.log("Connection open");
+            getAuthentication();
+        };
+
+        ws.onclose = function () {
+            console.log("Connection closed");
+            console.log("-----------------------------\n");
+            console.log(connectionOpen);
+            connectionOpen = false;
+        };
+
+        ws.onerror = function (err) {
+            console.error("WebSocket error:", err);
+        };
+
+        ws.onmessage = function (event) {
+            wsResponse = JSON.parse(event.data);
+
             if (wsResponse.msg_type === "authorize") {
                 console.log("Authorization successful.\n-----------------------------\n\n");
                 setFlashNotification("Authorization successful", 0);
@@ -117,13 +134,47 @@ ws.onmessage = function (event) {
                 authSuccess = true;
                 authenticateButton.innerHTML = "Authenticated. Ready to trade.";
                 authenticateButton.disabled = true;
+                connectionOpen = true;
                 resetParams();
                 // scriptButton.innerHTML = "Bot started....";
                 // placeTrade();
-                runScript();
+                // runScript();
+
+                if(automation){
+                    botRun();
+                }
             }
+        }
+    }
 
 
+}
+
+function stopBot() {
+    connectionOpen = false;
+    scriptButton.innerHTML = "Start Bot";
+    authenticateButton.innerHTML = "Authenticate.";
+    authenticateButton.disabled = false;
+
+}
+
+function botRun() {
+    automation = true;
+
+
+    if(connectionOpen){
+
+        scriptButton.innerHTML = "Bot is running...";
+        // scriptButton.disabled = true;
+
+
+        runScript();
+
+        ws.onmessage = function (event) {
+            wsResponse = JSON.parse(event.data);
+
+            // console.log('wsResponse - ', wsResponse);
+            
             if (wsResponse.msg_type === "proposal") {
                 if (
                     updatedAccountBalance > 0 &&
@@ -229,11 +280,13 @@ ws.onmessage = function (event) {
             }
 
         }
+    } else {
+        authenticate();
     }
+}
 
-};
 
-const getAuthentication = () => {
+function getAuthentication(){
     setFlashNotification("Authenticating....", 0);
     console.log("Authenticating....");
     ws.send(JSON.stringify({ authorize: apiToken }));
@@ -301,6 +354,9 @@ const placeTrade = (result = null) => {
         onTradeCount = 1;
         // Send the trade request to the WebSocket
         console.log("Sending Rise/Fall trade request:", tradeRequest);
+
+        console.log('ws - ', ws);
+        
         ws.send(JSON.stringify(tradeRequest));
     }
 };
@@ -332,7 +388,14 @@ function runScript() {
 }
 
 function reload() {
-    location.reload();
+    // location.reload();
+    if(connectionOpen){
+        placeTrade();
+    } else {
+        console.log('connectionOpen - ', connectionOpen);
+        
+        authenticate();
+    }
 }
 
 function reserParams() {
@@ -363,13 +426,10 @@ function reserParams() {
     setAccountInfo("currentLossAmount", `${currentLossAmountDisplay}`);
 }
 
-function resetParams() {
-    targetAmount =  (initialAccountBalance * (targetPercentage / 100)).toFixed(2);
-    setAccountInfo("targetAmount", `$ ${targetAmount}`);
-    amountPutForTrading = (initialAccountBalance * (amountPercentage / 100)).toFixed(2);
-    setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
-    stake = amountPutForTrading;
-}
+
+
+
+
 
 function weClose() {
     if (ws) {
@@ -378,8 +438,13 @@ function weClose() {
     }
 }
 
-
-
+function resetParams() {
+    targetAmount =  (initialAccountBalance * (targetPercentage / 100)).toFixed(2);
+    setAccountInfo("targetAmount", `$ ${targetAmount}`);
+    amountPutForTrading = (initialAccountBalance * (amountPercentage / 100)).toFixed(2);
+    setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
+    stake = amountPutForTrading;
+}
 
 
 function setFlashNotification(message, timeInSeconds) {
@@ -600,11 +665,4 @@ function getRandomNumber(min, max) {
         throw new Error("Min value must be less than or equal to Max value");
     }
     return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-function isWithinTimeRange() {
-    const now = new Date();
-    const hour = now.getHours(); // Get current hour (0-23)
-
-    return hour >= 5 && hour < 16; // Returns true if between 5 AM and 4 PM
 }
