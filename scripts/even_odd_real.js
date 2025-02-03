@@ -606,5 +606,5 @@ function isWithinTimeRange() {
     const now = new Date();
     const hour = now.getHours(); // Get current hour (0-23)
 
-    return hour >= 5 && hour < 16; // Returns true if between 5 AM and 4 PM
+    return hour >= 5 && hour < 18; // Returns true if between 5 AM and 4 PM
 }
