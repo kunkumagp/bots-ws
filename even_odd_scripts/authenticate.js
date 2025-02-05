@@ -1,9 +1,11 @@
 function authenticate() {
+    console.log('12312 - ', 1231231);
+    ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=1089");
+
 
     ws.onopen = function () {
         console.log("Connection open");
         getAuthentication();
-
     };
 
     ws.onclose = function () {
@@ -19,6 +21,8 @@ function authenticate() {
 
     ws.onmessage = function (event) {
         wsResponse = JSON.parse(event.data);
+
+        console.log('wsResponse - ', wsResponse);
 
         if (wsResponse != null) {
             if (wsResponse.msg_type === "authorize") {

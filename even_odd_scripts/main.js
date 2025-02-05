@@ -1,3 +1,5 @@
+let isRunning = false;
+
 
 function setFlashNotification(message, timeInSeconds) {
     $(".flash-notification").html(message);
@@ -217,4 +219,13 @@ function getRandomNumber(min, max) {
         throw new Error("Min value must be less than or equal to Max value");
     }
     return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+
+function resetParams() {
+    targetAmount =  (initialAccountBalance * (targetPercentage / 100)).toFixed(2);
+    setAccountInfo("targetAmount", `$ ${targetAmount}`);
+    amountPutForTrading = (initialAccountBalance * (amountPercentage / 100)).toFixed(2);
+    setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
+    stake = amountPutForTrading;
 }

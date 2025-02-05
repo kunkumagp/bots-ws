@@ -25,8 +25,8 @@ const martingaleMultiplier = 2.07112;
 
 let isRunning = false, intervalId;
 
-let targetPercentage = 0.3;
-let amountPercentage = 0.35;
+let targetPercentage = 0.08;
+let amountPercentage = 0.1;
 
 let initialAccountBalance = 0;
 let updatedAccountBalance = 0;
@@ -194,7 +194,7 @@ ws.onmessage = function (event) {
                         if (currentLossAmount < 0) {
                             if(lostCountInRow >= 2){
                                 // let newTime = (getRandomNumber(1, 2) * 60000 );
-                                let newTime = (getRandomNumber(10, 20) * 1000);
+                                let newTime = (getRandomNumber(30, 90) * 1000);
                                 setTimer(newTime);
                                 setTimeout(() => {
                                     runScript();
