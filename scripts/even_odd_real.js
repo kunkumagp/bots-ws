@@ -8,7 +8,7 @@ const accounts = [
 const marketArray = [
     { value: "R_10", name: "Volatility 10 Index" },
     { value: "R_25", name: "Volatility 25 Index" },
-    { value: "R_50", name: "Volatility 50 Index" },
+    // { value: "R_50", name: "Volatility 50 Index" },
     { value: "R_75", name: "Volatility 75 Index" },
     { value: "R_100", name: "Volatility 100 Index" },
 ];
@@ -25,8 +25,8 @@ const martingaleMultiplier = 2.07112;
 
 let isRunning = false, intervalId;
 
-let targetPercentage = 0.5;
-let amountPercentage = 1;
+let targetPercentage = 0.3;
+let amountPercentage = 0.35;
 
 let initialAccountBalance = 0;
 let updatedAccountBalance = 0;
@@ -85,7 +85,9 @@ accountSelectElement.addEventListener("change", () => {
     apiToken = accountSelectElement.value;
 });
 
-market = marketSelectElement.value;
+// market = marketSelectElement.value;
+market = getRandomMarket(marketArray, '');
+
 
 ws.onopen = function () {
     console.log("Connection open");
@@ -104,7 +106,7 @@ ws.onerror = function (err) {
 
 ws.onmessage = function (event) {
 
-    if(isWithinTimeRange()){
+    // if(isWithinTimeRange()){
         wsResponse = JSON.parse(event.data);
 
         if (wsResponse != null) {
@@ -203,8 +205,8 @@ ws.onmessage = function (event) {
                         } else {
                             if (currentProfitAmount >= targetAmount) {
                                 // let newTime = (getRandomNumber(30, 40) * 60000 );
-                                let newTime = (getRandomNumber(5, 10) * 60000 );
-                                // let newTime = (getRandomNumber(5, 10) * 1000);
+                                let newTime = (getRandomNumber(2, 3) * 60000 );
+                                // let newTime = (getRandomNumber(40, 60) * 1000);
                                 setTimer(newTime);
                                 setTimeout(() => {
                                     reserParams();
@@ -229,7 +231,7 @@ ws.onmessage = function (event) {
             }
 
         }
-    }
+    // }
 
 };
 
@@ -606,5 +608,17 @@ function isWithinTimeRange() {
     const now = new Date();
     const hour = now.getHours(); // Get current hour (0-23)
 
-    return hour >= 5 && hour < 18; // Returns true if between 5 AM and 4 PM
+    return hour >= 5 && hour < 23; // Returns true if between 5 AM and 4 PM
 }
+
+function getRandomMarket(array, current){
+    let randomIndex;
+    let randomMarket;
+  
+    do {
+      randomIndex = Math.floor(Math.random() * array.length);
+      randomMarket = array[randomIndex];
+    } while (randomMarket === current);
+  
+    return randomMarket.value;
+  };
