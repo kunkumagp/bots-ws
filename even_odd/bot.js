@@ -6,18 +6,6 @@ function startWebSocket() {
 
         // market = getRandomMarket(marketArray, '');
 
-        let hourValue = getHourValue();
-        if (hourValue > 5 && hourValue < 9) {
-            targetPercentage = 4;
-            amountPercentage = 5;
-        } else {
-            // targetPercentage = 0.5;
-            // amountPercentage = 1;
-
-            targetPercentage = 0.3;
-            amountPercentage = 0.5;
-        }
-
 
         ws.onopen = function () {
             console.log("Connection open");
@@ -49,7 +37,7 @@ function startWebSocket() {
 
             if (wsResponse != null) {
                 if (wsResponse.msg_type === "authorize") {
-
+                    updateParams();
                 }
 
                 // if (wsResponse.msg_type === "authorize") {
@@ -212,6 +200,8 @@ function startWebSocket() {
             ws.send(JSON.stringify(buyRequest));
         }
     };
+
+
 
     const placeTrade = (result = null) => {
         if (isTradeOpen == false) {
@@ -556,6 +546,28 @@ function startWebSocket() {
         const hour = now.getHours(); // Get current hour (0-23)
     
         return hour; // Returns true if between 5 AM and 4 PM
+    }
+
+        
+    function updateParams() {
+
+        let hourValue = getHourValue();
+        if (hourValue > 5 && hourValue < 9) {
+            targetPercentage = 4;
+            amountPercentage = 5;
+        } else {
+            // targetPercentage = 0.5;
+            // amountPercentage = 1;
+
+            targetPercentage = 0.3;
+            amountPercentage = 0.5;
+        }
+
+        targetAmount = (updatedAccountBalance * (targetPercentage / 100)).toFixed(2);
+        setAccountInfo("targetAmount", `$ ${targetAmount}`);
+        amountPutForTrading = (updatedAccountBalance * (amountPercentage / 100)).toFixed(2);
+        setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
+        stake = amountPutForTrading;
     }
 
 }
