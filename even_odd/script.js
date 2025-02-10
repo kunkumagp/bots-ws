@@ -211,7 +211,9 @@ function authenticate() {
 function resetParams() {
 
     let hourValue = getHourValue();
-    if (hourValue > 5 && hourValue < 9) {
+    console.log(hourValue);
+    
+    if (hourValue >= 6 && hourValue <= 9) {
         targetPercentage = 4;
         amountPercentage = 5;
     } else {

@@ -133,7 +133,7 @@ function startWebSocket() {
                                 }
                             } else {
                                 if (currentProfitAmount >= targetAmount) {
-                                    let newTime = (getRandomNumber(120, 300) * 1000);
+                                    let newTime = (getRandomNumber(180, 300) * 1000);
                                     // let newTime = (getRandomNumber(5, 8) * 1000);
                                     setTimer(newTime);
                                     setTimeout(() => {
@@ -552,7 +552,7 @@ function startWebSocket() {
     function updateParams() {
 
         let hourValue = getHourValue();
-        if (hourValue > 5 && hourValue < 9) {
+        if (hourValue >= 6 && hourValue <= 9) {
             targetPercentage = 4;
             amountPercentage = 5;
         } else {
