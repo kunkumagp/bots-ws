@@ -20,24 +20,15 @@ const initialStakeInputElement = document.getElementById("initial_stake");
 const authenticateButton = document.getElementById("authenticateButton");
 const scriptButton = document.getElementById("scriptButton");
 const infoOutput = document.getElementById("info_output");
+const investmentInputElement = document.getElementById("investmentAmount");
 
 const martingaleMultiplier = 2.07112;
 
 let isRunning = false, isAuthenticated = false, intervalId;
 
-// let targetPercentage = 0.08;
-// let amountPercentage = 0.1;
+let targetPercentage = 0.3;
+let amountPercentage = 0.35;
 
-let targetPercentage = 10;
-let amountPercentage = 8;
-
-if(targetProfitInputElement.value != ""){
-    targetPercentage = targetProfitInputElement.value;
-}
-
-if(initialStakeInputElement.value != ""){
-    amountPercentage = initialStakeInputElement.value;
-}
 
 
 let initialAccountBalance = 0;
@@ -70,9 +61,24 @@ let authSuccess = false;
 let isTradeOpen = false;
 let automation = false;
 let tradeProposal = null;
+let investmentBalance = 0;
 
 let stopTimer = false;
 let ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=1089");
+
+console.log('investmentInputElement: ', investmentInputElement);
+
+
+
+
+if(targetProfitInputElement.value != ""){
+    targetPercentage = Number(targetProfitInputElement.value);
+}
+
+if(initialStakeInputElement.value != ""){
+    amountPercentage = Number(initialStakeInputElement.value);
+}
+
 
 accounts.forEach((item) => {
     const option = document.createElement("option");
@@ -179,6 +185,10 @@ function authenticate() {
 
     ws.onmessage = function (event) {
 
+        if(investmentInputElement.value != ""){
+            investmentBalance = Number(investmentInputElement.value);
+        }
+
         // if(isWithinTimeRange()){
         authResponse = JSON.parse(event.data);
 
@@ -188,6 +198,14 @@ function authenticate() {
                 setFlashNotification("Authorization successful", 0);
                 initialAccountBalance = authResponse.authorize.balance;
                 updatedAccountBalance = initialAccountBalance;
+
+                
+                if(investmentBalance == 0){
+                    investmentBalance = updatedAccountBalance;
+                } else {
+                    updatedAccountBalance = investmentBalance;
+                }
+
                 setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance}`);
                 authenticateButton.innerHTML = "Authenticated. Ready to trade.";
                 authenticateButton.disabled = true;
@@ -227,9 +245,11 @@ function resetParams() {
     // targetPercentage = 5;
     // amountPercentage = 8;
 
-    targetAmount = (initialAccountBalance * (targetPercentage / 100)).toFixed(2);
+    setAccountInfo("investmentBalance", `$ ${investmentBalance}`);
+
+    targetAmount = (investmentBalance * (targetPercentage / 100)).toFixed(2);
     setAccountInfo("targetAmount", `$ ${targetAmount}`);
-    amountPutForTrading = (initialAccountBalance * (amountPercentage / 100)).toFixed(2);
+    amountPutForTrading = (investmentBalance * (amountPercentage / 100)).toFixed(2);
     setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
     stake = amountPutForTrading;
 }

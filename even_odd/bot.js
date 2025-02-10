@@ -12,7 +12,7 @@ function startWebSocket() {
             reAuthentication();
             
             if (!isAuthenticated) {
-                runScript();
+                requestTicksHistory();
             } else {
                 location.reload();
             }
@@ -55,6 +55,16 @@ function startWebSocket() {
                     //     runScript();
                     // }
 
+
+                    
+                    if (wsResponse.msg_type === 'history') {
+                        const lastDigitList = wsResponse.history.prices;
+                        console.log('lastDigitList - ', lastDigitList);
+
+                        checkPossibilityAndTrade(lastDigitList);
+                      
+                    }
+                    
 
                     if (wsResponse.msg_type === "proposal") {
                         if (
@@ -127,15 +137,15 @@ function startWebSocket() {
                                         // let newTime = 0;
                                         setTimer(newTime);
                                         setTimeout(() => {
-                                            runScript();
+                                            requestTicksHistory();
                                         }, newTime);
                                     } else {
-                                        runScript();
+                                        requestTicksHistory();
                                     }
                                 } else {
                                     if (currentProfitAmount >= targetAmount) {
-                                        let newTime = (getRandomNumber(25, 35) * 60000);
-                                        // let newTime = (getRandomNumber(120, 300) * 1000 );
+                                        // let newTime = (getRandomNumber(25, 35) * 60000);
+                                        let newTime = (getRandomNumber(120, 300) * 1000 );
                                         // let newTime = (getRandomNumber(5, 8) * 1000);
                                         setTimer(newTime);
                                         setTimeout(() => {
@@ -143,7 +153,7 @@ function startWebSocket() {
                                             reload();
                                         }, newTime);
                                     } else {
-                                        runScript();
+                                        requestTicksHistory();
                                     }
 
 
@@ -183,6 +193,20 @@ function startWebSocket() {
         scriptButton.disabled = true;
 }
 
+const checkPossibilityAndTrade = (lastDigitList) => {
+    const possibility = getLastDigit(lastDigitList);
+    console.log('tradeType - ',possibility);
+
+    if(possibility.evenProbability > possibility.oddProbability){
+        tradeType = 'even';
+        runScript();
+    } else if(possibility.evenProbability < possibility.oddProbability){
+        tradeType = 'odd';
+        runScript();
+    } else if(possibility.evenProbability == possibility.oddProbability){
+        requestTicksHistory();
+    }
+};
 
     const stakeChange = (status) => {
         if (status == "Loss") {
@@ -230,8 +254,8 @@ function startWebSocket() {
             stake = Number(stake);
             stake < 0.35 ? (stake = 0.35) : (stake = stake);
 
-            // tickCount = 1;
-            tickCount = getRandomNumber(2, 8);
+            tickCount = 1;
+            // tickCount = getRandomNumber(2, 8);
 
             const tradeRequest = {
                 proposal: 1,
@@ -270,6 +294,64 @@ function startWebSocket() {
         ws.send(JSON.stringify({ authorize: apiToken }));
     };
 
+
+    const requestTicksHistory = () => {
+        const ticksHistoryRequest = {
+            ticks_history: market,
+            end: 'latest',
+            count: 10, // Increased count for a larger dataset (more ticks for better prediction)
+            style: 'ticks'
+        };
+        ws.send(JSON.stringify(ticksHistoryRequest));
+    };
+
+
+    function getLastDigit(numbers) {
+        // Extract the last digit of each number
+        const lastDigits = numbers.map((num) => Math.floor((num * 1000) % 10));
+
+        console.log('lastDigits - ', lastDigits);
+    
+        return calculateEvenOddProbability(lastDigits);
+
+
+    
+        // lastDigits.forEach(digit => {
+        //     digit % 2 === 0 ? evenCount++ : oddCount++;
+        // });
+    
+        // if(evenCount == numbers.length){
+        //     return 'even';
+        // } else if(oddCount == numbers.length){
+        //     return 'odd';
+        // } else {
+        //     return 0; 
+        // }
+   
+    }
+
+    function calculateEvenOddProbability(numbers) {
+        let evenCount = 0;
+        let oddCount = 0;
+        let totalCount = numbers.length;
+    
+        if (totalCount === 0) {
+            return { evenProbability: 0, oddProbability: 0 }; // Avoid division by zero
+        }
+    
+        numbers.forEach(num => {
+            if (num % 2 === 0) {
+                evenCount++;
+            } else {
+                oddCount++;
+            }
+        });
+    
+        return {
+            evenProbability: (evenCount / totalCount).toFixed(4),
+            oddProbability: (oddCount / totalCount).toFixed(4)
+        };
+    }
 
     function runScript() {
         isRunning = true;
@@ -428,7 +510,7 @@ function startWebSocket() {
         currentLossAmount = currentLossAmount + lastTradeProfit;
         if (currentLossAmount >= 0) { currentLossAmount = 0; }
 
-        netProfit = updatedAccountBalance - initialAccountBalance;
+        netProfit = updatedAccountBalance - investmentBalance;
 
         if (lastTradeProfit > 0) {
             winTradeCount = winTradeCount + 1;
@@ -453,9 +535,9 @@ function startWebSocket() {
 
 
         let updatedAccountBalanceDisplay = null;
-        if (updatedAccountBalance > initialAccountBalance) {
+        if (updatedAccountBalance > investmentBalance) {
             updatedAccountBalanceDisplay = `<span class="green">$ ${updatedAccountBalance.toFixed(2)}</span>`;
-        } else if (updatedAccountBalance < initialAccountBalance) {
+        } else if (updatedAccountBalance < investmentBalance) {
             updatedAccountBalanceDisplay = `<span class="red">$ ${updatedAccountBalance.toFixed(2)}</span>`;
         }
         setAccountInfo("updatedAccountBalance", `${updatedAccountBalanceDisplay}`);
@@ -532,7 +614,7 @@ function startWebSocket() {
         const now = new Date();
         const hour = now.getHours(); // Get current hour (0-23)
 
-        return hour >= 5 && hour < 15; // Returns true if between 5 AM and 4 PM
+        return hour >= 5 && hour < 24; // Returns true if between 5 AM and 4 PM
     }
 
     function getRandomMarket(array, current) {
@@ -573,8 +655,8 @@ function startWebSocket() {
         // targetPercentage = 5;
         // amountPercentage = 8;
 
-        targetPercentage = 10;
-        amountPercentage = 8;
+        targetPercentage = 0.3;
+        amountPercentage = 0.35;
 
         targetAmount = (updatedAccountBalance * (targetPercentage / 100)).toFixed(2);
         setAccountInfo("targetAmount", `$ ${targetAmount}`);
