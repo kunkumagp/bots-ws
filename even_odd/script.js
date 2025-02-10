@@ -25,11 +25,11 @@ const martingaleMultiplier = 2.07112;
 
 let isRunning = false, isAuthenticated = false, intervalId;
 
-let targetPercentage = 0.5;
-let amountPercentage = 1;
+// let targetPercentage = 0.08;
+// let amountPercentage = 0.1;
 
-// let targetPercentage = 3;
-// let amountPercentage = 4;
+let targetPercentage = 10;
+let amountPercentage = 8;
 
 if(targetProfitInputElement.value != ""){
     targetPercentage = targetProfitInputElement.value;
@@ -210,19 +210,22 @@ function authenticate() {
 
 function resetParams() {
 
-    let hourValue = getHourValue();
-    console.log(hourValue);
+    // let hourValue = getHourValue();
+    // console.log(hourValue);
     
-    if (hourValue >= 6 && hourValue <= 9) {
-        targetPercentage = 4;
-        amountPercentage = 5;
-    } else {
-        // targetPercentage = 0.5;
-        // amountPercentage = 1;
+    // // if (hourValue >= 6 && hourValue <= 11) {
+    // //     targetPercentage = 20;
+    // //     amountPercentage = 15;
+    // // } else {
+    // //     // targetPercentage = 0.5;
+    // //     // amountPercentage = 1;
 
-        targetPercentage = 0.3;
-        amountPercentage = 0.5;
-    }
+    // //     targetPercentage = 0.3;
+    // //     amountPercentage = 0.5;
+    // // }
+
+    // targetPercentage = 5;
+    // amountPercentage = 8;
 
     targetAmount = (initialAccountBalance * (targetPercentage / 100)).toFixed(2);
     setAccountInfo("targetAmount", `$ ${targetAmount}`);

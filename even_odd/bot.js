@@ -32,134 +32,141 @@ function startWebSocket() {
 
         ws.onmessage = function (event) {
 
-            // if(isWithinTimeRange()){
-            wsResponse = JSON.parse(event.data);
+            if(isWithinTimeRange()){
+                wsResponse = JSON.parse(event.data);
 
-            if (wsResponse != null) {
-                if (wsResponse.msg_type === "authorize") {
-                    updateParams();
-                }
-
-                // if (wsResponse.msg_type === "authorize") {
-                //     console.log("Authorization successful.\n-----------------------------\n\n");
-                //     setFlashNotification("Authorization successful", 0);
-                //     initialAccountBalance = wsResponse.authorize.balance;
-                //     updatedAccountBalance = initialAccountBalance;
-                //     setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance}`);
-                //     authSuccess = true;
-                //     // authenticateButton.innerHTML = "Authenticated. Ready to trade.";
-                //     // authenticateButton.disabled = true;
-                //     resetParams();
-                //     // scriptButton.innerHTML = "Bot started....";
-                //     // placeTrade();
-                //     runScript();
-                // }
-
-
-                if (wsResponse.msg_type === "proposal") {
-                    if (
-                        updatedAccountBalance > 0 &&
-                        wsResponse.echo_req.amount > updatedAccountBalance
-                    ) {
-                        webSocketConnectionStop();
-                    } else {
-                        tradeProposal = wsResponse;
-                        makeTheTrade();
+                if (wsResponse != null) {
+                    if (wsResponse.msg_type === "authorize") {
+                        updateParams();
                     }
-                }
 
-                if (wsResponse.msg_type === "buy") {
-                    if (
-                        wsResponse.buy == undefined ||
-                        wsResponse.buy.contract_id == undefined
-                    ) {
-                        // placeTrade();
-                    } else {
-                        lastTradeId = wsResponse.buy.contract_id;
-                        totalTradeCount = totalTradeCount + 1;
-                        isTradeOpen = true;
-
-                        if (wsResponse.buy.shortcode.includes("DIGITEVEN")) {
-                            tradeTypeDisplay = "Even";
-                        } else if (wsResponse.buy.shortcode.includes("DIGITODD")) {
-                            tradeTypeDisplay = "Odd";
-                        }
-
-                        setResultNotification(
-                            lastTradeId,
-                            tradeTypeDisplay,
-                            market,
-                            wsResponse.buy.buy_price
-                        );
-
-                        // setAccountInfo('percentage10', `$ ${targetProfit.toFixed(2)}`)
-                        console.log("Trade Successful:", wsResponse);
-                        // scrollToBottom();
-
-                        automation = true;
-
-                        setTimeout(() => {
-                            fetchTradeDetails(lastTradeId);
-                        }, 500);
-                    }
-                }
-
-                if (wsResponse.msg_type === "proposal_open_contract") {
-                    if (wsResponse.proposal_open_contract.contract_id === lastTradeId) {
-                        const contract = wsResponse.proposal_open_contract;
-
-                        if (contract.is_sold) {
-                            const profit = contract.profit;
-                            const result = profit > 0 ? "Win" : "Loss";
-
-                            setInfo(contract, profit);
-                            stakeChange(result);
-                            isTradeOpen = false;
-
-                            if (profit < 0) {
-                                lostCountInRow = lostCountInRow + 1;
-                            }
+                    // if (wsResponse.msg_type === "authorize") {
+                    //     console.log("Authorization successful.\n-----------------------------\n\n");
+                    //     setFlashNotification("Authorization successful", 0);
+                    //     initialAccountBalance = wsResponse.authorize.balance;
+                    //     updatedAccountBalance = initialAccountBalance;
+                    //     setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance}`);
+                    //     authSuccess = true;
+                    //     // authenticateButton.innerHTML = "Authenticated. Ready to trade.";
+                    //     // authenticateButton.disabled = true;
+                    //     resetParams();
+                    //     // scriptButton.innerHTML = "Bot started....";
+                    //     // placeTrade();
+                    //     runScript();
+                    // }
 
 
-                            if (currentLossAmount < 0) {
-                                if (lostCountInRow >= 2) {
-                                    let newTime = (getRandomNumber(30, 40) * 1000);
-                                    setTimer(newTime);
-                                    setTimeout(() => {
-                                        runScript();
-                                    }, newTime);
-                                } else {
-                                    runScript();
-                                }
-                            } else {
-                                if (currentProfitAmount >= targetAmount) {
-                                    let newTime = (getRandomNumber(180, 300) * 1000);
-                                    // let newTime = (getRandomNumber(5, 8) * 1000);
-                                    setTimer(newTime);
-                                    setTimeout(() => {
-                                        reserParams();
-                                        reload();
-                                    }, newTime);
-                                } else {
-                                    runScript();
-                                }
-                            }
-
-
+                    if (wsResponse.msg_type === "proposal") {
+                        if (
+                            updatedAccountBalance > 0 &&
+                            wsResponse.echo_req.amount > updatedAccountBalance
+                        ) {
+                            webSocketConnectionStop();
                         } else {
-                            setTimeout(() => {
-                                setTickCountDown(
-                                    contract.tick_count,
-                                    contract.tick_stream.length
-                                );
-                                fetchTradeDetails(lastTradeId);
-                            }, 1000);
+                            tradeProposal = wsResponse;
+                            makeTheTrade();
                         }
                     }
-                }
 
+                    if (wsResponse.msg_type === "buy") {
+                        if (
+                            wsResponse.buy == undefined ||
+                            wsResponse.buy.contract_id == undefined
+                        ) {
+                            // placeTrade();
+                        } else {
+                            lastTradeId = wsResponse.buy.contract_id;
+                            totalTradeCount = totalTradeCount + 1;
+                            isTradeOpen = true;
+
+                            if (wsResponse.buy.shortcode.includes("DIGITEVEN")) {
+                                tradeTypeDisplay = "Even";
+                            } else if (wsResponse.buy.shortcode.includes("DIGITODD")) {
+                                tradeTypeDisplay = "Odd";
+                            }
+
+                            setResultNotification(
+                                lastTradeId,
+                                tradeTypeDisplay,
+                                market,
+                                wsResponse.buy.buy_price
+                            );
+
+                            // setAccountInfo('percentage10', `$ ${targetProfit.toFixed(2)}`)
+                            console.log("Trade Successful:", wsResponse);
+                            // scrollToBottom();
+
+                            automation = true;
+
+                            setTimeout(() => {
+                                fetchTradeDetails(lastTradeId);
+                            }, 500);
+                        }
+                    }
+
+                    if (wsResponse.msg_type === "proposal_open_contract") {
+                        if (wsResponse.proposal_open_contract.contract_id === lastTradeId) {
+                            const contract = wsResponse.proposal_open_contract;
+
+                            if (contract.is_sold) {
+                                const profit = contract.profit;
+                                const result = profit > 0 ? "Win" : "Loss";
+
+                                setInfo(contract, profit);
+                                stakeChange(result);
+                                isTradeOpen = false;
+
+                                if (profit < 0) {
+                                    lostCountInRow = lostCountInRow + 1;
+                                }
+
+
+                                if (currentLossAmount < 0) {
+                                    if (lostCountInRow >= 2) {
+                                        let newTime = (getRandomNumber(30, 40) * 1000);
+                                        // let newTime = 0;
+                                        setTimer(newTime);
+                                        setTimeout(() => {
+                                            runScript();
+                                        }, newTime);
+                                    } else {
+                                        runScript();
+                                    }
+                                } else {
+                                    if (currentProfitAmount >= targetAmount) {
+                                        let newTime = (getRandomNumber(25, 35) * 60000);
+                                        // let newTime = (getRandomNumber(120, 300) * 1000 );
+                                        // let newTime = (getRandomNumber(5, 8) * 1000);
+                                        setTimer(newTime);
+                                        setTimeout(() => {
+                                            reserParams();
+                                            reload();
+                                        }, newTime);
+                                    } else {
+                                        runScript();
+                                    }
+
+
+
+                                    // runScript();
+
+                                }
+
+
+                            } else {
+                                setTimeout(() => {
+                                    setTickCountDown(
+                                        contract.tick_count,
+                                        contract.tick_stream.length
+                                    );
+                                    fetchTradeDetails(lastTradeId);
+                                }, 1000);
+                            }
+                        }
+                    }
+
+                }
             }
-            // }
 
         };
 
@@ -525,7 +532,7 @@ function startWebSocket() {
         const now = new Date();
         const hour = now.getHours(); // Get current hour (0-23)
 
-        return hour >= 5 && hour < 19; // Returns true if between 5 AM and 4 PM
+        return hour >= 5 && hour < 15; // Returns true if between 5 AM and 4 PM
     }
 
     function getRandomMarket(array, current) {
@@ -551,17 +558,23 @@ function startWebSocket() {
         
     function updateParams() {
 
-        let hourValue = getHourValue();
-        if (hourValue >= 6 && hourValue <= 9) {
-            targetPercentage = 4;
-            amountPercentage = 5;
-        } else {
-            // targetPercentage = 0.5;
-            // amountPercentage = 1;
+        // let hourValue = getHourValue();
+        // if (hourValue >= 6 && hourValue <= 11) {
+        //     targetPercentage = 20;
+        //     amountPercentage = 15;
+        // } else {
+        //     // targetPercentage = 0.5;
+        //     // amountPercentage = 1;
 
-            targetPercentage = 0.3;
-            amountPercentage = 0.5;
-        }
+        //     targetPercentage = 0.3;
+        //     amountPercentage = 0.5;
+        // }
+
+        // targetPercentage = 5;
+        // amountPercentage = 8;
+
+        targetPercentage = 10;
+        amountPercentage = 8;
 
         targetAmount = (updatedAccountBalance * (targetPercentage / 100)).toFixed(2);
         setAccountInfo("targetAmount", `$ ${targetAmount}`);
