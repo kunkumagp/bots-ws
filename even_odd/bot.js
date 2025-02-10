@@ -1,6 +1,6 @@
 function startWebSocket() {
 
-    if(isWithinTimeRange()){
+    // if(isWithinTimeRange()){
 
         ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=1089");
 
@@ -24,6 +24,9 @@ function startWebSocket() {
 
             console.log("Connection closed");
             console.log("-----------------------------\n");
+            if(!isTradeOpen){
+                startWebSocket();
+            }
         };
 
         ws.onerror = function (err) {
@@ -32,7 +35,7 @@ function startWebSocket() {
 
         ws.onmessage = function (event) {
 
-            if(isWithinTimeRange()){
+            // if(isWithinTimeRange()){
                 wsResponse = JSON.parse(event.data);
 
                 if (wsResponse != null) {
@@ -145,7 +148,7 @@ function startWebSocket() {
                                 } else {
                                     if (currentProfitAmount >= targetAmount) {
                                         // let newTime = (getRandomNumber(25, 35) * 60000);
-                                        let newTime = (getRandomNumber(120, 300) * 1000 );
+                                        let newTime = (getRandomNumber(30, 60) * 1000 );
                                         // let newTime = (getRandomNumber(5, 8) * 1000);
                                         setTimer(newTime);
                                         setTimeout(() => {
@@ -176,22 +179,22 @@ function startWebSocket() {
                     }
 
                 }
-            }
+            // }
 
         };
 
         
-    } else {
-        let message = "Time is not good for trading...";
-        console.log(message);
-        setFlashNotification(message, 0);
+    // } else {
+    //     let message = "Time is not good for trading...";
+    //     console.log(message);
+    //     setFlashNotification(message, 0);
         
-        authenticateButton.innerHTML = "Authenticate.";
-        authenticateButton.disabled = false;
+    //     authenticateButton.innerHTML = "Authenticate.";
+    //     authenticateButton.disabled = false;
 
-        scriptButton.innerHTML = "Start WebSocket.";
-        scriptButton.disabled = true;
-}
+    //     scriptButton.innerHTML = "Start WebSocket.";
+    //     scriptButton.disabled = true;
+    // }
 
 const checkPossibilityAndTrade = (lastDigitList) => {
     const possibility = getLastDigit(lastDigitList);
