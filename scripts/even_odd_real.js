@@ -40,6 +40,7 @@ if(initialStakeInputElement.value != ""){
 }
 
 
+let fullAccountBalance = 0;
 let initialAccountBalance = 0;
 let updatedAccountBalance = 0;
 
@@ -88,7 +89,7 @@ marketArray.forEach((item) => {
     marketSelectElement.appendChild(option); // Append to the <select>
 });
 
-accountSelectElement.value = "iVOpdm24hBhw3JI";
+accountSelectElement.value = "lkUxtOopvUhCpIX";
 marketSelectElement.value = "R_10";
 apiToken = accountSelectElement.value;
 
@@ -123,13 +124,17 @@ ws.onmessage = function (event) {
             if (wsResponse.msg_type === "authorize") {
                 console.log("Authorization successful.\n-----------------------------\n\n");
                 setFlashNotification("Authorization successful", 0);
-                initialAccountBalance = wsResponse.authorize.balance;
+                fullAccountBalance = wsResponse.authorize.balance;
+                initialAccountBalance = fullAccountBalance - (fullAccountBalance / (7/6) );
                 updatedAccountBalance = initialAccountBalance;
                 setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance}`);
                 authSuccess = true;
                 authenticateButton.innerHTML = "Authenticated. Ready to trade.";
                 authenticateButton.disabled = true;
                 resetParams();
+
+
+
                 // scriptButton.innerHTML = "Bot started....";
                 // placeTrade();
                 runScript();
@@ -138,8 +143,8 @@ ws.onmessage = function (event) {
 
             if (wsResponse.msg_type === "proposal") {
                 if (
-                    updatedAccountBalance > 0 &&
-                    wsResponse.echo_req.amount > updatedAccountBalance
+                    fullAccountBalance > 0 &&
+                    wsResponse.echo_req.amount > fullAccountBalance
                 ) {
                     webSocketConnectionStop();
                 } else {
@@ -204,7 +209,8 @@ ws.onmessage = function (event) {
                         if (currentLossAmount < 0) {
                             if(lostCountInRow >= 2){
                                 // let newTime = (getRandomNumber(1, 2) * 60000 );
-                                let newTime = (getRandomNumber(30, 40) * 1000);
+                                // let newTime = (getRandomNumber(30, 40) * 1000);
+                                let newTime = (getRandomNumber(5, 10) * 1000);
                                 setTimer(newTime);
                                 setTimeout(() => {
                                     runScript();
@@ -216,8 +222,8 @@ ws.onmessage = function (event) {
                             if (currentProfitAmount >= targetAmount) {
                                 // let newTime = (getRandomNumber(30, 40) * 60000 );
                                 // let newTime = (getRandomNumber(5, 10) * 60000 );
-                                let newTime = (getRandomNumber(120, 180) * 1000 );
-                                // let newTime = (getRandomNumber(5, 10) * 1000);
+                                // let newTime = (getRandomNumber(120, 180) * 1000 );
+                                let newTime = (getRandomNumber(5, 10) * 1000);
                                 setTimer(newTime);
                                 setTimeout(() => {
                                     reserParams();
@@ -378,14 +384,14 @@ function reserParams() {
 
 function resetParams() {
 
-    let hourValue = getHourValue();
-    if(hourValue > 5 && hourValue < 9){
-        targetPercentage = 4;
-        amountPercentage = 5;
-    } else {
-        targetPercentage = 0.5;
-        amountPercentage = 1;
-    }
+    // let hourValue = getHourValue();
+    // if(hourValue > 5 && hourValue < 9){
+    //     targetPercentage = 4;
+    //     amountPercentage = 5;
+    // } else {
+    //     targetPercentage = 0.5;
+    //     amountPercentage = 1;
+    // }
 
     targetAmount =  (initialAccountBalance * (targetPercentage / 100)).toFixed(2);
     setAccountInfo("targetAmount", `$ ${targetAmount}`);
@@ -629,7 +635,7 @@ function isWithinTimeRange() {
     const now = new Date();
     const hour = now.getHours(); // Get current hour (0-23)
 
-    return hour >= 5 && hour < 17; // Returns true if between 5 AM and 4 PM
+    return hour >= 5 && hour < 24; // Returns true if between 5 AM and 4 PM
 }
 
 function getHourValue() {
