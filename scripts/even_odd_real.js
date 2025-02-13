@@ -28,6 +28,9 @@ let isRunning = false, intervalId;
 let targetPercentage = 0.5;
 let amountPercentage = 1;
 
+
+let devideValue = 10/9;
+
 // let targetPercentage = 3;
 // let amountPercentage = 4;
 
@@ -99,6 +102,7 @@ accountSelectElement.addEventListener("change", () => {
 });
 
 market = marketSelectElement.value;
+market = getRandomMarket(marketArray, market);
 
 ws.onopen = function () {
     console.log("Connection open");
@@ -125,14 +129,13 @@ ws.onmessage = function (event) {
                 console.log("Authorization successful.\n-----------------------------\n\n");
                 setFlashNotification("Authorization successful", 0);
                 fullAccountBalance = wsResponse.authorize.balance;
-                initialAccountBalance = fullAccountBalance - (fullAccountBalance / (7/6) );
+                initialAccountBalance = fullAccountBalance - (fullAccountBalance / (devideValue) );
                 updatedAccountBalance = initialAccountBalance;
                 setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance}`);
                 authSuccess = true;
                 authenticateButton.innerHTML = "Authenticated. Ready to trade.";
                 authenticateButton.disabled = true;
                 resetParams();
-
 
 
                 // scriptButton.innerHTML = "Bot started....";
@@ -209,8 +212,11 @@ ws.onmessage = function (event) {
                         if (currentLossAmount < 0) {
                             if(lostCountInRow >= 2){
                                 // let newTime = (getRandomNumber(1, 2) * 60000 );
-                                // let newTime = (getRandomNumber(30, 40) * 1000);
-                                let newTime = (getRandomNumber(5, 10) * 1000);
+                                let newTime = (getRandomNumber(30, 40) * 1000);
+                                market = getRandomMarket(marketArray, market);
+                                // devideValue = 10/9;
+
+                                // let newTime = (getRandomNumber(5, 10) * 1000);
                                 setTimer(newTime);
                                 setTimeout(() => {
                                     runScript();
@@ -223,7 +229,7 @@ ws.onmessage = function (event) {
                                 // let newTime = (getRandomNumber(30, 40) * 60000 );
                                 // let newTime = (getRandomNumber(5, 10) * 60000 );
                                 // let newTime = (getRandomNumber(120, 180) * 1000 );
-                                let newTime = (getRandomNumber(5, 10) * 1000);
+                                let newTime = (getRandomNumber(10, 15) * 1000);
                                 setTimer(newTime);
                                 setTimeout(() => {
                                     reserParams();
@@ -337,6 +343,8 @@ const fetchTradeDetails = (contractId) => {
 
     ws.send(JSON.stringify(contractDetailsRequest));
 };
+
+
 
 
 
@@ -635,7 +643,7 @@ function isWithinTimeRange() {
     const now = new Date();
     const hour = now.getHours(); // Get current hour (0-23)
 
-    return hour >= 5 && hour < 24; // Returns true if between 5 AM and 4 PM
+    return hour >= 5 && hour < 15; // Returns true if between 5 AM and 4 PM
 }
 
 function getHourValue() {
@@ -644,3 +652,16 @@ function getHourValue() {
 
     return hour; // Returns true if between 5 AM and 4 PM
 }
+
+
+function getRandomMarket(array, current){
+    let randomIndex;
+    let randomMarket;
+  
+    do {
+      randomIndex = Math.floor(Math.random() * array.length);
+      randomMarket = array[randomIndex];
+    } while (randomMarket === current);
+  
+    return randomMarket.value;
+  };
