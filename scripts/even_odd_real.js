@@ -207,7 +207,16 @@ ws.onmessage = function (event) {
                     
 
                         if (currentLossAmount < 0) {
-                            if(lostCountInRow >= 2){
+                            if(lostCountInRow >= 5){
+                                let newTime = (getRandomNumber(1, 2) * 60000 );
+                                // let newTime = (getRandomNumber(30, 40) * 1000);
+                                // let newTime = (getRandomNumber(5, 10) * 1000);
+                                setTimer(newTime);
+                                setTimeout(() => {
+                                    reserParams();
+                                    reload();
+                                }, newTime);
+                            } else if(lostCountInRow >= 2){
                                 // let newTime = (getRandomNumber(1, 2) * 60000 );
                                 // let newTime = (getRandomNumber(30, 40) * 1000);
                                 let newTime = (getRandomNumber(5, 10) * 1000);
