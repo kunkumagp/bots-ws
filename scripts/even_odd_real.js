@@ -24,15 +24,23 @@ const infoOutput = document.getElementById("info_output");
 const martingaleMultiplier = 2.07112;
 
 let isRunning = false, intervalId;
+let connectionStatus = false;
 
 let targetPercentage = 0.5;
 let amountPercentage = 1;
+let savings = 400;
+
+
+// let targetPercentage = 0.05;
+// let amountPercentage = 0.1;
 
 
 let devideValue = 10/9;
 
 // let targetPercentage = 3;
 // let amountPercentage = 4;
+
+let intervalTime = 0 ;
 
 if(targetProfitInputElement.value != ""){
     targetPercentage = targetProfitInputElement.value;
@@ -113,6 +121,7 @@ ws.onopen = function () {
 ws.onclose = function () {
     console.log("Connection closed");
     console.log("-----------------------------\n");
+    connectionStatus = false;
 };
 
 ws.onerror = function (err) {
@@ -121,15 +130,18 @@ ws.onerror = function (err) {
 
 ws.onmessage = function (event) {
 
-    // if(isWithinTimeRange()){
+    if(isWithinTimeRange()){
         wsResponse = JSON.parse(event.data);
 
         if (wsResponse != null) {
             if (wsResponse.msg_type === "authorize") {
+                connectionStatus = true;
                 console.log("Authorization successful.\n-----------------------------\n\n");
                 setFlashNotification("Authorization successful", 0);
                 fullAccountBalance = wsResponse.authorize.balance;
-                initialAccountBalance = fullAccountBalance - (fullAccountBalance / (devideValue) );
+                // initialAccountBalance = fullAccountBalance - (fullAccountBalance / (devideValue) );
+                initialAccountBalance = fullAccountBalance - savings;
+                // initialAccountBalance = fullAccountBalance / 2;
                 updatedAccountBalance = initialAccountBalance;
                 setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance}`);
                 authSuccess = true;
@@ -211,33 +223,59 @@ ws.onmessage = function (event) {
 
                         if (currentLossAmount < 0) {
                             if(lostCountInRow >= 2){
-                                // let newTime = (getRandomNumber(1, 2) * 60000 );
-                                let newTime = (getRandomNumber(30, 40) * 1000);
+                                // intervalTime = (getRandomNumber(1, 2) * 60000 );
+                                // intervalTime = (getRandomNumber(30, 40) * 1000);
                                 market = getRandomMarket(marketArray, market);
                                 // devideValue = 10/9;
 
-                                // let newTime = (getRandomNumber(5, 10) * 1000);
-                                setTimer(newTime);
+                                intervalTime = (getRandomNumber(3, 6) * 1000);
+                                setTimer(intervalTime);
                                 setTimeout(() => {
-                                    runScript();
-                                }, newTime);
+                                    if(connectionStatus){
+                                        runScript();
+                                    } else {
+                                        reserParams();
+                                        reload();
+                                    }
+                                }, intervalTime);
                             } else {
                                 runScript();
                             }
                         } else {
-                            if (currentProfitAmount >= targetAmount) {
-                                // let newTime = (getRandomNumber(30, 40) * 60000 );
-                                // let newTime = (getRandomNumber(5, 10) * 60000 );
-                                // let newTime = (getRandomNumber(120, 180) * 1000 );
-                                let newTime = (getRandomNumber(10, 15) * 1000);
-                                setTimer(newTime);
+
+                            if(netProfit >= (initialAccountBalance / 4)){
+                                // intervalTime = (getRandomNumber(20, 30) * 60000 );
+                                intervalTime = (getRandomNumber(10, 15) * 60000 );
+
+                                setTimer(intervalTime);
                                 setTimeout(() => {
-                                    reserParams();
-                                    reload();
-                                }, newTime);
+                                    if(connectionStatus){
+                                        runScript();
+                                    } else {
+                                        reserParams();
+                                        reload();
+                                    }
+                                }, intervalTime);
                             } else {
-                                runScript();
+                                if (currentProfitAmount >= targetAmount) {
+                                    // intervalTime = (getRandomNumber(30, 40) * 60000 );
+                                    // intervalTime = (getRandomNumber(5, 10) * 60000 );
+                                    // intervalTime = (getRandomNumber(120, 180) * 1000 );
+                                    intervalTime = (getRandomNumber(5, 10) * 1000);
+                                    setTimer(intervalTime);
+                                    setTimeout(() => {
+                                        if(connectionStatus){
+                                            runScript();
+                                        } else {
+                                            reserParams();
+                                            reload();
+                                        }
+                                    }, intervalTime);
+                                } else {
+                                    runScript();
+                                }
                             }
+                            
                         }
 
 
@@ -254,7 +292,7 @@ ws.onmessage = function (event) {
             }
 
         }
-    // }
+    }
 
 };
 
@@ -402,7 +440,9 @@ function resetParams() {
     // }
 
     targetAmount =  (initialAccountBalance * (targetPercentage / 100)).toFixed(2);
-    setAccountInfo("targetAmount", `$ ${targetAmount}`);
+
+
+    setAccountInfo("targetAmount", `$ ${(initialAccountBalance / 4 ).toFixed(2)}`);
     amountPutForTrading = (initialAccountBalance * (amountPercentage / 100)).toFixed(2);
     setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
     stake = amountPutForTrading;
@@ -643,7 +683,7 @@ function isWithinTimeRange() {
     const now = new Date();
     const hour = now.getHours(); // Get current hour (0-23)
 
-    return hour >= 5 && hour < 15; // Returns true if between 5 AM and 4 PM
+    return hour >= 5 && hour < 18; // Returns true if between 5 AM and 4 PM
 }
 
 function getHourValue() {
