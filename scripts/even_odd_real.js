@@ -140,7 +140,8 @@ ws.onmessage = function (event) {
                 setFlashNotification("Authorization successful", 0);
                 fullAccountBalance = wsResponse.authorize.balance;
                 // initialAccountBalance = fullAccountBalance - (fullAccountBalance / (devideValue) );
-                initialAccountBalance = fullAccountBalance - savings;
+                // initialAccountBalance = fullAccountBalance - savings;
+                initialAccountBalance = (fullAccountBalance / 5);
                 // initialAccountBalance = fullAccountBalance / 2;
                 updatedAccountBalance = initialAccountBalance;
                 setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance}`);
