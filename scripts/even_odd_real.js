@@ -26,8 +26,8 @@ const martingaleMultiplier = 2.07112;
 let isRunning = false, intervalId;
 let connectionStatus = false;
 
-let targetPercentage = 0.5;
-let amountPercentage = 1;
+let targetPercentage = 1;
+let amountPercentage = 1
 let savings = 400;
 
 
@@ -141,11 +141,13 @@ ws.onmessage = function (event) {
                 fullAccountBalance = wsResponse.authorize.balance;
                 // initialAccountBalance = fullAccountBalance - (fullAccountBalance / (devideValue) );
                 // initialAccountBalance = fullAccountBalance - savings;
-                initialAccountBalance = (fullAccountBalance / 5);
+                initialAccountBalance = (fullAccountBalance / 10);
                 // initialAccountBalance = fullAccountBalance / 2;
                 updatedAccountBalance = initialAccountBalance;
-                setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance}`);
+                setAccountInfo("initialAccountBalance", `$ ${fullAccountBalance}`);
+                setAccountInfo("investmentAmount", `$ ${initialAccountBalance}`);
                 authSuccess = true;
+                
                 authenticateButton.innerHTML = "Authenticated. Ready to trade.";
                 authenticateButton.disabled = true;
                 resetParams();
