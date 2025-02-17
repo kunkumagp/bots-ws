@@ -27,7 +27,7 @@ let isRunning = false, intervalId;
 let connectionStatus = false;
 
 let targetPercentage = 1;
-let amountPercentage = 1
+let amountPercentage = 0.5
 let savings = 400;
 
 
@@ -130,7 +130,7 @@ ws.onerror = function (err) {
 
 ws.onmessage = function (event) {
 
-    if(isWithinTimeRange()){
+    // if(isWithinTimeRange()){
         wsResponse = JSON.parse(event.data);
 
         if (wsResponse != null) {
@@ -225,7 +225,23 @@ ws.onmessage = function (event) {
                     
 
                         if (currentLossAmount < 0) {
-                            if(lostCountInRow >= 2){
+                            if(lostCountInRow >= 5){
+                                // intervalTime = (getRandomNumber(1, 2) * 60000 );
+                                // intervalTime = (getRandomNumber(30, 40) * 1000);
+                                market = getRandomMarket(marketArray, market);
+                                // devideValue = 10/9;
+
+                                intervalTime = (getRandomNumber(20, 30) * 1000);
+                                setTimer(intervalTime);
+                                setTimeout(() => {
+                                    if(connectionStatus){
+                                        runScript();
+                                    } else {
+                                        reserParams();
+                                        reload();
+                                    }
+                                }, intervalTime);
+                            } else if(lostCountInRow >= 2){
                                 // intervalTime = (getRandomNumber(1, 2) * 60000 );
                                 // intervalTime = (getRandomNumber(30, 40) * 1000);
                                 market = getRandomMarket(marketArray, market);
@@ -295,7 +311,7 @@ ws.onmessage = function (event) {
             }
 
         }
-    }
+    // }
 
 };
 
@@ -686,7 +702,7 @@ function isWithinTimeRange() {
     const now = new Date();
     const hour = now.getHours(); // Get current hour (0-23)
 
-    return hour >= 5 && hour < 18; // Returns true if between 5 AM and 4 PM
+    return hour >= 5 && hour < 24; // Returns true if between 5 AM and 4 PM
 }
 
 function getHourValue() {
