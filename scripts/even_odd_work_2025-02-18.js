@@ -24,10 +24,35 @@ const infoOutput = document.getElementById("info_output");
 const martingaleMultiplier = 2.07112;
 
 let isRunning = false, intervalId;
+let connectionStatus = false;
 
-let targetPercentage = 0.5;
-let amountPercentage = 1;
+let targetPercentage = 1;
+let targetPerRun = 5;
+let amountPercentage = 0.1
+let savings = 400;
 
+
+// let targetPercentage = 0.05;
+// let amountPercentage = 0.1;
+
+
+let devideValue = 10/9;
+
+// let targetPercentage = 3;
+// let amountPercentage = 4;
+
+let intervalTime = 0 ;
+
+if(targetProfitInputElement.value != ""){
+    targetPercentage = targetProfitInputElement.value;
+}
+
+if(initialStakeInputElement.value != ""){
+    amountPercentage = initialStakeInputElement.value;
+}
+
+
+let fullAccountBalance = 0;
 let initialAccountBalance = 0;
 let updatedAccountBalance = 0;
 
@@ -76,7 +101,7 @@ marketArray.forEach((item) => {
     marketSelectElement.appendChild(option); // Append to the <select>
 });
 
-accountSelectElement.value = "lkUxtOopvUhCpIX";
+accountSelectElement.value = "Y71P0GIOxz3YYvr";
 marketSelectElement.value = "R_10";
 apiToken = accountSelectElement.value;
 
@@ -86,6 +111,7 @@ accountSelectElement.addEventListener("change", () => {
 });
 
 market = marketSelectElement.value;
+market = getRandomMarket(marketArray, market);
 
 ws.onopen = function () {
     console.log("Connection open");
@@ -96,6 +122,7 @@ ws.onopen = function () {
 ws.onclose = function () {
     console.log("Connection closed");
     console.log("-----------------------------\n");
+    connectionStatus = false;
 };
 
 ws.onerror = function (err) {
@@ -109,15 +136,25 @@ ws.onmessage = function (event) {
 
         if (wsResponse != null) {
             if (wsResponse.msg_type === "authorize") {
+                connectionStatus = true;
                 console.log("Authorization successful.\n-----------------------------\n\n");
                 setFlashNotification("Authorization successful", 0);
-                initialAccountBalance = wsResponse.authorize.balance;
+                fullAccountBalance = wsResponse.authorize.balance;
+                // initialAccountBalance = fullAccountBalance - (fullAccountBalance / (devideValue) );
+                // initialAccountBalance = fullAccountBalance - savings;
+                initialAccountBalance = (fullAccountBalance / 10);
+                // initialAccountBalance = fullAccountBalance;
+                // initialAccountBalance = fullAccountBalance / 2;
                 updatedAccountBalance = initialAccountBalance;
-                setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance}`);
+                setAccountInfo("initialAccountBalance", `$ ${fullAccountBalance}`);
+                setAccountInfo("investmentAmount", `$ ${initialAccountBalance}`);
                 authSuccess = true;
+                
                 authenticateButton.innerHTML = "Authenticated. Ready to trade.";
                 authenticateButton.disabled = true;
                 resetParams();
+
+
                 // scriptButton.innerHTML = "Bot started....";
                 // placeTrade();
                 runScript();
@@ -126,8 +163,8 @@ ws.onmessage = function (event) {
 
             if (wsResponse.msg_type === "proposal") {
                 if (
-                    updatedAccountBalance > 0 &&
-                    wsResponse.echo_req.amount > updatedAccountBalance
+                    fullAccountBalance > 0 &&
+                    wsResponse.echo_req.amount > fullAccountBalance
                 ) {
                     webSocketConnectionStop();
                 } else {
@@ -186,39 +223,115 @@ ws.onmessage = function (event) {
 
                         if(profit < 0){
                             lostCountInRow = lostCountInRow + 1;
+                        } else {
+                            lostCountInRow = 0;
                         }
                     
 
                         if (currentLossAmount < 0) {
-                            let newTime = (getRandomNumber(20, 30) * 1000);
-                            setTimer(newTime);
+                            market = getRandomMarket(marketArray, market);
+                                // devideValue = 10/9;
+
+                            intervalTime = (getRandomNumber(20, 30) * 1000);
+                            setTimer(intervalTime);
                             setTimeout(() => {
-                                runScript();
-                            }, newTime);
+                                if(connectionStatus){
+                                    runScript();
+                                } else {
+                                    reserParams();
+                                    reload();
+                                }
+                            }, intervalTime);
                             
-                            // if(lostCountInRow >= 2){
-                            //     // let newTime = (getRandomNumber(1, 2) * 60000 );
-                            //     let newTime = (getRandomNumber(20, 30) * 1000);
-                            //     setTimer(newTime);
+                            // if(lostCountInRow >= 5){
+                            //     // intervalTime = (getRandomNumber(1, 2) * 60000 );
+                            //     // intervalTime = (getRandomNumber(30, 40) * 1000);
+                            //     market = getRandomMarket(marketArray, market);
+                            //     // devideValue = 10/9;
+
+                            //     intervalTime = (getRandomNumber(20, 30) * 1000);
+                            //     setTimer(intervalTime);
                             //     setTimeout(() => {
-                            //         runScript();
-                            //     }, newTime);
+                            //         if(connectionStatus){
+                            //             runScript();
+                            //         } else {
+                            //             reserParams();
+                            //             reload();
+                            //         }
+                            //     }, intervalTime);
+                            // } else if(lostCountInRow >= 2){
+                            //     // intervalTime = (getRandomNumber(1, 2) * 60000 );
+                            //     // intervalTime = (getRandomNumber(30, 40) * 1000);
+                            //     market = getRandomMarket(marketArray, market);
+                            //     // devideValue = 10/9;
+
+                            //     intervalTime = (getRandomNumber(3, 6) * 1000);
+                            //     setTimer(intervalTime);
+                            //     setTimeout(() => {
+                            //         if(connectionStatus){
+                            //             runScript();
+                            //         } else {
+                            //             reserParams();
+                            //             reload();
+                            //         }
+                            //     }, intervalTime);
                             // } else {
                             //     runScript();
                             // }
                         } else {
-                            if (currentProfitAmount >= targetAmount) {
-                                // let newTime = (getRandomNumber(30, 40) * 60000 );
-                                // let newTime = (getRandomNumber(5, 10) * 60000 );
-                                let newTime = (getRandomNumber(1, 3) * 1000);
-                                setTimer(newTime);
+
+                            if(netProfit >= targetAmount){
+                                intervalTime = (getRandomNumber(10, 15) * 60000 );
+
+                                setTimer(intervalTime);
                                 setTimeout(() => {
-                                    reserParams();
-                                    reload();
-                                }, newTime);
+                                    if(connectionStatus){
+                                        runScript();
+                                    } else {
+                                        reserParams();
+                                        reload();
+                                    }
+                                }, intervalTime);
+
                             } else {
                                 runScript();
+
+
                             }
+
+                            // if(netProfit >= (initialAccountBalance / 4)){
+                            //     // intervalTime = (getRandomNumber(20, 30) * 60000 );
+                            //     intervalTime = (getRandomNumber(10, 15) * 60000 );
+
+                            //     setTimer(intervalTime);
+                            //     setTimeout(() => {
+                            //         if(connectionStatus){
+                            //             runScript();
+                            //         } else {
+                            //             reserParams();
+                            //             reload();
+                            //         }
+                            //     }, intervalTime);
+                            // } else {
+                            //     if (currentProfitAmount >= targetAmount) {
+                            //         // intervalTime = (getRandomNumber(30, 40) * 60000 );
+                            //         // intervalTime = (getRandomNumber(5, 10) * 60000 );
+                            //         // intervalTime = (getRandomNumber(120, 180) * 1000 );
+                            //         intervalTime = (getRandomNumber(5, 10) * 1000);
+                            //         setTimer(intervalTime);
+                            //         setTimeout(() => {
+                            //             if(connectionStatus){
+                            //                 runScript();
+                            //             } else {
+                            //                 reserParams();
+                            //                 reload();
+                            //             }
+                            //         }, intervalTime);
+                            //     } else {
+                            //         runScript();
+                            //     }
+                            // }
+                            
                         }
 
 
@@ -291,7 +404,7 @@ const placeTrade = (result = null) => {
         stake < 0.35 ? (stake = 0.35) : (stake = stake);
 
         // tickCount = 1;
-        tickCount = getRandomNumber(5, 8);
+        tickCount = getRandomNumber(2, 8);
 
         const tradeRequest = {
             proposal: 1,
@@ -324,6 +437,8 @@ const fetchTradeDetails = (contractId) => {
 
     ws.send(JSON.stringify(contractDetailsRequest));
 };
+
+
 
 
 
@@ -370,12 +485,20 @@ function reserParams() {
 }
 
 function resetParams() {
-    let investment = initialAccountBalance / 10;
 
+    // let hourValue = getHourValue();
+    // if(hourValue > 5 && hourValue < 9){
+    //     targetPercentage = 4;
+    //     amountPercentage = 5;
+    // } else {
+    //     targetPercentage = 0.5;
+    //     amountPercentage = 1;
+    // }
 
-    targetAmount =  (investment * (targetPercentage / 100)).toFixed(2);
+    targetAmount =  (initialAccountBalance * (targetPerRun / 100)).toFixed(2);
+
     setAccountInfo("targetAmount", `$ ${targetAmount}`);
-    amountPutForTrading = (investment * (amountPercentage / 100)).toFixed(2);
+    amountPutForTrading = (initialAccountBalance * (amountPercentage / 100)).toFixed(2);
     setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
     stake = amountPutForTrading;
 }
@@ -615,5 +738,25 @@ function isWithinTimeRange() {
     const now = new Date();
     const hour = now.getHours(); // Get current hour (0-23)
 
-    return hour >= 5 && hour < 18; // Returns true if between 5 AM and 4 PM
+    return hour >= 5 && hour < 17; // Returns true if between 5 AM and 4 PM
 }
+
+function getHourValue() {
+    const now = new Date();
+    const hour = now.getHours(); // Get current hour (0-23)
+
+    return hour; // Returns true if between 5 AM and 4 PM
+}
+
+
+function getRandomMarket(array, current){
+    let randomIndex;
+    let randomMarket;
+  
+    do {
+      randomIndex = Math.floor(Math.random() * array.length);
+      randomMarket = array[randomIndex];
+    } while (randomMarket === current);
+  
+    return randomMarket.value;
+  };
