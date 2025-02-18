@@ -734,11 +734,23 @@ function getRandomNumber(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+// function isWithinTimeRange() {
+//     const now = new Date();
+//     const hour = now.getHours(); // Get current hour (0-23)
+
+//     return hour >= 5 && hour < 17; // Returns true if between 5 AM and 4 PM
+// }
+
 function isWithinTimeRange() {
     const now = new Date();
     const hour = now.getHours(); // Get current hour (0-23)
 
-    return hour >= 5 && hour < 17; // Returns true if between 5 AM and 4 PM
+    let returnValue = false;
+    if((hour >= 5 && hour < 13) || (hour >= 14 && hour < 18) || (hour >= 20 && hour < 22)){
+        returnValue = true;
+    }
+
+    return returnValue; // Returns true if between 5 AM and 4 PM
 }
 
 function getHourValue() {
