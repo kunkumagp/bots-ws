@@ -81,7 +81,7 @@ marketArray.forEach((item) => {
     marketSelectElement.appendChild(option); // Append to the <select>
 });
 
-accountSelectElement.value = "Y71P0GIOxz3YYvr";
+accountSelectElement.value = "lkUxtOopvUhCpIX";
 marketSelectElement.value = "R_10";
 apiToken = accountSelectElement.value;
 
@@ -234,11 +234,12 @@ ws.onmessage = function (event) {
                         }
                     
                         if (currentLossAmount < 0) {
-                            runScript();
+                            // runScript();
+                            requestTicksHistory();
                         } else {
                             if (currentProfitAmount >= targetAmount) {
                                 // let newTime = (getRandomNumber(15, 30) * 60000);
-                                let newTime = (getRandomNumber(1, 15) * 1000);
+                                let newTime = (getRandomNumber(1, 10) * 1000);
                                 setTimer(newTime);
                                 setTimeout(() => {
                                     reserParams();
@@ -660,7 +661,7 @@ function isWithinTimeRange() {
     const hour = now.getHours(); // Get current hour (0-23)
 
     let returnValue = false;
-    if((hour >= 5 && hour < 14) || (hour >= 15 && hour < 18) || (hour >= 20 && hour < 22)){
+    if((hour >= 5 && hour < 14) || (hour >= 15 && hour < 18) || (hour >= 18 && hour < 22)){
         returnValue = true;
     }
 
