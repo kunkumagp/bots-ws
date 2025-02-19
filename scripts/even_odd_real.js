@@ -81,7 +81,7 @@ marketArray.forEach((item) => {
     marketSelectElement.appendChild(option); // Append to the <select>
 });
 
-accountSelectElement.value = "lkUxtOopvUhCpIX";
+accountSelectElement.value = "Y71P0GIOxz3YYvr";
 marketSelectElement.value = "R_10";
 apiToken = accountSelectElement.value;
 
@@ -109,7 +109,7 @@ ws.onerror = function (err) {
 
 ws.onmessage = function (event) {
 
-    if(isWithinTimeRange()){
+    // if(isWithinTimeRange()){
         wsResponse = JSON.parse(event.data);
 
         if (wsResponse != null) {
@@ -235,8 +235,8 @@ ws.onmessage = function (event) {
 
                         if (currentLossAmount < 0) {
                             market = getRandomMarket(marketArray, market);
-                            // let newTime = (getRandomNumber(20, 30) * 1000);
-                            let newTime = (getRandomNumber(1, 3) * 1000);
+                            let newTime = (getRandomNumber(20, 30) * 1000);
+                            // let newTime = (getRandomNumber(1, 3) * 1000);
                             setTimer(newTime);
                             setTimeout(() => {
                                 runScript();
@@ -266,7 +266,12 @@ ws.onmessage = function (event) {
                             //     runScript();
                             // }
 
-                            runScript();
+                            let newTime = (getRandomNumber(1, 3) * 1000);
+                            setTimer(newTime);
+                            setTimeout(() => {
+                                runScript();
+                            }, newTime);
+
 
                         }
 
@@ -284,7 +289,7 @@ ws.onmessage = function (event) {
             }
 
         }
-    }
+    // }
 
 };
 
@@ -339,8 +344,8 @@ const placeTrade = (result = null) => {
         stake = Number(stake);
         stake < 0.35 ? (stake = 0.35) : (stake = stake);
 
-        tickCount = 1;
-        // tickCount = getRandomNumber(5, 8);
+        // tickCount = 1;
+        tickCount = getRandomNumber(5, 8);
 
         const tradeRequest = {
             proposal: 1,
@@ -392,9 +397,11 @@ const requestTicksHistory = () => {
 
 
 function runScript() {
-    isRunning = true;
-    // placeTrade();
-    requestTicksHistory();
+    // if(isWithinTimeRange()){
+        isRunning = true;
+        placeTrade();
+        // requestTicksHistory();
+    // }
 }
 
 function reload() {
