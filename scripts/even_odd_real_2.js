@@ -81,7 +81,7 @@ marketArray.forEach((item) => {
     marketSelectElement.appendChild(option); // Append to the <select>
 });
 
-accountSelectElement.value = "lkUxtOopvUhCpIX";
+accountSelectElement.value = "Y71P0GIOxz3YYvr";
 marketSelectElement.value = "R_10";
 apiToken = accountSelectElement.value;
 
@@ -125,14 +125,15 @@ ws.onmessage = function (event) {
                 resetParams();
                 // scriptButton.innerHTML = "Bot started....";
                 // placeTrade();
-                runScript();
+                // runScript();
+                requestTicksHistory();
             }
 
             if (wsResponse.msg_type === 'history') {
                 const lastDigitList = wsResponse.history.prices;
                 // console.log('lastDigitList - ', lastDigitList);
 
-                // const tradeType = checkLastDigitParity(lastDigitList);
+                const tradeType = checkLastDigitParity(lastDigitList);
                 // console.log('tradeType - ',tradeType);
                 
                 checkPossibilityAndTrade(lastDigitList);
@@ -232,46 +233,21 @@ ws.onmessage = function (event) {
                             lostCountInRow = lostCountInRow + 1;
                         }
                     
-
                         if (currentLossAmount < 0) {
-                            market = getRandomMarket(marketArray, market);
-                            let newTime = (getRandomNumber(20, 30) * 1000);
-                            // let newTime = (getRandomNumber(1, 3) * 1000);
-                            setTimer(newTime);
-                            setTimeout(() => {
-                                runScript();
-                            }, newTime);
-                            
-                            // if(lostCountInRow >= 2){
-                            //     // let newTime = (getRandomNumber(1, 2) * 60000 );
-                            //     let newTime = (getRandomNumber(20, 30) * 1000);
-                            //     setTimer(newTime);
-                            //     setTimeout(() => {
-                            //         runScript();
-                            //     }, newTime);
-                            // } else {
-                            //     runScript();
-                            // }
+                            runScript();
                         } else {
-                            // if (currentProfitAmount >= targetAmount) {
-                            //     // let newTime = (getRandomNumber(30, 40) * 60000 );
-                            //     // let newTime = (getRandomNumber(5, 10) * 60000 );
-                            //     let newTime = (getRandomNumber(1, 3) * 1000);
-                            //     setTimer(newTime);
-                            //     setTimeout(() => {
-                            //         reserParams();
-                            //         reload();
-                            //     }, newTime);
-                            // } else {
-                            //     runScript();
-                            // }
-
-                            let newTime = (getRandomNumber(1, 3) * 1000);
-                            setTimer(newTime);
-                            setTimeout(() => {
+                            if (currentProfitAmount >= targetAmount) {
+                                // let newTime = (getRandomNumber(15, 30) * 60000);
+                                let newTime = (getRandomNumber(1, 15) * 1000);
+                                setTimer(newTime);
+                                setTimeout(() => {
+                                    reserParams();
+                                    reload();
+                                    // runScript();
+                                }, newTime);
+                            } else {
                                 runScript();
-                            }, newTime);
-
+                            }
 
                         }
 
@@ -344,8 +320,8 @@ const placeTrade = (result = null) => {
         stake = Number(stake);
         stake < 0.35 ? (stake = 0.35) : (stake = stake);
 
-        // tickCount = 1;
-        tickCount = getRandomNumber(5, 8);
+        tickCount = 1;
+        // tickCount = getRandomNumber(5, 8);
 
         const tradeRequest = {
             proposal: 1,
@@ -384,7 +360,7 @@ const requestTicksHistory = () => {
     const ticksHistoryRequest = {
         ticks_history: market,
         end: 'latest',
-        count: 3, // Increased count for a larger dataset (more ticks for better prediction)
+        count: 10, // Increased count for a larger dataset (more ticks for better prediction)
         style: 'ticks'
     };
     ws.send(JSON.stringify(ticksHistoryRequest));
@@ -397,11 +373,11 @@ const requestTicksHistory = () => {
 
 
 function runScript() {
-    // if(isWithinTimeRange()){
+    if(isWithinTimeRange()){
         isRunning = true;
         placeTrade();
         // requestTicksHistory();
-    // }
+    }
 }
 
 function reload() {
@@ -437,13 +413,13 @@ function reserParams() {
 }
 
 function resetParams() {
-    let investment = initialAccountBalance / 10;
+
+    let investment = (initialAccountBalance / 10).toFixed(2);
 
 
-    targetAmount =  (investment * (targetPercentage / 100)).toFixed(2);
+    targetAmount =  (investment * (0.8/100)).toFixed(2);
     setAccountInfo("targetAmount", `$ ${targetAmount}`);
-    // amountPutForTrading = (investment * (amountPercentage / 100)).toFixed(2);
-    amountPutForTrading = 0.35;
+    amountPutForTrading = (investment * (1/100)).toFixed(2);
     setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
     stake = amountPutForTrading;
 }
@@ -684,7 +660,7 @@ function isWithinTimeRange() {
     const hour = now.getHours(); // Get current hour (0-23)
 
     let returnValue = false;
-    if((hour >= 5 && hour < 14) || (hour >= 18 && hour < 24)){
+    if((hour >= 5 && hour < 14) || (hour >= 15 && hour < 18) || (hour >= 20 && hour < 22)){
         returnValue = true;
     }
 
@@ -781,9 +757,13 @@ const checkPossibilityAndTrade = (lastDigitList) => {
     if(possibility.evenProbability > possibility.oddProbability){
         tradeType = 'even';
         runScript();
+        console.log('tradeType - ',tradeType);
+
     } else if(possibility.evenProbability < possibility.oddProbability){
         tradeType = 'odd';
         runScript();
+        console.log('tradeType - ',tradeType);
+
     } else if(possibility.evenProbability == possibility.oddProbability){
         requestTicksHistory();
     }
