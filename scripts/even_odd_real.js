@@ -6,10 +6,15 @@ const accounts = [
 ];
 
 const marketArray = [
+    // { value: "1HZ10V", name: "Volatility 10 (1s) Index" },
     { value: "R_10", name: "Volatility 10 Index" },
+    // { value: "1HZ25V", name: "Volatility 25 (1s) Index" },
     { value: "R_25", name: "Volatility 25 Index" },
+    // { value: "1HZ50V", name: "Volatility 50 (1s) Index" },
     { value: "R_50", name: "Volatility 50 Index" },
+    // { value: "1HZ75V", name: "Volatility 75 (1s) Index" },
     { value: "R_75", name: "Volatility 75 Index" },
+    // { value: "1HZ100V", name: "Volatility 100 (1s) Index" },
     { value: "R_100", name: "Volatility 100 Index" },
 ];
 
@@ -25,8 +30,8 @@ const martingaleMultiplier = 2.07112;
 
 let isRunning = false, intervalId;
 
-let targetPercentage = 0.5;
-let amountPercentage = 1;
+let targetPercentage = 0.4;
+let amountPercentage = 0.5;
 
 let initialAccountBalance = 0;
 let updatedAccountBalance = 0;
@@ -123,6 +128,45 @@ ws.onmessage = function (event) {
                 runScript();
             }
 
+            if (wsResponse.msg_type === 'history') {
+                const lastDigitList = wsResponse.history.prices;
+                // console.log('lastDigitList - ', lastDigitList);
+
+                // const tradeType = checkLastDigitParity(lastDigitList);
+                // console.log('tradeType - ',tradeType);
+                
+                checkPossibilityAndTrade(lastDigitList);
+
+                // if(tradeType == 0){
+                //     setFlashNotification("Analizing...", 0);
+                //     setTimeout(() => {
+                //         requestTicksHistory();
+                //     }, 1000);
+                    
+                // } else {
+                //     setFlashNotification("", 0);
+                //     placeTrade();
+                // }
+            }
+
+
+            // if (response.msg_type === 'history') {
+            //     const lastDigitList = response.history.prices;
+            //     console.log('lastDigitList - ', lastDigitList);
+
+            //     const tradeType = checkLastDigitParity(lastDigitList);
+            //     console.log('tradeType - ',tradeType);
+
+            //     if(tradeType == 0){
+            //         setFlashNotification("Analizing...", 0);
+            //         requestTicksHistory();
+            //     } else {
+            //         setFlashNotification("", 0);
+            //         placeTrade(tradeType);
+            //     }
+                
+            // }
+
 
             if (wsResponse.msg_type === "proposal") {
                 if (
@@ -190,7 +234,9 @@ ws.onmessage = function (event) {
                     
 
                         if (currentLossAmount < 0) {
-                            let newTime = (getRandomNumber(20, 30) * 1000);
+                            market = getRandomMarket(marketArray, market);
+                            // let newTime = (getRandomNumber(20, 30) * 1000);
+                            let newTime = (getRandomNumber(1, 3) * 1000);
                             setTimer(newTime);
                             setTimeout(() => {
                                 runScript();
@@ -207,18 +253,21 @@ ws.onmessage = function (event) {
                             //     runScript();
                             // }
                         } else {
-                            if (currentProfitAmount >= targetAmount) {
-                                // let newTime = (getRandomNumber(30, 40) * 60000 );
-                                // let newTime = (getRandomNumber(5, 10) * 60000 );
-                                let newTime = (getRandomNumber(1, 3) * 1000);
-                                setTimer(newTime);
-                                setTimeout(() => {
-                                    reserParams();
-                                    reload();
-                                }, newTime);
-                            } else {
-                                runScript();
-                            }
+                            // if (currentProfitAmount >= targetAmount) {
+                            //     // let newTime = (getRandomNumber(30, 40) * 60000 );
+                            //     // let newTime = (getRandomNumber(5, 10) * 60000 );
+                            //     let newTime = (getRandomNumber(1, 3) * 1000);
+                            //     setTimer(newTime);
+                            //     setTimeout(() => {
+                            //         reserParams();
+                            //         reload();
+                            //     }, newTime);
+                            // } else {
+                            //     runScript();
+                            // }
+
+                            runScript();
+
                         }
 
 
@@ -290,8 +339,8 @@ const placeTrade = (result = null) => {
         stake = Number(stake);
         stake < 0.35 ? (stake = 0.35) : (stake = stake);
 
-        // tickCount = 1;
-        tickCount = getRandomNumber(5, 8);
+        tickCount = 1;
+        // tickCount = getRandomNumber(5, 8);
 
         const tradeRequest = {
             proposal: 1,
@@ -326,6 +375,16 @@ const fetchTradeDetails = (contractId) => {
 };
 
 
+const requestTicksHistory = () => {
+    const ticksHistoryRequest = {
+        ticks_history: market,
+        end: 'latest',
+        count: 3, // Increased count for a larger dataset (more ticks for better prediction)
+        style: 'ticks'
+    };
+    ws.send(JSON.stringify(ticksHistoryRequest));
+};
+
 
 
 // scriptButton.addEventListener("click", runScript);
@@ -334,7 +393,8 @@ const fetchTradeDetails = (contractId) => {
 
 function runScript() {
     isRunning = true;
-    placeTrade();
+    // placeTrade();
+    requestTicksHistory();
 }
 
 function reload() {
@@ -375,7 +435,8 @@ function resetParams() {
 
     targetAmount =  (investment * (targetPercentage / 100)).toFixed(2);
     setAccountInfo("targetAmount", `$ ${targetAmount}`);
-    amountPutForTrading = (investment * (amountPercentage / 100)).toFixed(2);
+    // amountPutForTrading = (investment * (amountPercentage / 100)).toFixed(2);
+    amountPutForTrading = 0.35;
     setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
     stake = amountPutForTrading;
 }
@@ -622,3 +683,101 @@ function isWithinTimeRange() {
 
     return returnValue; // Returns true if between 5 AM and 4 PM
 }
+
+
+function getRandomMarket(array, current){
+    let randomIndex;
+    let randomMarket;
+  
+    do {
+      randomIndex = Math.floor(Math.random() * array.length);
+      randomMarket = array[randomIndex];
+    } while (randomMarket === current);
+  
+    return randomMarket.value;
+  };
+
+
+function checkLastDigitParity(numbers) {
+    // Extract the last digit of each number
+    const lastDigits = numbers.map((num) => Math.floor(num * 10) % 10);
+
+    console.log('lastDigits - ', lastDigits);
+
+    let evenCount = 0;
+    let oddCount = 0;
+
+    lastDigits.forEach(digit => {
+        digit % 2 === 0 ? evenCount++ : oddCount++;
+    });
+
+    console.log('evenCount - ', evenCount);
+    console.log('oddCount - ', oddCount);
+
+
+    if(evenCount == numbers.length){
+        return 'even';
+    } else if(oddCount == numbers.length){
+        return 'odd';
+    } else {
+        return 0; 
+    }
+    
+
+    // Check if all last digits are the same
+    // const allMatch = lastDigits.every((digit) => digit === lastDigits[0]);
+    // console.log('allMatch - ', allMatch);
+
+    // if (allMatch) {
+    //     const parity = lastDigits[0] % 2 === 0 ? 'even' : 'odd';
+    //     return parity; // Return "even" or "odd" based on the common last digit
+    // } else {
+    //     return 0; // Return "not matched" if the digits are different
+    // }
+}
+
+function getLastDigit(numbers) {
+    // Extract the last digit of each number
+    const lastDigits = numbers.map((num) => Math.floor((num * 1000) % 10));
+
+    return calculateEvenOddProbability(lastDigits);
+
+}
+
+function calculateEvenOddProbability(numbers) {
+    let evenCount = 0;
+    let oddCount = 0;
+    let totalCount = numbers.length;
+
+    if (totalCount === 0) {
+        return { evenProbability: 0, oddProbability: 0 }; // Avoid division by zero
+    }
+
+    numbers.forEach(num => {
+        if (num % 2 === 0) {
+            evenCount++;
+        } else {
+            oddCount++;
+        }
+    });
+
+    return {
+        evenProbability: (evenCount / totalCount).toFixed(4),
+        oddProbability: (oddCount / totalCount).toFixed(4)
+    };
+}
+
+const checkPossibilityAndTrade = (lastDigitList) => {
+    const possibility = getLastDigit(lastDigitList);
+    console.log('tradeType - ',possibility);
+
+    if(possibility.evenProbability > possibility.oddProbability){
+        tradeType = 'even';
+        runScript();
+    } else if(possibility.evenProbability < possibility.oddProbability){
+        tradeType = 'odd';
+        runScript();
+    } else if(possibility.evenProbability == possibility.oddProbability){
+        requestTicksHistory();
+    }
+};

@@ -6,10 +6,15 @@ const accounts = [
 ];
 
 const marketArray = [
+    { value: "1HZ10V", name: "Volatility 10 (1s) Index" },
     { value: "R_10", name: "Volatility 10 Index" },
+    { value: "1HZ25V", name: "Volatility 25 (1s) Index" },
     { value: "R_25", name: "Volatility 25 Index" },
+    { value: "1HZ50V", name: "Volatility 50 (1s) Index" },
     { value: "R_50", name: "Volatility 50 Index" },
+    { value: "1HZ75V", name: "Volatility 75 (1s) Index" },
     { value: "R_75", name: "Volatility 75 Index" },
+    { value: "1HZ100V", name: "Volatility 100 (1s) Index" },
     { value: "R_100", name: "Volatility 100 Index" },
 ];
 
