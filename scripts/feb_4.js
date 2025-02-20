@@ -6,15 +6,10 @@ const accounts = [
 ];
 
 const marketArray = [
-    { value: "1HZ10V", name: "Volatility 10 (1s) Index" },
     { value: "R_10", name: "Volatility 10 Index" },
-    { value: "1HZ25V", name: "Volatility 25 (1s) Index" },
     { value: "R_25", name: "Volatility 25 Index" },
-    { value: "1HZ50V", name: "Volatility 50 (1s) Index" },
-    { value: "R_50", name: "Volatility 50 Index" },
-    { value: "1HZ75V", name: "Volatility 75 (1s) Index" },
+    // { value: "R_50", name: "Volatility 50 Index" },
     { value: "R_75", name: "Volatility 75 Index" },
-    { value: "1HZ100V", name: "Volatility 100 (1s) Index" },
     { value: "R_100", name: "Volatility 100 Index" },
 ];
 
@@ -29,35 +24,10 @@ const infoOutput = document.getElementById("info_output");
 const martingaleMultiplier = 2.07112;
 
 let isRunning = false, intervalId;
-let connectionStatus = false;
 
-let targetPercentage = 1;
-let targetPerRun = 5;
-let amountPercentage = 0.1
-let savings = 400;
+let targetPercentage = 0.3;
+let amountPercentage = 0.35;
 
-
-// let targetPercentage = 0.05;
-// let amountPercentage = 0.1;
-
-
-let devideValue = 10/9;
-
-// let targetPercentage = 3;
-// let amountPercentage = 4;
-
-let intervalTime = 0 ;
-
-if(targetProfitInputElement.value != ""){
-    targetPercentage = targetProfitInputElement.value;
-}
-
-if(initialStakeInputElement.value != ""){
-    amountPercentage = initialStakeInputElement.value;
-}
-
-
-let fullAccountBalance = 0;
 let initialAccountBalance = 0;
 let updatedAccountBalance = 0;
 
@@ -115,8 +85,9 @@ accountSelectElement.addEventListener("change", () => {
     apiToken = accountSelectElement.value;
 });
 
-market = marketSelectElement.value;
-market = getRandomMarket(marketArray, market);
+// market = marketSelectElement.value;
+market = getRandomMarket(marketArray, '');
+
 
 ws.onopen = function () {
     console.log("Connection open");
@@ -127,7 +98,6 @@ ws.onopen = function () {
 ws.onclose = function () {
     console.log("Connection closed");
     console.log("-----------------------------\n");
-    connectionStatus = false;
 };
 
 ws.onerror = function (err) {
@@ -136,30 +106,20 @@ ws.onerror = function (err) {
 
 ws.onmessage = function (event) {
 
-    if(isWithinTimeRange()){
+    // if(isWithinTimeRange()){
         wsResponse = JSON.parse(event.data);
 
         if (wsResponse != null) {
             if (wsResponse.msg_type === "authorize") {
-                connectionStatus = true;
                 console.log("Authorization successful.\n-----------------------------\n\n");
                 setFlashNotification("Authorization successful", 0);
-                fullAccountBalance = wsResponse.authorize.balance;
-                // initialAccountBalance = fullAccountBalance - (fullAccountBalance / (devideValue) );
-                // initialAccountBalance = fullAccountBalance - savings;
-                initialAccountBalance = (fullAccountBalance / 10);
-                // initialAccountBalance = fullAccountBalance;
-                // initialAccountBalance = fullAccountBalance / 2;
+                initialAccountBalance = wsResponse.authorize.balance;
                 updatedAccountBalance = initialAccountBalance;
-                setAccountInfo("initialAccountBalance", `$ ${fullAccountBalance}`);
-                setAccountInfo("investmentAmount", `$ ${initialAccountBalance}`);
+                setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance}`);
                 authSuccess = true;
-                
                 authenticateButton.innerHTML = "Authenticated. Ready to trade.";
                 authenticateButton.disabled = true;
                 resetParams();
-
-
                 // scriptButton.innerHTML = "Bot started....";
                 // placeTrade();
                 runScript();
@@ -168,8 +128,8 @@ ws.onmessage = function (event) {
 
             if (wsResponse.msg_type === "proposal") {
                 if (
-                    fullAccountBalance > 0 &&
-                    wsResponse.echo_req.amount > fullAccountBalance
+                    updatedAccountBalance > 0 &&
+                    wsResponse.echo_req.amount > updatedAccountBalance
                 ) {
                     webSocketConnectionStop();
                 } else {
@@ -228,115 +188,33 @@ ws.onmessage = function (event) {
 
                         if(profit < 0){
                             lostCountInRow = lostCountInRow + 1;
-                        } else {
-                            lostCountInRow = 0;
                         }
                     
 
                         if (currentLossAmount < 0) {
-                            market = getRandomMarket(marketArray, market);
-                                // devideValue = 10/9;
-
-                            intervalTime = (getRandomNumber(20, 30) * 1000);
-                            setTimer(intervalTime);
-                            setTimeout(() => {
-                                if(connectionStatus){
-                                    runScript();
-                                } else {
-                                    reserParams();
-                                    reload();
-                                }
-                            }, intervalTime);
-                            
-                            // if(lostCountInRow >= 5){
-                            //     // intervalTime = (getRandomNumber(1, 2) * 60000 );
-                            //     // intervalTime = (getRandomNumber(30, 40) * 1000);
-                            //     market = getRandomMarket(marketArray, market);
-                            //     // devideValue = 10/9;
-
-                            //     intervalTime = (getRandomNumber(20, 30) * 1000);
-                            //     setTimer(intervalTime);
-                            //     setTimeout(() => {
-                            //         if(connectionStatus){
-                            //             runScript();
-                            //         } else {
-                            //             reserParams();
-                            //             reload();
-                            //         }
-                            //     }, intervalTime);
-                            // } else if(lostCountInRow >= 2){
-                            //     // intervalTime = (getRandomNumber(1, 2) * 60000 );
-                            //     // intervalTime = (getRandomNumber(30, 40) * 1000);
-                            //     market = getRandomMarket(marketArray, market);
-                            //     // devideValue = 10/9;
-
-                            //     intervalTime = (getRandomNumber(3, 6) * 1000);
-                            //     setTimer(intervalTime);
-                            //     setTimeout(() => {
-                            //         if(connectionStatus){
-                            //             runScript();
-                            //         } else {
-                            //             reserParams();
-                            //             reload();
-                            //         }
-                            //     }, intervalTime);
-                            // } else {
-                            //     runScript();
-                            // }
-                        } else {
-
-                            if(netProfit >= targetAmount){
-                                intervalTime = (getRandomNumber(10, 15) * 60000 );
-
-                                setTimer(intervalTime);
+                            if(lostCountInRow >= 2){
+                                // let newTime = (getRandomNumber(1, 2) * 60000 );
+                                let newTime = (getRandomNumber(10, 20) * 1000);
+                                setTimer(newTime);
                                 setTimeout(() => {
-                                    if(connectionStatus){
-                                        runScript();
-                                    } else {
-                                        reserParams();
-                                        reload();
-                                    }
-                                }, intervalTime);
-
+                                    runScript();
+                                }, newTime);
                             } else {
                                 runScript();
-
-
                             }
-
-                            // if(netProfit >= (initialAccountBalance / 4)){
-                            //     // intervalTime = (getRandomNumber(20, 30) * 60000 );
-                            //     intervalTime = (getRandomNumber(10, 15) * 60000 );
-
-                            //     setTimer(intervalTime);
-                            //     setTimeout(() => {
-                            //         if(connectionStatus){
-                            //             runScript();
-                            //         } else {
-                            //             reserParams();
-                            //             reload();
-                            //         }
-                            //     }, intervalTime);
-                            // } else {
-                            //     if (currentProfitAmount >= targetAmount) {
-                            //         // intervalTime = (getRandomNumber(30, 40) * 60000 );
-                            //         // intervalTime = (getRandomNumber(5, 10) * 60000 );
-                            //         // intervalTime = (getRandomNumber(120, 180) * 1000 );
-                            //         intervalTime = (getRandomNumber(5, 10) * 1000);
-                            //         setTimer(intervalTime);
-                            //         setTimeout(() => {
-                            //             if(connectionStatus){
-                            //                 runScript();
-                            //             } else {
-                            //                 reserParams();
-                            //                 reload();
-                            //             }
-                            //         }, intervalTime);
-                            //     } else {
-                            //         runScript();
-                            //     }
-                            // }
-                            
+                        } else {
+                            if (currentProfitAmount >= targetAmount) {
+                                // let newTime = (getRandomNumber(30, 40) * 60000 );
+                                let newTime = (getRandomNumber(2, 3) * 60000 );
+                                // let newTime = (getRandomNumber(40, 60) * 1000);
+                                setTimer(newTime);
+                                setTimeout(() => {
+                                    reserParams();
+                                    reload();
+                                }, newTime);
+                            } else {
+                                runScript();
+                            }
                         }
 
 
@@ -353,7 +231,7 @@ ws.onmessage = function (event) {
             }
 
         }
-    }
+    // }
 
 };
 
@@ -409,7 +287,7 @@ const placeTrade = (result = null) => {
         stake < 0.35 ? (stake = 0.35) : (stake = stake);
 
         // tickCount = 1;
-        tickCount = getRandomNumber(2, 8);
+        tickCount = getRandomNumber(5, 8);
 
         const tradeRequest = {
             proposal: 1,
@@ -442,8 +320,6 @@ const fetchTradeDetails = (contractId) => {
 
     ws.send(JSON.stringify(contractDetailsRequest));
 };
-
-
 
 
 
@@ -490,18 +366,7 @@ function reserParams() {
 }
 
 function resetParams() {
-
-    // let hourValue = getHourValue();
-    // if(hourValue > 5 && hourValue < 9){
-    //     targetPercentage = 4;
-    //     amountPercentage = 5;
-    // } else {
-    //     targetPercentage = 0.5;
-    //     amountPercentage = 1;
-    // }
-
-    targetAmount =  (initialAccountBalance * (targetPerRun / 100)).toFixed(2);
-
+    targetAmount =  (initialAccountBalance * (targetPercentage / 100)).toFixed(2);
     setAccountInfo("targetAmount", `$ ${targetAmount}`);
     amountPutForTrading = (initialAccountBalance * (amountPercentage / 100)).toFixed(2);
     setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
@@ -739,32 +604,12 @@ function getRandomNumber(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-// function isWithinTimeRange() {
-//     const now = new Date();
-//     const hour = now.getHours(); // Get current hour (0-23)
-
-//     return hour >= 5 && hour < 17; // Returns true if between 5 AM and 4 PM
-// }
-
 function isWithinTimeRange() {
     const now = new Date();
     const hour = now.getHours(); // Get current hour (0-23)
 
-    let returnValue = false;
-    if((hour >= 5 && hour < 13) || (hour >= 14 && hour < 18) || (hour >= 20 && hour < 22)){
-        returnValue = true;
-    }
-
-    return returnValue; // Returns true if between 5 AM and 4 PM
+    return hour >= 5 && hour < 23; // Returns true if between 5 AM and 4 PM
 }
-
-function getHourValue() {
-    const now = new Date();
-    const hour = now.getHours(); // Get current hour (0-23)
-
-    return hour; // Returns true if between 5 AM and 4 PM
-}
-
 
 function getRandomMarket(array, current){
     let randomIndex;

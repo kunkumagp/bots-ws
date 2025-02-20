@@ -30,8 +30,8 @@ const martingaleMultiplier = 2.07112;
 
 let isRunning = false, intervalId;
 
-let targetPercentage = 0.4;
-let amountPercentage = 0.5;
+let targetPercentage = 0.8;
+let amountPercentage = 1;
 
 let initialAccountBalance = 0;
 let updatedAccountBalance = 0;
@@ -128,15 +128,24 @@ ws.onmessage = function (event) {
                 // scriptButton.innerHTML = "Bot started....";
                 // placeTrade();
                 // runScript();
+
+                // let newTime = 10000;
+                // setTimer(newTime);
+                // setTimeout(() => {
+                //     requestTicksHistory();
+                // }, newTime);
                 requestTicksHistory();
+
+
             }
 
             if (wsResponse.msg_type === 'history') {
                 const lastDigitList = wsResponse.history.prices;
                 // console.log('lastDigitList - ', lastDigitList);
 
-                const tradeType = checkLastDigitParity(lastDigitList);
+                // const tradeType = checkLastDigitParity(lastDigitList);
                 // console.log('tradeType - ',tradeType);
+                
                 
                 checkPossibilityAndTrade(lastDigitList);
 
@@ -208,7 +217,7 @@ ws.onmessage = function (event) {
                     );
 
                     // setAccountInfo('percentage10', `$ ${targetProfit.toFixed(2)}`)
-                    console.log("Trade Successful:", wsResponse);
+                    // console.log("Trade Successful:", wsResponse);
                     // scrollToBottom();
 
                     automation = true;
@@ -227,29 +236,31 @@ ws.onmessage = function (event) {
                         const profit = contract.profit;
                         const result = profit > 0 ? "Win" : "Loss";
 
-                        setInfo(contract, profit);
-                        stakeChange(result);
-                        isTradeOpen = false;
-
                         if(profit < 0){
                             lostCountInRow = lostCountInRow + 1;
                         }
-                    
+
+                        setInfo(contract, profit);
+                        stakeChange(result, currentLossAmount, lostCountInRow);
+                        isTradeOpen = false;
+
                         if (currentLossAmount < 0) {
                             if(lostCountInRow >= 4){
-                                let newTime = (getRandomNumber(10, 20) * 1000);
+                                let newTime = (getRandomNumber(20, 30) * 1000);
+                                // let newTime = 0;
                                 setTimer(newTime);
                                 setTimeout(() => {
                                     requestTicksHistory();
                                 }, newTime);
                             } else {
-                                runScript();
+                                // runScript();
+                                requestTicksHistory();
                             }
-                            // requestTicksHistory();
                         } else {
                             if (currentProfitAmount >= targetAmount) {
                                 // let newTime = (getRandomNumber(15, 30) * 60000);
-                                let newTime = (getRandomNumber(1, 10) * 1000);
+                                // let newTime = (getRandomNumber(1, 10) * 1000);
+                                let newTime = 0;
                                 setTimer(newTime);
                                 setTimeout(() => {
                                     reserParams();
@@ -257,7 +268,8 @@ ws.onmessage = function (event) {
                                     // runScript();
                                 }, newTime);
                             } else {
-                                runScript();
+                                // runScript();
+                                requestTicksHistory();
                             }
 
                         }
@@ -287,9 +299,16 @@ const getAuthentication = () => {
 };
 
 
-const stakeChange = (status) => {
+const stakeChange = (status,currentLossAmount=null, lostCountInRow=null) => {
     if (status == "Loss") {
-        stake = stake * martingaleMultiplier;
+        // if(lostCountInRow >= 5){
+        //     stake = Math.abs(calculateNextStake(currentLossAmount));
+        // } else {
+        //     stake = stake * martingaleMultiplier;
+        // }
+        // stake = stake * martingaleMultiplier;
+        stake = Math.abs(calculateNextStake(currentLossAmount))
+
     } else if (status == "Win") {
         stake = amountPutForTrading;
     }
@@ -347,7 +366,7 @@ const placeTrade = (result = null) => {
 
         onTradeCount = 1;
         // Send the trade request to the WebSocket
-        console.log("Sending Rise/Fall trade request:", tradeRequest);
+        // console.log("Sending Rise/Fall trade request:", tradeRequest);
         ws.send(JSON.stringify(tradeRequest));
     }
 };
@@ -426,11 +445,25 @@ function reserParams() {
 function resetParams() {
 
     let investment = (initialAccountBalance / 10).toFixed(2);
+    let times = getLocalTime();
+    let hour = Number(times.hour);
+
+    console.log('times: ', hour);
 
 
-    targetAmount =  (investment * (targetPercentage/100)).toFixed(2);
+    if((hour >= 5 && hour <= 12) || (hour >= 14 && hour <= 17)){
+        amountPutForTrading = (investment * ((amountPercentage * 2)/100)).toFixed(2);
+    } else {
+        amountPutForTrading = (investment * (amountPercentage/100)).toFixed(2);
+    }
+
+    console.log('amountPutForTrading: ', amountPutForTrading);
+
+
+    // targetAmount =  (investment * (targetPercentage/100)).toFixed(2);
+    targetAmount =  Number(currentLossAmount);
     setAccountInfo("targetAmount", `$ ${targetAmount}`);
-    amountPutForTrading = (investment * (amountPercentage/100)).toFixed(2);
+    // amountPutForTrading = (investment * (amountPercentage/100)).toFixed(2);
     setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
     stake = amountPutForTrading;
 }
@@ -666,12 +699,20 @@ function getRandomNumber(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+function getLocalTime(){
+    const now = new Date();
+    const hour = now.getHours(); // Get current hour (0-23)
+    const minutes = now.getMinutes(); // Get current Minutes (0-23)
+
+    return {hour: hour, minute: minutes}
+}
+
 function isWithinTimeRange() {
     const now = new Date();
     const hour = now.getHours(); // Get current hour (0-23)
 
     let returnValue = false;
-    if((hour >= 5 && hour < 14) || (hour >= 15 && hour < 18) || (hour >= 18 && hour < 24)){
+    if((hour >= 5 && hour < 12) || (hour >= 15 && hour < 24)){
         returnValue = true;
     }
 
@@ -696,7 +737,7 @@ function checkLastDigitParity(numbers) {
     // Extract the last digit of each number
     const lastDigits = numbers.map((num) => Math.floor(num * 10) % 10);
 
-    console.log('lastDigits - ', lastDigits);
+    // console.log('lastDigits - ', lastDigits);
 
     let evenCount = 0;
     let oddCount = 0;
@@ -763,19 +804,35 @@ function calculateEvenOddProbability(numbers) {
 
 const checkPossibilityAndTrade = (lastDigitList) => {
     const possibility = getLastDigit(lastDigitList);
-    console.log('tradeType - ',possibility);
 
     if(possibility.evenProbability > possibility.oddProbability){
+        console.log('tradeType - ',possibility);
+
         tradeType = 'even';
         runScript();
-        console.log('tradeType - ',tradeType);
+        // console.log('tradeType - ',tradeType);
 
     } else if(possibility.evenProbability < possibility.oddProbability){
+        console.log('tradeType - ',possibility);
+
         tradeType = 'odd';
         runScript();
-        console.log('tradeType - ',tradeType);
+        // console.log('tradeType - ',tradeType);
 
     } else if(possibility.evenProbability == possibility.oddProbability){
+        console.log('Analizing...');
+        setFlashNotification("Analizing...", 0);
         requestTicksHistory();
     }
 };
+
+function calculateNextStake(totalLoss, returnPercentage = 0.94) {
+    // The next stake should be such that its profit (stake * returnPercentage) covers the total loss
+    // return (totalLoss / returnPercentage) + Number(amountPutForTrading);
+
+    totalLoss = Math.abs(totalLoss);
+
+    console.log('next Stake: ', (totalLoss / returnPercentage));
+
+    return (totalLoss / returnPercentage) + (Number(amountPutForTrading)/2);
+}
