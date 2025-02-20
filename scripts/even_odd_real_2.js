@@ -91,6 +91,8 @@ accountSelectElement.addEventListener("change", () => {
 });
 
 market = marketSelectElement.value;
+market = getRandomMarket(marketArray, market);
+
 
 ws.onopen = function () {
     console.log("Connection open");
