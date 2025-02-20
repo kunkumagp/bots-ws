@@ -234,8 +234,16 @@ ws.onmessage = function (event) {
                         }
                     
                         if (currentLossAmount < 0) {
-                            // runScript();
-                            requestTicksHistory();
+                            if(lostCountInRow >= 4){
+                                let newTime = (getRandomNumber(10, 20) * 1000);
+                                setTimer(newTime);
+                                setTimeout(() => {
+                                    requestTicksHistory();
+                                }, newTime);
+                            } else {
+                                runScript();
+                            }
+                            // requestTicksHistory();
                         } else {
                             if (currentProfitAmount >= targetAmount) {
                                 // let newTime = (getRandomNumber(15, 30) * 60000);
@@ -374,11 +382,11 @@ const requestTicksHistory = () => {
 
 
 function runScript() {
-    if(isWithinTimeRange()){
+    // if(isWithinTimeRange()){
         isRunning = true;
         placeTrade();
         // requestTicksHistory();
-    }
+    // }
 }
 
 function reload() {
@@ -418,9 +426,9 @@ function resetParams() {
     let investment = (initialAccountBalance / 10).toFixed(2);
 
 
-    targetAmount =  (investment * (0.8/100)).toFixed(2);
+    targetAmount =  (investment * (targetPercentage/100)).toFixed(2);
     setAccountInfo("targetAmount", `$ ${targetAmount}`);
-    amountPutForTrading = (investment * (1/100)).toFixed(2);
+    amountPutForTrading = (investment * (amountPercentage/100)).toFixed(2);
     setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
     stake = amountPutForTrading;
 }
@@ -661,7 +669,7 @@ function isWithinTimeRange() {
     const hour = now.getHours(); // Get current hour (0-23)
 
     let returnValue = false;
-    if((hour >= 5 && hour < 14) || (hour >= 15 && hour < 18) || (hour >= 18 && hour < 22)){
+    if((hour >= 5 && hour < 14) || (hour >= 15 && hour < 18) || (hour >= 18 && hour < 24)){
         returnValue = true;
     }
 
