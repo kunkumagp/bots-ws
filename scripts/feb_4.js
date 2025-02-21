@@ -106,7 +106,7 @@ ws.onerror = function (err) {
 
 ws.onmessage = function (event) {
 
-    // if(isWithinTimeRange()){
+    if(isWithinTimeRange()){
         wsResponse = JSON.parse(event.data);
 
         if (wsResponse != null) {
@@ -231,7 +231,12 @@ ws.onmessage = function (event) {
             }
 
         }
-    // }
+    } else {
+        setTimeout(() => {
+            reload();
+        }, 60000);
+
+    }
 
 };
 
@@ -604,12 +609,12 @@ function getRandomNumber(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function isWithinTimeRange() {
-    const now = new Date();
-    const hour = now.getHours(); // Get current hour (0-23)
+// function isWithinTimeRange() {
+//     const now = new Date();
+//     const hour = now.getHours(); // Get current hour (0-23)
 
-    return hour >= 5 && hour < 23; // Returns true if between 5 AM and 4 PM
-}
+//     return hour >= 5 && hour < 23; // Returns true if between 5 AM and 4 PM
+// }
 
 function getRandomMarket(array, current){
     let randomIndex;
@@ -622,3 +627,15 @@ function getRandomMarket(array, current){
   
     return randomMarket.value;
   };
+
+  function isWithinTimeRange() {
+    const now = new Date();
+    const hour = now.getHours(); // Get current hour (0-23)
+
+    let returnValue = false;
+    if((hour >= 5 && hour < 13) || (hour >= 14 && hour < 24)){
+        returnValue = true;
+    }
+
+    return returnValue; // Returns true if between 5 AM and 4 PM
+}
