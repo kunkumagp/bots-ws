@@ -633,7 +633,7 @@ function getRandomMarket(array, current){
     const hour = now.getHours(); // Get current hour (0-23)
 
     let returnValue = false;
-    if((hour >= 5 && hour < 13) || (hour >= 14 && hour < 24)){
+    if((hour >= 5 && hour < 13) || (hour >= 14 && hour < 21)){
         returnValue = true;
     }
 
