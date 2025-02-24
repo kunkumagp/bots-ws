@@ -106,7 +106,7 @@ ws.onerror = function (err) {
 
 ws.onmessage = function (event) {
 
-    if(isWithinTimeRange()){
+    // if(isWithinTimeRange()){
         wsResponse = JSON.parse(event.data);
 
         if (wsResponse != null) {
@@ -231,12 +231,12 @@ ws.onmessage = function (event) {
             }
 
         }
-    } else {
-        setTimeout(() => {
-            reload();
-        }, 60000);
+    // } else {
+    //     setTimeout(() => {
+    //         reload();
+    //     }, 60000);
 
-    }
+    // }
 
 };
 
