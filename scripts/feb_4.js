@@ -98,6 +98,9 @@ ws.onopen = function () {
 ws.onclose = function () {
     console.log("Connection closed");
     console.log("-----------------------------\n");
+    if(isTradeOpen){
+        reload();
+    }
 };
 
 ws.onerror = function (err) {
@@ -106,7 +109,7 @@ ws.onerror = function (err) {
 
 ws.onmessage = function (event) {
 
-    if(isWithinTimeRange()){
+    // if(isWithinTimeRange()){
         wsResponse = JSON.parse(event.data);
 
         if (wsResponse != null) {
@@ -183,18 +186,19 @@ ws.onmessage = function (event) {
                         const result = profit > 0 ? "Win" : "Loss";
 
                         setInfo(contract, profit);
-                        stakeChange(result);
                         isTradeOpen = false;
 
                         if(profit < 0){
                             lostCountInRow = lostCountInRow + 1;
                         }
-                    
+
+                        stakeChange(result);
 
                         if (currentLossAmount < 0) {
                             if(lostCountInRow >= 2){
                                 // let newTime = (getRandomNumber(1, 2) * 60000 );
-                                let newTime = (getRandomNumber(10, 20) * 1000);
+                                // let newTime = (getRandomNumber(10, 20) * 1000);
+                                let newTime = (getRandomNumber(1, 5) * 1000);
                                 setTimer(newTime);
                                 setTimeout(() => {
                                     runScript();
@@ -205,7 +209,8 @@ ws.onmessage = function (event) {
                         } else {
                             if (currentProfitAmount >= targetAmount) {
                                 // let newTime = (getRandomNumber(30, 40) * 60000 );
-                                let newTime = (getRandomNumber(2, 3) * 60000 );
+                                // let newTime = (getRandomNumber(2, 3) * 60000 );
+                                let newTime = (getRandomNumber(1, 5) * 1000);
                                 // let newTime = (getRandomNumber(40, 60) * 1000);
                                 setTimer(newTime);
                                 setTimeout(() => {
@@ -231,12 +236,12 @@ ws.onmessage = function (event) {
             }
 
         }
-    } else {
-        setTimeout(() => {
-            reload();
-        }, 60000);
+    // } else {
+    //     setTimeout(() => {
+    //         reload();
+    //     }, 60000);
 
-    }
+    // }
 
 };
 
@@ -248,8 +253,17 @@ const getAuthentication = () => {
 
 
 const stakeChange = (status) => {
+    console.log('status: ', status);
+    console.log('lostCountInRow: ', lostCountInRow);
+    console.log('currentLossAmount: ', currentLossAmount);
+    console.log('amountPutForTrading: ', amountPutForTrading);
+    console.log('martingaleMultiplier: ', martingaleMultiplier);
     if (status == "Loss") {
-        stake = stake * martingaleMultiplier;
+        if(lostCountInRow >= 1){
+            stake = calculateNextStake(currentLossAmount);;
+        } else {
+            stake = stake * martingaleMultiplier;
+        }
     } else if (status == "Win") {
         stake = amountPutForTrading;
     }
@@ -371,9 +385,11 @@ function reserParams() {
 }
 
 function resetParams() {
-    targetAmount =  (initialAccountBalance * (targetPercentage / 100)).toFixed(2);
+    // targetAmount =  (initialAccountBalance * (targetPercentage / 100)).toFixed(2);
+    targetAmount =  0.3;
     setAccountInfo("targetAmount", `$ ${targetAmount}`);
-    amountPutForTrading = (initialAccountBalance * (amountPercentage / 100)).toFixed(2);
+    // amountPutForTrading = (initialAccountBalance * (amountPercentage / 100)).toFixed(2);
+    amountPutForTrading = 0.35;
     setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
     stake = amountPutForTrading;
 }
@@ -638,4 +654,17 @@ function getRandomMarket(array, current){
     }
 
     return returnValue; // Returns true if between 5 AM and 4 PM
+}
+
+function calculateNextStake(totalLoss) {
+    let returnPercentage = 0.88;
+    // The next stake should be such that its profit (stake * returnPercentage) covers the total loss
+    // return (totalLoss / returnPercentage) + Number(amountPutForTrading);
+    totalLoss = Math.abs(totalLoss);
+
+    let nextStake = (totalLoss / returnPercentage) + Number(amountPutForTrading/2);
+
+    console.log('nextStake: ', nextStake);
+
+    return nextStake;
 }
