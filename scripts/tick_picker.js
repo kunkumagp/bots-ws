@@ -34,9 +34,16 @@ let ws,
     initialAccountBalance = 0,
     updatedAccountBalance = 0,
     totalTradeCount = 0,
+    winTradeCount = 0,
+    totalProfitAmount = 0,
+    lossTradeCount = 0,
+    totalLossAmount = 0,
+    currentProfitAmount = 0,
+    currentLossAmount = 0;
     stake = 1,
     initialStake = 1,
-    duration = 4
+    duration = 1,
+    cutofNumber = 6
     ;
 
 accounts.forEach((item) => {
@@ -53,7 +60,7 @@ marketArray.forEach((item) => {
     marketSelectElement.appendChild(option); // Append to the <select>
 });
 
-accountSelectElement.value = "iVOpdm24hBhw3JI";
+accountSelectElement.value = "lkUxtOopvUhCpIX";
 marketSelectElement.value = "R_10";
 apiToken = accountSelectElement.value;
 market = marketSelectElement.value;
@@ -158,33 +165,27 @@ function startWebSocket() {
 
                 // console.log(lastDigitList);
 
-                console.log(upDownObject);
+                // console.log(upDownObject);
 
                 if (
                     (upDownObject.up < upDownObject.down)
-                    && (upDownObject.down >= 7)
-                    // && (upDownObject.last == "down")
+                    && (upDownObject.down >= cutofNumber)
                 ) {
                     console.log('Strong Down');
                     tradeTypeDisplay = "Fall";
-                    setTimeout(() => {
                         placeTrade('down');
-                    }, 2000);
                 } else if (
                     (upDownObject.up > upDownObject.down)
-                    && (upDownObject.up >= 7)
-                    // && (upDownObject.last == "up")
+                    && (upDownObject.up >= cutofNumber)
                 ) {
                     console.log('Strong Up');
                     tradeTypeDisplay = "Rise";
-                    setTimeout(() => {
                         placeTrade('up');
-                    }, 2000);
                 } else {
                     console.log('Analizing....');
                     setTimeout(() => {
                         requestTicksHistory();
-                    }, 2000);
+                    }, 1000);
                 }
 
             }
@@ -241,7 +242,7 @@ function startWebSocket() {
                         isTradeOpen = false;
                         const profit = contract.profit;
                         const result = profit > 0 ? "Win" : "Loss";
-                        // setInfo(contract, profit);
+                        setInfo(contract, profit);
                         // stakeChange(result);
 
                         setResultNotification(
@@ -252,14 +253,11 @@ function startWebSocket() {
                             profit
                         );
 
-                        if(profit < 0){
-                            // market = getRandomMarket(marketArray, market);
-                        }
-
+                        // market = getRandomMarket(marketArray, market);
 
                         setTimeout(() => {
                             requestTicksHistory();
-                        }, 5000);
+                        }, 10000);
                     } else {
                         setTimeout(() => {
                             setTickCountDown(
@@ -583,4 +581,98 @@ function analyzeMarketsWithHistory(callback) {
 
   function getMarketByValue(value) {
     return marketArray.find(market => market.value === value);
+}
+
+
+
+
+function setInfo(contract, lastTradeProfit) {
+    updatedAccountBalance = updatedAccountBalance + lastTradeProfit;
+
+
+    currentProfitAmount = currentProfitAmount + lastTradeProfit;
+    currentLossAmount = currentLossAmount + lastTradeProfit;
+    if(currentLossAmount >= 0){currentLossAmount = 0;}
+
+    netProfit = updatedAccountBalance - initialAccountBalance;
+
+    if (lastTradeProfit > 0) {
+        winTradeCount = winTradeCount + 1;
+        totalProfitAmount = totalProfitAmount + lastTradeProfit;
+    } else if (lastTradeProfit < 0) {
+        lossTradeCount = lossTradeCount + 1;
+        totalLossAmount = totalLossAmount + lastTradeProfit;
+    }
+
+    setAccountInfo("totalTradeCount", `${totalTradeCount}`);
+    setAccountInfo("winCount", `${winTradeCount}`);
+    setAccountInfo("lossCount", `${lossTradeCount}`);
+
+
+    let updatedAccountBalanceDisplay = null;
+    if (updatedAccountBalance > initialAccountBalance) {
+        updatedAccountBalanceDisplay = `<span class="green">$ ${updatedAccountBalance.toFixed(2)}</span>`;
+    } else if (updatedAccountBalance < initialAccountBalance) {
+        updatedAccountBalanceDisplay = `<span class="red">$ ${updatedAccountBalance.toFixed(2)}</span>`;
+    }
+    setAccountInfo("updatedAccountBalance", `${updatedAccountBalanceDisplay}`);
+
+
+    
+    let netProfitDisplay = null;
+    if (netProfit > 0) {
+        netProfitDisplay = `<span class="green">$ ${netProfit.toFixed(2)}</span>`;
+    } else if (netProfit < 0) {
+        netProfitDisplay = `<span class="red">$ ${netProfit.toFixed(2)}</span>`;
+    }
+    setAccountInfo("net_profit", `${netProfitDisplay}`);
+
+
+    
+    let totalProfitAmountDisplay = null;
+    if (totalProfitAmount < 0) {
+        totalProfitAmountDisplay = `<span class="red">$ ${totalProfitAmount.toFixed(2)}</span>`;
+    } else if (totalProfitAmount > 0) {
+        totalProfitAmountDisplay = `<span class="green">$ ${totalProfitAmount.toFixed(2)}</span>`;
+    } else {
+        totalProfitAmountDisplay = `$ ${totalProfitAmount.toFixed(2)}`;
+    }
+    setAccountInfo("totalProfit", `${totalProfitAmountDisplay}`);
+
+
+
+    let totalLossAmountDisplay = null;
+    if (totalLossAmount < 0) {
+        totalLossAmountDisplay = `<span class="red">$ ${totalLossAmount.toFixed(2)}</span>`;
+    } else if (totalLossAmount > 0) {
+        totalLossAmountDisplay = `<span class="green">$ ${totalLossAmount.toFixed(2)}</span>`;
+    } else {
+        totalLossAmountDisplay = `$ ${totalLossAmount.toFixed(2)}`;
+    }
+    setAccountInfo("totalLoss", `${totalLossAmountDisplay}`);
+
+
+
+    let currentProfitAmountDisplay = null;
+    if (currentProfitAmount < 0) {
+        currentProfitAmountDisplay = `<span class="red">$ ${currentProfitAmount.toFixed(2)}</span>`;
+    } else if (currentProfitAmount > 0) {
+        currentProfitAmountDisplay = `<span class="green">$ ${currentProfitAmount.toFixed(2)}</span>`;
+    } else {
+        currentProfitAmountDisplay = `$ ${currentProfitAmount.toFixed(2)}`;
+    }
+    setAccountInfo("currentProfitAmount", `${currentProfitAmountDisplay}`);
+
+
+
+    let currentLossAmountDisplay = null;
+    if (currentLossAmount < 0) {
+        currentLossAmountDisplay = `<span class="red">$ ${currentLossAmount.toFixed(2)}</span>`;
+    } else if (currentLossAmount > 0) {
+        currentLossAmountDisplay = `<span class="green">$ ${currentLossAmount.toFixed(2)}</span>`;
+    } else {
+        currentLossAmountDisplay = `$ ${currentLossAmount.toFixed(2)}`;
+    }
+    setAccountInfo("currentLossAmount", `${currentLossAmountDisplay}`);
+
 }
