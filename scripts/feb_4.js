@@ -76,7 +76,7 @@ marketArray.forEach((item) => {
     marketSelectElement.appendChild(option); // Append to the <select>
 });
 
-accountSelectElement.value = "lkUxtOopvUhCpIX";
+accountSelectElement.value = "iVOpdm24hBhw3JI";
 marketSelectElement.value = "R_10";
 apiToken = accountSelectElement.value;
 
@@ -195,24 +195,20 @@ ws.onmessage = function (event) {
                         stakeChange(result);
 
                         if (currentLossAmount < 0) {
-                            if(lostCountInRow >= 2){
                                 market = getRandomMarket(marketArray, '');
 
                                 // let newTime = (getRandomNumber(1, 2) * 60000 );
-                                let newTime = (getRandomNumber(10, 40) * 1000);
+                                let newTime = (getRandomNumber(30, 60) * 1000);
                                 // let newTime = (getRandomNumber(1, 5) * 1000);
                                 setTimer(newTime);
                                 setTimeout(() => {
                                     runScript();
                                 }, newTime);
-                            } else {
-                                runScript();
-                            }
                         } else {
                             if (currentProfitAmount >= targetAmount) {
                                 // let newTime = (getRandomNumber(30, 40) * 60000 );
-                                // let newTime = (getRandomNumber(2, 3) * 60000 );
-                                let newTime = (getRandomNumber(1, 5) * 1000);
+                                let newTime = (getRandomNumber(2, 3) * 60000 );
+                                // let newTime = (getRandomNumber(1, 5) * 1000);
                                 // let newTime = (getRandomNumber(40, 60) * 1000);
                                 setTimer(newTime);
                                 setTimeout(() => {
@@ -255,17 +251,20 @@ const getAuthentication = () => {
 
 
 const stakeChange = (status) => {
-    console.log('status: ', status);
-    console.log('lostCountInRow: ', lostCountInRow);
-    console.log('currentLossAmount: ', currentLossAmount);
-    console.log('amountPutForTrading: ', amountPutForTrading);
-    console.log('martingaleMultiplier: ', martingaleMultiplier);
+    // console.log('status: ', status);
+    // console.log('lostCountInRow: ', lostCountInRow);
+    // console.log('currentLossAmount: ', currentLossAmount);
+    // console.log('amountPutForTrading: ', amountPutForTrading);
+    // console.log('martingaleMultiplier: ', martingaleMultiplier);
+
     if (status == "Loss") {
-        if(lostCountInRow >= 1){
-            stake = calculateNextStake(currentLossAmount);;
-        } else {
-            stake = stake * martingaleMultiplier;
-        }
+        // if(lostCountInRow >= 1){
+        //     stake = calculateNextStake(currentLossAmount);;
+        // } else {
+        //     stake = stake * martingaleMultiplier;
+        // }
+        stake = stake * martingaleMultiplier;
+
     } else if (status == "Win") {
         stake = amountPutForTrading;
     }
