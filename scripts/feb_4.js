@@ -1,4 +1,5 @@
 const accounts = [
+    { name: "", value: "" },
     { name: "KunkumaGP", value: "lkUxtOopvUhCpIX" },
     { name: "KUNKUMAGP Real", value: "Y71P0GIOxz3YYvr" },
     { name: "Kunkuma Trading", value: "hJfU1x5xpoSTwHe" },
@@ -76,331 +77,344 @@ marketArray.forEach((item) => {
     marketSelectElement.appendChild(option); // Append to the <select>
 });
 
-accountSelectElement.value = "iVOpdm24hBhw3JI";
+// accountSelectElement.value = "iVOpdm24hBhw3JI";
 marketSelectElement.value = "R_10";
 apiToken = accountSelectElement.value;
 
 
 accountSelectElement.addEventListener("change", () => {
     apiToken = accountSelectElement.value;
+    runBot();
 });
 
 // market = marketSelectElement.value;
 market = getRandomMarket(marketArray, '');
 
+function runBot() {
 
-ws.onopen = function () {
-    console.log("Connection open");
-    getAuthentication();
+    console.log(apiToken);
+        
+    if(apiToken != ''){
+        ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=1089");
 
-};
 
-ws.onclose = function () {
-    console.log("Connection closed");
-    console.log("-----------------------------\n");
-    if(isTradeOpen){
-        reload();
-    }
-};
-
-ws.onerror = function (err) {
-    console.error("WebSocket error:", err);
-};
-
-ws.onmessage = function (event) {
-
-    // if(isWithinTimeRange()){
-        wsResponse = JSON.parse(event.data);
-
-        if (wsResponse != null) {
-            if (wsResponse.msg_type === "authorize") {
-                console.log("Authorization successful.\n-----------------------------\n\n");
-                setFlashNotification("Authorization successful", 0);
-                initialAccountBalance = wsResponse.authorize.balance;
-                updatedAccountBalance = initialAccountBalance;
-                setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance}`);
-                authSuccess = true;
-                authenticateButton.innerHTML = "Authenticated. Ready to trade.";
-                authenticateButton.disabled = true;
-                resetParams();
-                // scriptButton.innerHTML = "Bot started....";
-                // placeTrade();
-                runScript();
+        ws.onopen = function () {
+            console.log("Connection open");
+            getAuthentication();
+        
+        };
+        
+        ws.onclose = function () {
+            console.log("Connection closed");
+            console.log("-----------------------------\n");
+            if(isTradeOpen){
+                reload();
             }
-
-
-            if (wsResponse.msg_type === "proposal") {
-                if (
-                    updatedAccountBalance > 0 &&
-                    wsResponse.echo_req.amount > updatedAccountBalance
-                ) {
-                    webSocketConnectionStop();
-                } else {
-                    tradeProposal = wsResponse;
-                    makeTheTrade();
-                }
-            }
-
-            if (wsResponse.msg_type === "buy") {
-                if (
-                    wsResponse.buy == undefined ||
-                    wsResponse.buy.contract_id == undefined
-                ) {
-                    // placeTrade();
-                } else {
-                    lastTradeId = wsResponse.buy.contract_id;
-                    totalTradeCount = totalTradeCount + 1;
-                    isTradeOpen = true;
-
-                    if (wsResponse.buy.shortcode.includes("DIGITEVEN")) {
-                        tradeTypeDisplay = "Even";
-                    } else if (wsResponse.buy.shortcode.includes("DIGITODD")) {
-                        tradeTypeDisplay = "Odd";
+        };
+        
+        ws.onerror = function (err) {
+            console.error("WebSocket error:", err);
+        };
+        
+        ws.onmessage = function (event) {
+        
+            // if(isWithinTimeRange()){
+                wsResponse = JSON.parse(event.data);
+        
+                if (wsResponse != null) {
+                    if (wsResponse.msg_type === "authorize") {
+                        console.log("Authorization successful.\n-----------------------------\n\n");
+                        setFlashNotification("Authorization successful", 0);
+                        initialAccountBalance = wsResponse.authorize.balance;
+                        updatedAccountBalance = initialAccountBalance;
+                        setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance}`);
+                        authSuccess = true;
+                        authenticateButton.innerHTML = "Authenticated. Ready to trade.";
+                        authenticateButton.disabled = true;
+                        resetParams();
+                        // scriptButton.innerHTML = "Bot started....";
+                        // placeTrade();
+                        runScript();
                     }
-
-                    setResultNotification(
-                        lastTradeId,
-                        tradeTypeDisplay,
-                        market,
-                        wsResponse.buy.buy_price
-                    );
-
-                    // setAccountInfo('percentage10', `$ ${targetProfit.toFixed(2)}`)
-                    console.log("Trade Successful:", wsResponse);
-                    // scrollToBottom();
-
-                    automation = true;
-
-                    setTimeout(() => {
-                        fetchTradeDetails(lastTradeId);
-                    }, 500);
-                }
-            }
-
-            if (wsResponse.msg_type === "proposal_open_contract") {
-                if (wsResponse.proposal_open_contract.contract_id === lastTradeId) {
-                    const contract = wsResponse.proposal_open_contract;
-
-                    if (contract.is_sold) {
-                        const profit = contract.profit;
-                        const result = profit > 0 ? "Win" : "Loss";
-
-                        setInfo(contract, profit);
-                        isTradeOpen = false;
-
-                        if(profit < 0){
-                            lostCountInRow = lostCountInRow + 1;
-                        }
-
-                        stakeChange(result);
-
-                        if (currentLossAmount < 0) {
-                                market = getRandomMarket(marketArray, '');
-
-                                // let newTime = (getRandomNumber(1, 2) * 60000 );
-                                let newTime = (getRandomNumber(30, 60) * 1000);
-                                // let newTime = (getRandomNumber(1, 5) * 1000);
-                                setTimer(newTime);
-                                setTimeout(() => {
-                                    runScript();
-                                }, newTime);
+        
+        
+                    if (wsResponse.msg_type === "proposal") {
+                        if (
+                            updatedAccountBalance > 0 &&
+                            wsResponse.echo_req.amount > updatedAccountBalance
+                        ) {
+                            webSocketConnectionStop();
                         } else {
-                            if (currentProfitAmount >= targetAmount) {
-                                // let newTime = (getRandomNumber(30, 40) * 60000 );
-                                let newTime = (getRandomNumber(2, 3) * 60000 );
-                                // let newTime = (getRandomNumber(1, 5) * 1000);
-                                // let newTime = (getRandomNumber(40, 60) * 1000);
-                                setTimer(newTime);
-                                setTimeout(() => {
-                                    reserParams();
-                                    reload();
-                                }, newTime);
+                            tradeProposal = wsResponse;
+                            makeTheTrade();
+                        }
+                    }
+        
+                    if (wsResponse.msg_type === "buy") {
+                        if (
+                            wsResponse.buy == undefined ||
+                            wsResponse.buy.contract_id == undefined
+                        ) {
+                            // placeTrade();
+                        } else {
+                            lastTradeId = wsResponse.buy.contract_id;
+                            totalTradeCount = totalTradeCount + 1;
+                            isTradeOpen = true;
+        
+                            if (wsResponse.buy.shortcode.includes("DIGITEVEN")) {
+                                tradeTypeDisplay = "Even";
+                            } else if (wsResponse.buy.shortcode.includes("DIGITODD")) {
+                                tradeTypeDisplay = "Odd";
+                            }
+        
+                            setResultNotification(
+                                lastTradeId,
+                                tradeTypeDisplay,
+                                market,
+                                wsResponse.buy.buy_price
+                            );
+        
+                            // setAccountInfo('percentage10', `$ ${targetProfit.toFixed(2)}`)
+                            console.log("Trade Successful:", wsResponse);
+                            // scrollToBottom();
+        
+                            automation = true;
+        
+                            setTimeout(() => {
+                                fetchTradeDetails(lastTradeId);
+                            }, 500);
+                        }
+                    }
+        
+                    if (wsResponse.msg_type === "proposal_open_contract") {
+                        if (wsResponse.proposal_open_contract.contract_id === lastTradeId) {
+                            const contract = wsResponse.proposal_open_contract;
+        
+                            if (contract.is_sold) {
+                                const profit = contract.profit;
+                                const result = profit > 0 ? "Win" : "Loss";
+        
+                                setInfo(contract, profit);
+                                isTradeOpen = false;
+        
+                                if(profit < 0){
+                                    lostCountInRow = lostCountInRow + 1;
+                                }
+        
+                                stakeChange(result);
+        
+                                if (currentLossAmount < 0) {
+                                        market = getRandomMarket(marketArray, '');
+        
+                                        // let newTime = (getRandomNumber(1, 2) * 60000 );
+                                        let newTime = (getRandomNumber(30, 60) * 1000);
+                                        // let newTime = (getRandomNumber(1, 5) * 1000);
+                                        setTimer(newTime);
+                                        setTimeout(() => {
+                                            runScript();
+                                        }, newTime);
+                                } else {
+                                    if (currentProfitAmount >= targetAmount) {
+                                        // let newTime = (getRandomNumber(30, 40) * 60000 );
+                                        let newTime = (getRandomNumber(2, 3) * 60000 );
+                                        // let newTime = (getRandomNumber(1, 5) * 1000);
+                                        // let newTime = (getRandomNumber(40, 60) * 1000);
+                                        setTimer(newTime);
+                                        setTimeout(() => {
+                                            reserParams();
+                                            runBot();
+                                        }, newTime);
+                                    } else {
+                                        runScript();
+                                    }
+                                }
+        
+        
                             } else {
-                                runScript();
+                                setTimeout(() => {
+                                    setTickCountDown(
+                                        contract.tick_count,
+                                        contract.tick_stream.length
+                                    );
+                                    fetchTradeDetails(lastTradeId);
+                                }, 1000);
                             }
                         }
-
-
-                    } else {
-                        setTimeout(() => {
-                            setTickCountDown(
-                                contract.tick_count,
-                                contract.tick_stream.length
-                            );
-                            fetchTradeDetails(lastTradeId);
-                        }, 1000);
+                    }
+        
+                }
+            // } else {
+            //     setTimeout(() => {
+            //         reload();
+            //     }, 60000);
+        
+            // }
+        
+        };
+        
+        const getAuthentication = () => {
+            setFlashNotification("Authenticating....", 0);
+            console.log("Authenticating....");
+            ws.send(JSON.stringify({ authorize: apiToken }));
+        };
+        
+        
+        const stakeChange = (status) => {
+            // console.log('status: ', status);
+            // console.log('lostCountInRow: ', lostCountInRow);
+            // console.log('currentLossAmount: ', currentLossAmount);
+            // console.log('amountPutForTrading: ', amountPutForTrading);
+            // console.log('martingaleMultiplier: ', martingaleMultiplier);
+        
+            if (status == "Loss") {
+                // if(lostCountInRow >= 1){
+                //     stake = calculateNextStake(currentLossAmount);;
+                // } else {
+                //     stake = stake * martingaleMultiplier;
+                // }
+                stake = stake * martingaleMultiplier;
+        
+            } else if (status == "Win") {
+                stake = amountPutForTrading;
+            }
+        };
+        
+        const makeTheTrade = () => {
+            if (
+                tradeProposal.proposal == undefined ||
+                tradeProposal.proposal.id == undefined
+            ) {
+                isRunning = false;
+                webSocketConnectionStart();
+            } else {
+                buyRequest = {
+                    buy: tradeProposal.proposal.id,
+                    price: tradeProposal.proposal.ask_price,
+                };
+                ws.send(JSON.stringify(buyRequest));
+            }
+        };
+        
+        const placeTrade = (result = null) => {
+            if (isTradeOpen == false) {
+                if (result != null) {
+                    if (result == "even") {
+                        tradeState = "DIGITODD";
+                    } else if (result == "odd") {
+                        tradeState = "DIGITEVEN";
+                    }
+                } else {
+                    if (tradeType == "even") {
+                        tradeState = "DIGITEVEN";
+                        tradeType = "odd";
+                    } else if (tradeType == "odd") {
+                        tradeState = "DIGITODD";
+                        tradeType = "even";
                     }
                 }
+                stake = Number(stake);
+                stake < 0.35 ? (stake = 0.35) : (stake = stake);
+        
+                // tickCount = 1;
+                tickCount = getRandomNumber(5, 8);
+        
+                const tradeRequest = {
+                    proposal: 1,
+                    amount: stake.toFixed(2),
+                    basis: "stake",
+                    contract_type: tradeState, // Use 'DIGITEVEN' for even and 'DIGITODD' for odd
+                    currency: "USD",
+                    duration: tickCount,
+                    duration_unit: "t",
+                    symbol: market,
+                };
+        
+                onTradeCount = 1;
+                // Send the trade request to the WebSocket
+                console.log("Sending Rise/Fall trade request:", tradeRequest);
+                ws.send(JSON.stringify(tradeRequest));
             }
-
-        }
-    // } else {
-    //     setTimeout(() => {
-    //         reload();
-    //     }, 60000);
-
-    // }
-
-};
-
-const getAuthentication = () => {
-    setFlashNotification("Authenticating....", 0);
-    console.log("Authenticating....");
-    ws.send(JSON.stringify({ authorize: apiToken }));
-};
-
-
-const stakeChange = (status) => {
-    // console.log('status: ', status);
-    // console.log('lostCountInRow: ', lostCountInRow);
-    // console.log('currentLossAmount: ', currentLossAmount);
-    // console.log('amountPutForTrading: ', amountPutForTrading);
-    // console.log('martingaleMultiplier: ', martingaleMultiplier);
-
-    if (status == "Loss") {
-        // if(lostCountInRow >= 1){
-        //     stake = calculateNextStake(currentLossAmount);;
-        // } else {
-        //     stake = stake * martingaleMultiplier;
-        // }
-        stake = stake * martingaleMultiplier;
-
-    } else if (status == "Win") {
-        stake = amountPutForTrading;
-    }
-};
-
-const makeTheTrade = () => {
-    if (
-        tradeProposal.proposal == undefined ||
-        tradeProposal.proposal.id == undefined
-    ) {
-        isRunning = false;
-        webSocketConnectionStart();
-    } else {
-        buyRequest = {
-            buy: tradeProposal.proposal.id,
-            price: tradeProposal.proposal.ask_price,
         };
-        ws.send(JSON.stringify(buyRequest));
-    }
-};
-
-const placeTrade = (result = null) => {
-    if (isTradeOpen == false) {
-        if (result != null) {
-            if (result == "even") {
-                tradeState = "DIGITODD";
-            } else if (result == "odd") {
-                tradeState = "DIGITEVEN";
+        
+        const fetchTradeDetails = (contractId) => {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                console.error("WebSocket is not open.");
+                return;
             }
-        } else {
-            if (tradeType == "even") {
-                tradeState = "DIGITEVEN";
-                tradeType = "odd";
-            } else if (tradeType == "odd") {
-                tradeState = "DIGITODD";
-                tradeType = "even";
+        
+            const contractDetailsRequest = {
+                proposal_open_contract: 1,
+                contract_id: contractId,
+            };
+        
+            ws.send(JSON.stringify(contractDetailsRequest));
+        };
+        
+        
+        
+        
+        // scriptButton.addEventListener("click", runScript);
+        // authenticateButton.addEventListener("click", getAuthentication);
+        
+        
+        function runScript() {
+            isRunning = true;
+            placeTrade();
+        }
+        
+        function reload() {
+            location.reload();
+        }
+        
+        function reserParams() {
+            currentProfitAmount = 0;
+            currentLossAmount = 0;
+            lostCountInRow = 0;
+        
+            let currentProfitAmountDisplay = null;
+            if (currentProfitAmount < 0) {
+                currentProfitAmountDisplay = `<span class="red">$ ${currentProfitAmount.toFixed(2)}</span>`;
+            } else if (currentProfitAmount > 0) {
+                currentProfitAmountDisplay = `<span class="green">$ ${currentProfitAmount.toFixed(2)}</span>`;
+            } else {
+                currentProfitAmountDisplay = `$ ${currentProfitAmount.toFixed(2)}`;
+            }
+            setAccountInfo("currentProfitAmount", `${currentProfitAmountDisplay}`);
+        
+        
+        
+            let currentLossAmountDisplay = null;
+            if (currentLossAmount < 0) {
+                currentLossAmountDisplay = `<span class="red">$ ${currentLossAmount.toFixed(2)}</span>`;
+            } else if (currentLossAmount > 0) {
+                currentLossAmountDisplay = `<span class="green">$ ${currentLossAmount.toFixed(2)}</span>`;
+            } else {
+                currentLossAmountDisplay = `$ ${currentLossAmount.toFixed(2)}`;
+            }
+            setAccountInfo("currentLossAmount", `${currentLossAmountDisplay}`);
+        }
+        
+        function resetParams() {
+            // targetAmount =  (initialAccountBalance * (targetPercentage / 100)).toFixed(2);
+            targetAmount =  0.3;
+            setAccountInfo("targetAmount", `$ ${targetAmount}`);
+            // amountPutForTrading = (initialAccountBalance * (amountPercentage / 100)).toFixed(2);
+            amountPutForTrading = 0.35;
+            setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
+            stake = amountPutForTrading;
+        }
+        
+        function weClose() {
+            if (ws) {
+                ws.close();
+                ws = null;
             }
         }
-        stake = Number(stake);
-        stake < 0.35 ? (stake = 0.35) : (stake = stake);
-
-        // tickCount = 1;
-        tickCount = getRandomNumber(5, 8);
-
-        const tradeRequest = {
-            proposal: 1,
-            amount: stake.toFixed(2),
-            basis: "stake",
-            contract_type: tradeState, // Use 'DIGITEVEN' for even and 'DIGITODD' for odd
-            currency: "USD",
-            duration: tickCount,
-            duration_unit: "t",
-            symbol: market,
-        };
-
-        onTradeCount = 1;
-        // Send the trade request to the WebSocket
-        console.log("Sending Rise/Fall trade request:", tradeRequest);
-        ws.send(JSON.stringify(tradeRequest));
-    }
-};
-
-const fetchTradeDetails = (contractId) => {
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-        console.error("WebSocket is not open.");
-        return;
+        
     }
 
-    const contractDetailsRequest = {
-        proposal_open_contract: 1,
-        contract_id: contractId,
-    };
-
-    ws.send(JSON.stringify(contractDetailsRequest));
-};
-
-
-
-
-// scriptButton.addEventListener("click", runScript);
-// authenticateButton.addEventListener("click", getAuthentication);
-
-
-function runScript() {
-    isRunning = true;
-    placeTrade();
 }
 
-function reload() {
-    location.reload();
-}
-
-function reserParams() {
-    currentProfitAmount = 0;
-    currentLossAmount = 0;
-    lostCountInRow = 0;
-
-    let currentProfitAmountDisplay = null;
-    if (currentProfitAmount < 0) {
-        currentProfitAmountDisplay = `<span class="red">$ ${currentProfitAmount.toFixed(2)}</span>`;
-    } else if (currentProfitAmount > 0) {
-        currentProfitAmountDisplay = `<span class="green">$ ${currentProfitAmount.toFixed(2)}</span>`;
-    } else {
-        currentProfitAmountDisplay = `$ ${currentProfitAmount.toFixed(2)}`;
-    }
-    setAccountInfo("currentProfitAmount", `${currentProfitAmountDisplay}`);
-
-
-
-    let currentLossAmountDisplay = null;
-    if (currentLossAmount < 0) {
-        currentLossAmountDisplay = `<span class="red">$ ${currentLossAmount.toFixed(2)}</span>`;
-    } else if (currentLossAmount > 0) {
-        currentLossAmountDisplay = `<span class="green">$ ${currentLossAmount.toFixed(2)}</span>`;
-    } else {
-        currentLossAmountDisplay = `$ ${currentLossAmount.toFixed(2)}`;
-    }
-    setAccountInfo("currentLossAmount", `${currentLossAmountDisplay}`);
-}
-
-function resetParams() {
-    // targetAmount =  (initialAccountBalance * (targetPercentage / 100)).toFixed(2);
-    targetAmount =  0.3;
-    setAccountInfo("targetAmount", `$ ${targetAmount}`);
-    // amountPutForTrading = (initialAccountBalance * (amountPercentage / 100)).toFixed(2);
-    amountPutForTrading = 0.35;
-    setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
-    stake = amountPutForTrading;
-}
-
-function weClose() {
-    if (ws) {
-        ws.close();
-        ws = null;
-    }
-}
 
 
 
