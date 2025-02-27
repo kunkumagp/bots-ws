@@ -148,6 +148,12 @@ pre,
   margin: 0 10px;
 }
 
+.flash-notification .signal {
+  font-size: 24px;
+  color: #9a9a9a;
+  margin: 0 10px;
+}
+
 .result-notification .stake-info {
   display: flex;
   justify-content: space-between;
@@ -170,11 +176,16 @@ pre,
 }
 
 .green {
-  color: #00d300;
+  color: #00d300 !important;
   font-weight: 700;
 }
 
 .red {
-  color: #d30000;
+  color: #d30000 !important;
+  font-weight: 700;
+}
+
+.blue {
+  color: #4b45f2 !important;
   font-weight: 700;
 }

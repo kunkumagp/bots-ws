@@ -241,8 +241,8 @@ function runBot() {
                             }
 
                             if (currentLossAmount < 0) {
-                                let newTime = (getRandomNumber(2, 3) * 60000 );
-                                
+                                let newTime = (getRandomNumber(3, 4) * 60000 );
+
                                 if(lostCountInRow >= 2){
                                     market = getRandomMarket(marketArray, market);
                                 }
@@ -261,8 +261,8 @@ function runBot() {
                             } else {
                                 if (currentProfitAmount >= targetAmount) {
                                     // let newTime = (getRandomNumber(30, 40) * 60000 );
-                                    // let newTime = (getRandomNumber(5, 10) * 60000 );
-                                    let newTime = (getRandomNumber(50, 60) * 1000 );
+                                    let newTime = (getRandomNumber(2, 3) * 60000 );
+                                    // let newTime = (getRandomNumber(50, 60) * 1000 );
                                     // let newTime = (getRandomNumber(5, 10) * 1000);
                                     setTimer(newTime);
                                     setTimeout(() => {
