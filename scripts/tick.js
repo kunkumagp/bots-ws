@@ -20,7 +20,7 @@ const initialStakeInputElement = document.getElementById("initial_stake");
 const authenticateButton = document.getElementById("authenticateButton");
 const scriptButton = document.getElementById('scriptButton');
 
-const martingaleMultiplier = 1.2;
+const martingaleMultiplier = 2.07112;
 
 let subscriptionId = null;
 
@@ -41,12 +41,12 @@ let ws,
     lossTradeCount = 0,
     totalLossAmount = 0,
     currentProfitAmount = 0,
-    currentLossAmount = 0;
-    stake = 1,
-    initialStake = 1,
+    currentLossAmount = 0,
+    stake = 0.35,
+    initialStake = 0.35,
     duration = 1,
     cutofNumber = 6,
-    tickHistoryCount = 25,
+    tickHistoryCount = 100,
     previousTickValue = null,
     currentTickValue = null
     ;
@@ -159,7 +159,8 @@ function startWebSocket() {
                 
                 // [Call the function to identify the market trend in here]
 
-                startTicks();
+                // startTicks();
+                requestTicksHistory(market);
 
             }
 
@@ -203,14 +204,18 @@ function startWebSocket() {
             if (wsResponse.msg_type === 'history') {
                 const lastDigitList = wsResponse.history.prices;
                 let trend = analyzeMarketTrend(lastDigitList);
-                let marketSignal = getTrendSignal(tickCountObject);
+                let last10Values = lastDigitList.slice(-10);
+                let upDownObject = getUpDownCount(last10Values);
+                let marketSignal = getTrendSignal(upDownObject);
 
-                console.log('trend: ',trend);
-                console.log('tickCountObject: ',tickCountObject);
-                console.log('marketSignal: ',marketSignal);
+                // console.log('trend: ',trend);
+                // console.log('last10Values: ',last10Values);
+                // console.log('tickCountObject: ',upDownObject);
 
                 if(trend == "up" && marketSignal.signal == "up" && marketSignal.percentage >= `70%` ){
                     console.log('Trade Up');
+                    console.log('Market Signal: ',marketSignal);
+
                     tradeTypeDisplay = "Rise";
                     setFlashNotification(`<span class="signal green">Strong Up</span>.`, 0);
 
@@ -220,6 +225,7 @@ function startWebSocket() {
 
                 } else if(trend == "down" && marketSignal.signal == "down" && marketSignal.percentage >= `70%` ){
                     console.log('Trade Down');
+                    console.log('Market Signal: ',marketSignal);
                     setFlashNotification(`<span class="signal red">Strong Down</span>.`, 0);
                     tradeTypeDisplay = "Fall";
 
@@ -229,15 +235,23 @@ function startWebSocket() {
 
                 }  else {
                     reset();
-                    startTicks();
+                    // startTicks();
 
-                    if(trend == "up" && marketSignal.signal == "up" && (marketSignal.percentage >= `50%` && marketSignal.percentage < `70%`) ){
-                        setFlashNotification(`<span class="signal ">Medium Up</span>.`, 0);
-                    } else if(trend == "down" && marketSignal.signal == "down" && (marketSignal.percentage >= `50%` && marketSignal.percentage < `70%`) ){
-                        setFlashNotification(`<span class="signal ">Medium Down</span>.`, 0);
-                    } else {
-                        setFlashNotification(`<span class="signal blue">Neutral</span>.`, 0);
-                    }
+                    console.log('Analizing...');
+                    setFlashNotification(`<span class="signal blink_me">Analizing...</span>`, 0);
+                    setTimeout(() => {
+                        requestTicksHistory(market);
+                    }, 1000);
+
+
+                    
+                    // if(trend == "up" && marketSignal.signal == "up" && (marketSignal.percentage >= `50%` && marketSignal.percentage < `70%`) ){
+                    //     setFlashNotification(`<span class="signal ">Medium Up</span>.`, 0);
+                    // } else if(trend == "down" && marketSignal.signal == "down" && (marketSignal.percentage >= `50%` && marketSignal.percentage < `70%`) ){
+                    //     setFlashNotification(`<span class="signal ">Medium Down</span>.`, 0);
+                    // } else {
+                    //     setFlashNotification(`<span class="signal blue">Neutral</span>.`, 0);
+                    // }
                 }
 
 
@@ -297,7 +311,7 @@ function startWebSocket() {
                         const profit = contract.profit;
                         const result = profit > 0 ? "Win" : "Loss";
                         setInfo(contract, profit);
-                        // stakeChange(result);
+                        stakeChange(result);
 
                         setResultNotification(
                             lastTradeId,
@@ -311,8 +325,9 @@ function startWebSocket() {
 
                         setTimeout(() => {
                             reset();
-                            startTicks();
-                        }, 10000);
+                            // startTicks();
+                            requestTicksHistory(market);
+                        }, 1000);
                     } else {
                         setTimeout(() => {
                             setTickCountDown(
@@ -422,6 +437,14 @@ function startWebSocket() {
         };
 
         ws.send(JSON.stringify(contractDetailsRequest));
+    };
+
+    const stakeChange = (status) => {
+        if (status == "Loss") {
+            stake = stake * martingaleMultiplier;
+        } else if (status == "Win") {
+            stake = initialStake;
+        }
     };
 
 }
@@ -650,3 +673,18 @@ function setTickCountDown(tickCount, tick) {
         setFlashNotification(``, 0);
     }
 }
+
+function getUpDownCount(data) {
+    let result = { up: 0, down: 0, total: data.length };
+
+    for (let i = 1; i < data.length; i++) {
+        if (data[i] > data[i - 1]) {
+            result.up++;
+        } else if (data[i] < data[i - 1]) {
+            result.down++;
+        }
+    }
+
+    return result;
+}
+
