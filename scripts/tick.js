@@ -44,6 +44,7 @@ let ws,
     currentLossAmount = 0,
     stake = 0.35,
     initialStake = 0.35,
+    stakePercentage = 0.35,
     duration = 1,
     cutofNumber = 6,
     tickHistoryCount = 100,
@@ -87,7 +88,8 @@ marketSelectElement.addEventListener("change", () => {
 });
 
 
-scriptButton.addEventListener('click', runScript);
+// scriptButton.addEventListener('click', runScript);
+runScript();
 
 
 function runScript() {
@@ -151,6 +153,7 @@ function startWebSocket() {
                 console.log("Authorization successful.\n-----------------------------\n\n");
                 setFlashNotification("Authorization successful", 0);
                 initialAccountBalance = wsResponse.authorize.balance;
+                // stake = Number(initialAccountBalance) * (Number(stakePercentage)/100)
                 updatedAccountBalance = initialAccountBalance;
                 setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance}`);
                 authSuccess = true;
@@ -323,11 +326,16 @@ function startWebSocket() {
 
                         // market = getRandomMarket(marketArray, market);
 
-                        setTimeout(() => {
-                            reset();
-                            // startTicks();
-                            requestTicksHistory(market);
-                        }, 1000);
+                        // if(profit > 0){
+                        //     reload();
+                        // } else{
+                            setTimeout(() => {
+                                reset();
+                                // startTicks();
+                                requestTicksHistory(market);
+                            }, 1000);
+                        // }
+
                     } else {
                         setTimeout(() => {
                             setTickCountDown(
@@ -688,3 +696,6 @@ function getUpDownCount(data) {
     return result;
 }
 
+function reload() {
+    location.reload();
+}
