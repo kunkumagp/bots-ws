@@ -24,9 +24,10 @@ const infoOutput = document.getElementById("info_output");
 const martingaleMultiplier = 2.07112;
 
 let isRunning = false, intervalId;
+let isConnectionOn = false;
 
-let targetPercentage = 0.3;
-let amountPercentage = 0.35;
+let targetPercentage = 0.8;
+let amountPercentage = 1;
 
 let initialAccountBalance = 0;
 let updatedAccountBalance = 0;
@@ -76,7 +77,7 @@ marketArray.forEach((item) => {
     marketSelectElement.appendChild(option); // Append to the <select>
 });
 
-accountSelectElement.value = "Y71P0GIOxz3YYvr";
+accountSelectElement.value = "lkUxtOopvUhCpIX";
 marketSelectElement.value = "R_10";
 apiToken = accountSelectElement.value;
 
@@ -90,11 +91,12 @@ market = marketSelectElement.value;
 ws.onopen = function () {
     console.log("Connection open");
     getAuthentication();
-
+    isConnectionOn = true;
 };
 
 ws.onclose = function () {
     console.log("Connection closed");
+    isConnectionOn = false;
     console.log("-----------------------------\n");
 };
 
@@ -190,20 +192,24 @@ ws.onmessage = function (event) {
                     
 
                         if (currentLossAmount < 0) {
-                            if(lostCountInRow >= 2){
-                                // let newTime = (getRandomNumber(1, 2) * 60000 );
-                                let newTime = (getRandomNumber(10, 20) * 1000);
-                                setTimer(newTime);
-                                setTimeout(() => {
+                            let newTime = (getRandomNumber(60, 80) * 1000 );
+
+                            setTimer(newTime);
+                            setTimeout(() => {
+                                console.log("isConnectionOn in loss : ",isConnectionOn);
+                                if(isConnectionOn){
+                                    console.log('connected..');
                                     runScript();
-                                }, newTime);
-                            } else {
-                                runScript();
-                            }
+                                } else {
+                                    console.log('reconnect..');
+                                    weReopen();
+                                }
+                            }, newTime);
                         } else {
                             if (currentProfitAmount >= targetAmount) {
                                 // let newTime = (getRandomNumber(30, 40) * 60000 );
-                                let newTime = (getRandomNumber(5, 10) * 60000 );
+                                // let newTime = (getRandomNumber(5, 10) * 60000 );
+                                let newTime = (getRandomNumber(50, 60) * 1000 );
                                 // let newTime = (getRandomNumber(5, 10) * 1000);
                                 setTimer(newTime);
                                 setTimeout(() => {
@@ -319,7 +325,17 @@ const fetchTradeDetails = (contractId) => {
     ws.send(JSON.stringify(contractDetailsRequest));
 };
 
-
+const weReopen = () => {
+    console.log('ws: ',ws);
+    console.log("isConnectionOn : ",isConnectionOn);
+    if (ws) {
+        ws.onopen = function () {
+            console.log("Connection open");
+            // getAuthentication();
+            isConnectionOn = true;
+        };
+    }
+}
 
 
 // scriptButton.addEventListener("click", runScript);
@@ -377,6 +393,7 @@ function weClose() {
         ws = null;
     }
 }
+
 
 
 
