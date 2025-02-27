@@ -77,14 +77,14 @@ marketArray.forEach((item) => {
     marketSelectElement.appendChild(option); // Append to the <select>
 });
 
-// accountSelectElement.value = "iVOpdm24hBhw3JI";
+accountSelectElement.value = "lkUxtOopvUhCpIX";
 marketSelectElement.value = "R_10";
 apiToken = accountSelectElement.value;
 
+runBot();
 
 accountSelectElement.addEventListener("change", () => {
     apiToken = accountSelectElement.value;
-    runBot();
 });
 
 // market = marketSelectElement.value;
@@ -107,9 +107,6 @@ function runBot() {
         ws.onclose = function () {
             console.log("Connection closed");
             console.log("-----------------------------\n");
-            if(isTradeOpen){
-                reload();
-            }
         };
         
         ws.onerror = function (err) {
@@ -207,8 +204,8 @@ function runBot() {
                                         market = getRandomMarket(marketArray, '');
         
                                         // let newTime = (getRandomNumber(1, 2) * 60000 );
-                                        let newTime = (getRandomNumber(30, 60) * 1000);
-                                        // let newTime = (getRandomNumber(1, 5) * 1000);
+                                        // let newTime = (getRandomNumber(30, 60) * 1000);
+                                        let newTime = (getRandomNumber(1, 5) * 1000);
                                         setTimer(newTime);
                                         setTimeout(() => {
                                             runScript();
@@ -216,13 +213,13 @@ function runBot() {
                                 } else {
                                     if (currentProfitAmount >= targetAmount) {
                                         // let newTime = (getRandomNumber(30, 40) * 60000 );
-                                        let newTime = (getRandomNumber(2, 3) * 60000 );
-                                        // let newTime = (getRandomNumber(1, 5) * 1000);
+                                        // let newTime = (getRandomNumber(2, 3) * 60000 );
+                                        let newTime = (getRandomNumber(1, 5) * 1000);
                                         // let newTime = (getRandomNumber(40, 60) * 1000);
                                         setTimer(newTime);
                                         setTimeout(() => {
                                             reserParams();
-                                            runBot();
+                                            reload();
                                         }, newTime);
                                     } else {
                                         runScript();
@@ -272,7 +269,10 @@ function runBot() {
                 // } else {
                 //     stake = stake * martingaleMultiplier;
                 // }
-                stake = stake * martingaleMultiplier;
+
+                stake = calculateNextStake(currentLossAmount);;
+
+                // stake = stake * martingaleMultiplier;
         
             } else if (status == "Win") {
                 stake = amountPutForTrading;
