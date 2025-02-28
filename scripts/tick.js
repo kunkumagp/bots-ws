@@ -13,6 +13,9 @@ const marketArray = [
     { value: "R_100", name: "Volatility 100 Index" },
 ];
 
+const params = new URLSearchParams(window.location.search);
+const tokenValue = params.get('token'); // Replace 'yourParam' with the actual parameter name
+
 const accountSelectElement = document.getElementById("account_select");
 const marketSelectElement = document.getElementById("market");
 const targetProfitInputElement = document.getElementById("target_profit");
@@ -33,6 +36,7 @@ let ws,
     isTradeOpen = false,
     automation = false,
     authSuccess = false,
+    stopTimer = false,
     initialAccountBalance = 0,
     updatedAccountBalance = 0,
     totalTradeCount = 0,
@@ -44,7 +48,8 @@ let ws,
     currentLossAmount = 0,
     stake = 0.35,
     initialStake = 0.35,
-    stakePercentage = 0.35,
+    stakePercentage = 1,
+    targetAmount = 0;
     duration = 1,
     cutofNumber = 6,
     tickHistoryCount = 100,
@@ -72,8 +77,8 @@ marketArray.forEach((item) => {
     marketSelectElement.appendChild(option); // Append to the <select>
 });
 
-accountSelectElement.value = "lkUxtOopvUhCpIX";
-marketSelectElement.value = "R_25";
+accountSelectElement.value = tokenValue;
+marketSelectElement.value = "R_100";
 apiToken = accountSelectElement.value;
 market = marketSelectElement.value;
 
@@ -135,6 +140,7 @@ function startWebSocket() {
     ws.onclose = function () {
         console.log("Connection closed");
         console.log("-----------------------------\n");
+        reload();
     };
 
     ws.onerror = function (err) {
@@ -153,12 +159,13 @@ function startWebSocket() {
                 console.log("Authorization successful.\n-----------------------------\n\n");
                 setFlashNotification("Authorization successful", 0);
                 initialAccountBalance = wsResponse.authorize.balance;
-                // stake = Number(initialAccountBalance) * (Number(stakePercentage)/100)
                 updatedAccountBalance = initialAccountBalance;
                 setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance}`);
                 authSuccess = true;
                 authenticateButton.innerHTML = "Authenticated. Ready to trade.";
                 authenticateButton.disabled = true;
+
+                resetParams()
                 
                 // [Call the function to identify the market trend in here]
 
@@ -326,15 +333,20 @@ function startWebSocket() {
 
                         // market = getRandomMarket(marketArray, market);
 
-                        // if(profit > 0){
-                        //     reload();
-                        // } else{
+                        if(currentProfitAmount >= targetAmount && profit > 0){
+                            let newTime = (1 * 60000);
+                            setTimer(newTime);
+                            setTimeout(() => {
+                                reload();
+                            }, newTime);
+                            
+                        } else{
                             setTimeout(() => {
                                 reset();
                                 // startTicks();
                                 requestTicksHistory(market);
                             }, 1000);
-                        // }
+                        }
 
                     } else {
                         setTimeout(() => {
@@ -409,6 +421,8 @@ function startWebSocket() {
                 duration: duration,
                 duration_unit: "t",
                 symbol: market,
+                // barrier: 0,  // Setting a barrier
+                // barrier_equal: 1, // Allowing equals
             };
 
             // Send the trade request to the WebSocket
@@ -451,7 +465,7 @@ function startWebSocket() {
         if (status == "Loss") {
             stake = stake * martingaleMultiplier;
         } else if (status == "Win") {
-            stake = initialStake;
+            stake = amountPutForTrading;
         }
     };
 
@@ -698,4 +712,51 @@ function getUpDownCount(data) {
 
 function reload() {
     location.reload();
+}
+
+function resetParams() {
+    // stake = Number(initialAccountBalance) * (Number(stakePercentage)/100);
+
+    // targetAmount =  (initialAccountBalance * (0.8 / 100)).toFixed(2);
+    targetAmount =  0.3;
+    setAccountInfo("targetAmount", `$ ${targetAmount}`);
+    // amountPutForTrading = (initialAccountBalance * (stakePercentage / 100)).toFixed(2);
+    amountPutForTrading = 0.35;
+    setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
+    stake = amountPutForTrading;
+}
+
+function setTimer(time) {
+    let timeleft = time / 1000; // Convert milliseconds to seconds
+
+    if (!isRunning) {
+        timeleft = 0;
+        stopTimer = true;
+    }
+
+    let timer = setInterval(function () {
+        if (timeleft <= 0) {
+            clearInterval(timer);
+            setFlashNotification(``, 0);
+        } else if (timeleft > 0 && !stopTimer) {
+            let formattedTime = formatTime(timeleft);
+            setFlashNotification(`Bot will run again in <span class="number">${formattedTime}</span>.`,0);
+        }
+        timeleft -= 1;
+    }, 1000);
+}
+
+// Helper function to format time (hide hours & minutes if they are 0)
+function formatTime(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    let timeString = "";
+
+    if (hours > 0) timeString += `${hours} h `;
+    if (minutes > 0) timeString += `${minutes} m `;
+    if (secs > 0 || timeString === "") timeString += `${secs} s`;
+
+    return timeString.trim();
 }
