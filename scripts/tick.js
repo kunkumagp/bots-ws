@@ -48,10 +48,11 @@ let ws,
     currentLossAmount = 0,
     stake = 0.35,
     initialStake = 0.35,
-    stakePercentage = 1,
+    stakePercentage = 0.35,
     targetAmount = 0;
-    duration = 1,
+    duration = 5,
     cutofNumber = 6,
+    lostCountInRow = 0,
     tickHistoryCount = 100,
     previousTickValue = null,
     currentTickValue = null
@@ -331,21 +332,41 @@ function startWebSocket() {
                             profit
                         );
 
+                        if(profit < 0){
+                            lostCountInRow = lostCountInRow + 1;
+                        } else {
+                            lostCountInRow = 0;
+                        }
+
+
                         // market = getRandomMarket(marketArray, market);
+                        let newTime;
 
                         if(currentProfitAmount >= targetAmount && profit > 0){
-                            let newTime = (1 * 60000);
+                            newTime = (1 * 60000);
                             setTimer(newTime);
                             setTimeout(() => {
                                 reload();
                             }, newTime);
                             
                         } else{
+
+                            newTime = 1000;
+
+                            if(lostCountInRow >= 2){
+                                newTime = (1 * 60000);
+                            } else if(lostCountInRow >= 3){
+                                market = getRandomMarket(marketArray, market);
+                                console.log('change market');
+                                
+                            }
+                            setTimer(newTime);
+                            
                             setTimeout(() => {
                                 reset();
                                 // startTicks();
                                 requestTicksHistory(market);
-                            }, 1000);
+                            }, newTime);
                         }
 
                     } else {
@@ -717,11 +738,11 @@ function reload() {
 function resetParams() {
     // stake = Number(initialAccountBalance) * (Number(stakePercentage)/100);
 
-    // targetAmount =  (initialAccountBalance * (0.8 / 100)).toFixed(2);
-    targetAmount =  0.3;
+    targetAmount =  (initialAccountBalance * (0.3 / 100)).toFixed(2);
+    // targetAmount =  0.3;
     setAccountInfo("targetAmount", `$ ${targetAmount}`);
-    // amountPutForTrading = (initialAccountBalance * (stakePercentage / 100)).toFixed(2);
-    amountPutForTrading = 0.35;
+    amountPutForTrading = (initialAccountBalance * (stakePercentage / 100)).toFixed(2);
+    // amountPutForTrading = 0.35;
     setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
     stake = amountPutForTrading;
 }
@@ -760,3 +781,15 @@ function formatTime(seconds) {
 
     return timeString.trim();
 }
+
+function getRandomMarket(array, current){
+    let randomIndex;
+    let randomMarket;
+  
+    do {
+      randomIndex = Math.floor(Math.random() * array.length);
+      randomMarket = array[randomIndex];
+    } while (randomMarket === current);
+  
+    return randomMarket.value;
+  };
