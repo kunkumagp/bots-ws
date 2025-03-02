@@ -51,7 +51,7 @@ let ws,
     initialStake = 0.35,
     stakePercentage = 0.35,
     targetAmount = 0;
-    duration = 5,
+    duration = 10,
     cutofNumber = 6,
     lostCountInRow = 0,
     tickHistoryCount = 100,
@@ -231,9 +231,9 @@ function startWebSocket() {
                     tradeTypeDisplay = "Rise";
                     setFlashNotification(`<span class="signal green">Strong Up</span>.`, 0);
 
-                    setTimeout(() => {
+                    // setTimeout(() => {
                         placeTrade('up');
-                    }, 1000);
+                    // }, 1000);
 
                 } else if(trend == "down" && marketSignal.signal == "down" && marketSignal.percentage >= `70%` ){
                     console.log('Trade Down');
@@ -241,9 +241,9 @@ function startWebSocket() {
                     setFlashNotification(`<span class="signal red">Strong Down</span>.`, 0);
                     tradeTypeDisplay = "Fall";
 
-                    setTimeout(() => {
+                    // setTimeout(() => {
                         placeTrade('down');
-                    }, 1000);
+                    // }, 1000);
 
                 }  else {
                     reset();
