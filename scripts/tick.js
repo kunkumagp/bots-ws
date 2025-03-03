@@ -51,7 +51,7 @@ let ws,
     initialStake = 0.35,
     stakePercentage = 0.35,
     targetAmount = 0;
-    duration = 10,
+    duration = 5,
     cutofNumber = 6,
     lostCountInRow = 0,
     tickHistoryCount = 100,
@@ -82,7 +82,10 @@ marketArray.forEach((item) => {
 accountSelectElement.value = tokenValue;
 marketSelectElement.value = marketValue;
 apiToken = accountSelectElement.value;
-market = marketSelectElement.value;
+
+market = getRandomMarket(marketArray, '');
+
+// market = marketSelectElement.value;
 
 
 accountSelectElement.addEventListener("change", () => {
@@ -150,249 +153,254 @@ function startWebSocket() {
     };
 
     ws.onmessage = function (event) {
-        wsResponse = JSON.parse(event.data);
 
-        // console.log('wsResponse: ', wsResponse);
+        if(isWithinTimeRange()){
+
+            wsResponse = JSON.parse(event.data);
+
+            // console.log('wsResponse: ', wsResponse);
 
 
-        if (wsResponse != null) {
+            if (wsResponse != null) {
 
-            if (wsResponse.msg_type === "authorize") {
-                console.log("Authorization successful.\n-----------------------------\n\n");
-                setFlashNotification("Authorization successful", 0);
-                initialAccountBalance = wsResponse.authorize.balance;
-                updatedAccountBalance = initialAccountBalance;
-                setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance}`);
-                authSuccess = true;
-                authenticateButton.innerHTML = "Authenticated. Ready to trade.";
-                authenticateButton.disabled = true;
+                if (wsResponse.msg_type === "authorize") {
+                    console.log("Authorization successful.\n-----------------------------\n\n");
+                    setFlashNotification("Authorization successful", 0);
+                    initialAccountBalance = wsResponse.authorize.balance;
+                    updatedAccountBalance = initialAccountBalance;
+                    setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance}`);
+                    authSuccess = true;
+                    authenticateButton.innerHTML = "Authenticated. Ready to trade.";
+                    authenticateButton.disabled = true;
 
-                resetParams()
-                
-                // [Call the function to identify the market trend in here]
+                    resetParams()
+                    
+                    // [Call the function to identify the market trend in here]
 
-                // startTicks();
-                requestTicksHistory(market);
+                    // startTicks();
+                    requestTicksHistory(market);
 
-            }
-
-            if (wsResponse.msg_type === 'tick') {
-                const tickValue = wsResponse.tick.quote;
-
-                // Check if the response contains the subscription ID
-                if (wsResponse.subscription && wsResponse.subscription.id) {
-                    subscriptionId = wsResponse.subscription.id; // Store the subscription ID
-                    // console.log("Subscribed with ID:", subscriptionId);
                 }
 
-                if(previousTickValue == null && currentTickValue == null){
-                    currentTickValue = tickValue;
-                } else {
-                    previousTickValue = currentTickValue;
-                    currentTickValue = tickValue;
+                if (wsResponse.msg_type === 'tick') {
+                    const tickValue = wsResponse.tick.quote;
 
-                    tickCountObject.total = tickCountObject.total + 1;
+                    // Check if the response contains the subscription ID
+                    if (wsResponse.subscription && wsResponse.subscription.id) {
+                        subscriptionId = wsResponse.subscription.id; // Store the subscription ID
+                        // console.log("Subscribed with ID:", subscriptionId);
+                    }
 
-                    if(previousTickValue < currentTickValue){
-                        tickCountObject.up = tickCountObject.up + 1;
-                    } else if(previousTickValue > currentTickValue){
-                        tickCountObject.down = tickCountObject.down + 1;
-                    } else if(previousTickValue == currentTickValue){
-                        reset();
+                    if(previousTickValue == null && currentTickValue == null){
+                        currentTickValue = tickValue;
+                    } else {
+                        previousTickValue = currentTickValue;
+                        currentTickValue = tickValue;
+
+                        tickCountObject.total = tickCountObject.total + 1;
+
+                        if(previousTickValue < currentTickValue){
+                            tickCountObject.up = tickCountObject.up + 1;
+                        } else if(previousTickValue > currentTickValue){
+                            tickCountObject.down = tickCountObject.down + 1;
+                        } else if(previousTickValue == currentTickValue){
+                            reset();
+                        }
+
+                    }
+
+                    
+                    console.log('Tick value: ',tickValue);
+
+                    if(tickCountObject.total == 10){
+                        requestTicksHistory(market);
+                        stopTicks();
                     }
 
                 }
 
-                
-                console.log('Tick value: ',tickValue);
+                if (wsResponse.msg_type === 'history') {
+                    const lastDigitList = wsResponse.history.prices;
+                    let trend = analyzeMarketTrend(lastDigitList);
+                    let last10Values = lastDigitList.slice(-10);
+                    let upDownObject = getUpDownCount(last10Values);
+                    let marketSignal = getTrendSignal(upDownObject);
 
-                if(tickCountObject.total == 10){
-                    requestTicksHistory(market);
-                    stopTicks();
+                    // console.log('trend: ',trend);
+                    // console.log('last10Values: ',last10Values);
+                    // console.log('tickCountObject: ',upDownObject);
+
+                    if(trend == "up" && marketSignal.signal == "up" && marketSignal.percentage >= `70%` ){
+                        console.log('Trade Up');
+                        console.log('Market Signal: ',marketSignal);
+
+                        tradeTypeDisplay = "Rise";
+                        setFlashNotification(`<span class="signal green">Strong Up</span>.`, 0);
+
+                        // setTimeout(() => {
+                            placeTrade('up');
+                        // }, 1000);
+
+                    } else if(trend == "down" && marketSignal.signal == "down" && marketSignal.percentage >= `70%` ){
+                        console.log('Trade Down');
+                        console.log('Market Signal: ',marketSignal);
+                        setFlashNotification(`<span class="signal red">Strong Down</span>.`, 0);
+                        tradeTypeDisplay = "Fall";
+
+                        // setTimeout(() => {
+                            placeTrade('down');
+                        // }, 1000);
+
+                    }  else {
+                        reset();
+                        // startTicks();
+
+                        console.log('Analizing...');
+                        setFlashNotification(`<span class="signal blink_me">Analizing...</span>`, 0);
+                        setTimeout(() => {
+                            requestTicksHistory(market);
+                        }, 1000);
+
+
+                        
+                        // if(trend == "up" && marketSignal.signal == "up" && (marketSignal.percentage >= `50%` && marketSignal.percentage < `70%`) ){
+                        //     setFlashNotification(`<span class="signal ">Medium Up</span>.`, 0);
+                        // } else if(trend == "down" && marketSignal.signal == "down" && (marketSignal.percentage >= `50%` && marketSignal.percentage < `70%`) ){
+                        //     setFlashNotification(`<span class="signal ">Medium Down</span>.`, 0);
+                        // } else {
+                        //     setFlashNotification(`<span class="signal blue">Neutral</span>.`, 0);
+                        // }
+                    }
+
+
                 }
 
-            }
-
-            if (wsResponse.msg_type === 'history') {
-                const lastDigitList = wsResponse.history.prices;
-                let trend = analyzeMarketTrend(lastDigitList);
-                let last10Values = lastDigitList.slice(-10);
-                let upDownObject = getUpDownCount(last10Values);
-                let marketSignal = getTrendSignal(upDownObject);
-
-                // console.log('trend: ',trend);
-                // console.log('last10Values: ',last10Values);
-                // console.log('tickCountObject: ',upDownObject);
-
-                if(trend == "up" && marketSignal.signal == "up" && marketSignal.percentage >= `70%` ){
-                    console.log('Trade Up');
-                    console.log('Market Signal: ',marketSignal);
-
-                    tradeTypeDisplay = "Rise";
-                    setFlashNotification(`<span class="signal green">Strong Up</span>.`, 0);
-
-                    // setTimeout(() => {
-                        placeTrade('up');
-                    // }, 1000);
-
-                } else if(trend == "down" && marketSignal.signal == "down" && marketSignal.percentage >= `70%` ){
-                    console.log('Trade Down');
-                    console.log('Market Signal: ',marketSignal);
-                    setFlashNotification(`<span class="signal red">Strong Down</span>.`, 0);
-                    tradeTypeDisplay = "Fall";
-
-                    // setTimeout(() => {
-                        placeTrade('down');
-                    // }, 1000);
-
-                }  else {
-                    reset();
-                    // startTicks();
-
-                    console.log('Analizing...');
-                    setFlashNotification(`<span class="signal blink_me">Analizing...</span>`, 0);
-                    setTimeout(() => {
-                        requestTicksHistory(market);
-                    }, 1000);
-
-
-                    
-                    // if(trend == "up" && marketSignal.signal == "up" && (marketSignal.percentage >= `50%` && marketSignal.percentage < `70%`) ){
-                    //     setFlashNotification(`<span class="signal ">Medium Up</span>.`, 0);
-                    // } else if(trend == "down" && marketSignal.signal == "down" && (marketSignal.percentage >= `50%` && marketSignal.percentage < `70%`) ){
-                    //     setFlashNotification(`<span class="signal ">Medium Down</span>.`, 0);
-                    // } else {
-                    //     setFlashNotification(`<span class="signal blue">Neutral</span>.`, 0);
-                    // }
+                if (wsResponse.msg_type === "proposal") {
+                    if (
+                        updatedAccountBalance > 0 &&
+                        wsResponse.echo_req.amount > updatedAccountBalance
+                    ) {
+                        webSocketConnectionStop();
+                    } else {
+                        tradeProposal = wsResponse;
+                        makeTheTrade();
+                    }
                 }
 
-
-            }
-
-            if (wsResponse.msg_type === "proposal") {
-                if (
-                    updatedAccountBalance > 0 &&
-                    wsResponse.echo_req.amount > updatedAccountBalance
-                ) {
-                    webSocketConnectionStop();
-                } else {
-                    tradeProposal = wsResponse;
-                    makeTheTrade();
-                }
-            }
-
-            if (wsResponse.msg_type === "buy") {
-                if (
-                    wsResponse.buy == undefined ||
-                    wsResponse.buy.contract_id == undefined
-                ) {
-                    // placeTrade();
-                } else {
-                    lastTradeId = wsResponse.buy.contract_id;
-                    totalTradeCount = totalTradeCount + 1;
-                    isTradeOpen = true;
-
-                    setResultNotification(
-                        lastTradeId,
-                        tradeTypeDisplay,
-                        market,
-                        wsResponse.buy.buy_price
-                    );
-
-                    // setAccountInfo('percentage10', `$ ${targetProfit.toFixed(2)}`)
-                    console.log("Trade Successful:", wsResponse);
-                    // scrollToBottom();
-
-                    automation = true;
-
-                    setTimeout(() => {
-                        fetchTradeDetails(lastTradeId);
-                    }, 500);
-                }
-            }
-
-
-            if (wsResponse.msg_type === "proposal_open_contract") {
-                if (wsResponse.proposal_open_contract.contract_id === lastTradeId) {
-                    const contract = wsResponse.proposal_open_contract;
-
-                    console.log(contract);
-
-                    if (contract.is_sold) {
-                        let newTime;
-
-                        isTradeOpen = false;
-                        const profit = contract.profit;
-                        const result = profit > 0 ? "Win" : "Loss";
-                        setInfo(contract, profit);
-                        stakeChange(result);
+                if (wsResponse.msg_type === "buy") {
+                    if (
+                        wsResponse.buy == undefined ||
+                        wsResponse.buy.contract_id == undefined
+                    ) {
+                        // placeTrade();
+                    } else {
+                        lastTradeId = wsResponse.buy.contract_id;
+                        totalTradeCount = totalTradeCount + 1;
+                        isTradeOpen = true;
 
                         setResultNotification(
                             lastTradeId,
                             tradeTypeDisplay,
                             market,
-                            contract.buy_price,
-                            profit
+                            wsResponse.buy.buy_price
                         );
 
-                        if(profit < 0){
-                            lostCountInRow = lostCountInRow + 1;
+                        // setAccountInfo('percentage10', `$ ${targetProfit.toFixed(2)}`)
+                        console.log("Trade Successful:", wsResponse);
+                        // scrollToBottom();
 
-                            newTime = 1000;
+                        automation = true;
 
-                            if(lostCountInRow >= 2){
-                                newTime = (1 * 60000);
-                            } else if(lostCountInRow >= 3){
-                                market = getRandomMarket(marketArray, market);
-                                console.log('change market');
-                            }
-                            setTimer(newTime);
-                            
-                            setTimeout(() => {
-                                reset();
-                                // startTicks();
-                                requestTicksHistory(market);
-                            }, newTime);
+                        setTimeout(() => {
+                            fetchTradeDetails(lastTradeId);
+                        }, 500);
+                    }
+                }
 
-                        } else {
-                            if(currentProfitAmount < targetAmount){
-                                if(lostCountInRow == 4){
-                                    newTime = (5 * 60000);
-                                } else {
+
+                if (wsResponse.msg_type === "proposal_open_contract") {
+                    if (wsResponse.proposal_open_contract.contract_id === lastTradeId) {
+                        const contract = wsResponse.proposal_open_contract;
+
+                        console.log(contract);
+
+                        if (contract.is_sold) {
+                            let newTime;
+
+                            isTradeOpen = false;
+                            const profit = contract.profit;
+                            const result = profit > 0 ? "Win" : "Loss";
+                            setInfo(contract, profit);
+                            stakeChange(result);
+
+                            setResultNotification(
+                                lastTradeId,
+                                tradeTypeDisplay,
+                                market,
+                                contract.buy_price,
+                                profit
+                            );
+
+                            if(profit < 0){
+                                lostCountInRow = lostCountInRow + 1;
+
+                                newTime = 1000;
+
+                                if(lostCountInRow >= 2){
                                     newTime = (1 * 60000);
+                                } else if(lostCountInRow >= 3){
+                                    market = getRandomMarket(marketArray, market);
+                                    console.log('change market');
                                 }
                                 setTimer(newTime);
+                                
                                 setTimeout(() => {
-                                    reload();
+                                    reset();
+                                    // startTicks();
+                                    requestTicksHistory(market);
                                 }, newTime);
 
-                            } else if(currentProfitAmount >= targetAmount){
-                                newTime = (1 * 60000);
-                                setTimer(newTime);
-                                setTimeout(() => {
-                                    reload();
-                                }, newTime);
+                            } else {
+                                if(currentProfitAmount < targetAmount){
+                                    if(lostCountInRow == 4){
+                                        newTime = (5 * 60000);
+                                    } else {
+                                        newTime = (1 * 60000);
+                                    }
+                                    setTimer(newTime);
+                                    setTimeout(() => {
+                                        reload();
+                                    }, newTime);
+
+                                } else if(currentProfitAmount >= targetAmount){
+                                    newTime = ((10 + Number(lostCountInRow)) * 60000);
+                                    setTimer(newTime);
+                                    setTimeout(() => {
+                                        reload();
+                                    }, newTime);
+                                }
+
+                                lostCountInRow = 0;
                             }
-
-                            lostCountInRow = 0;
+                        
+                        } else {
+                            setTimeout(() => {
+                                setTickCountDown(
+                                    contract.tick_count,
+                                    contract.tick_stream.length
+                                );
+                                fetchTradeDetails(lastTradeId);
+                            }, 1000);
                         }
-                       
-                    } else {
-                        setTimeout(() => {
-                            setTickCountDown(
-                                contract.tick_count,
-                                contract.tick_stream.length
-                            );
-                            fetchTradeDetails(lastTradeId);
-                        }, 1000);
+
                     }
-
                 }
+
+
+                
             }
-
-
-            
         }
+
     }
 
 
@@ -747,10 +755,12 @@ function resetParams() {
     // stake = Number(initialAccountBalance) * (Number(stakePercentage)/100);
 
     // targetAmount =  (initialAccountBalance * ((stakePercentage/5) / 100)).toFixed(2);
-    targetAmount =  0.3;
+    targetAmount =  (initialAccountBalance * (1 / 100)).toFixed(2);
+    // targetAmount =  0.3;
     setAccountInfo("targetAmount", `$ ${targetAmount}`);
     // amountPutForTrading = (initialAccountBalance * (stakePercentage / 100)).toFixed(2);
-    amountPutForTrading = 0.35;
+    amountPutForTrading = (initialAccountBalance * (2 / 100)).toFixed(2);
+    // amountPutForTrading = 0.35;
     setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
     stake = amountPutForTrading;
 }
@@ -801,3 +811,18 @@ function getRandomMarket(array, current){
   
     return randomMarket.value;
   };
+
+  function isWithinTimeRange() {
+    const now = new Date();
+    const hour = now.getHours(); // Get current hour (0-23)
+
+    let returnHours;
+    if((hour >= 6 && hour < 11) || (hour >= 13 && hour < 15) || (hour >= 16 && hour < 23)){
+        returnHours = true;
+    } else {
+        returnHours = false;
+    }
+
+
+    return returnHours; // Returns true if between 5 AM and 4 PM
+}

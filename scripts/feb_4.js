@@ -26,13 +26,31 @@ const tokenValue = params.get('token');
 const dTargetValue = params.get('dtarget');
 
 
+accounts.forEach((item) => {
+    const option = document.createElement("option");
+    option.value = item.value; // Set the value
+    option.textContent = item.name; // Set the display text
+    accountSelectElement.appendChild(option); // Append to the <select>
+});
+
+marketArray.forEach((item) => {
+    const option = document.createElement("option");
+    option.value = item.value; // Set the value
+    option.textContent = item.name; // Set the display text
+    marketSelectElement.appendChild(option); // Append to the <select>
+});
+
+accountSelectElement.value = 'Y71P0GIOxz3YYvr';
+// accountSelectElement.value = tokenValue;
+marketSelectElement.value = "R_10";
+
 
 const martingaleMultiplier = 2.07112;
 
 let isRunning = false, intervalId;
 
-let targetPercentage = 8;
-let amountPercentage = 10;
+let targetPercentage = 0.8;
+let amountPercentage = 0.1;
 
 let initialAccountBalance = 0;
 let updatedAccountBalance = 0;
@@ -68,22 +86,7 @@ let tradeProposal = null;
 let stopTimer = false;
 let ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=1089");
 
-accounts.forEach((item) => {
-    const option = document.createElement("option");
-    option.value = item.value; // Set the value
-    option.textContent = item.name; // Set the display text
-    accountSelectElement.appendChild(option); // Append to the <select>
-});
 
-marketArray.forEach((item) => {
-    const option = document.createElement("option");
-    option.value = item.value; // Set the value
-    option.textContent = item.name; // Set the display text
-    marketSelectElement.appendChild(option); // Append to the <select>
-});
-
-accountSelectElement.value = tokenValue;
-marketSelectElement.value = "R_10";
 apiToken = accountSelectElement.value;
 
 
@@ -112,7 +115,7 @@ ws.onerror = function (err) {
 
 ws.onmessage = function (event) {
 
-    // if(isWithinTimeRange()){
+    if(isWithinTimeRange()){
         wsResponse = JSON.parse(event.data);
 
         if (wsResponse != null) {
@@ -126,14 +129,19 @@ ws.onmessage = function (event) {
                 authenticateButton.innerHTML = "Authenticated. Ready to trade.";
                 authenticateButton.disabled = true;
 
-                if(dTargetValue != null && Number(dTargetValue) > Number(initialAccountBalance)){
-                    resetParams();
+                resetParams();
                     // scriptButton.innerHTML = "Bot started....";
                     // placeTrade();
                     runScript();
-                } else {
-                    setFlashNotification("Target covered...", 0);
-                }
+
+                // if(dTargetValue != null && Number(dTargetValue) > Number(initialAccountBalance)){
+                //     resetParams();
+                //     // scriptButton.innerHTML = "Bot started....";
+                //     // placeTrade();
+                //     runScript();
+                // } else {
+                //     setFlashNotification("Target covered...", 0);
+                // }
             }
 
 
@@ -194,7 +202,7 @@ ws.onmessage = function (event) {
                         const result = profit > 0 ? "Win" : "Loss";
 
                         setInfo(contract, profit);
-                        stakeChange(result);
+                        // stakeChange(result);
                         isTradeOpen = false;
 
                         if(profit < 0){
@@ -205,7 +213,7 @@ ws.onmessage = function (event) {
                         if (currentLossAmount < 0) {
                             if(lostCountInRow >= 2){
                                 // let newTime = (getRandomNumber(1, 2) * 60000 );
-                                let newTime = (getRandomNumber(10, 20) * 1000);
+                                let newTime = (getRandomNumber(10, 60) * 1000);
                                 setTimer(newTime);
                                 setTimeout(() => {
                                     runScript();
@@ -216,7 +224,7 @@ ws.onmessage = function (event) {
                         } else {
                             if (currentProfitAmount >= targetAmount) {
                                 // let newTime = (getRandomNumber(30, 40) * 60000 );
-                                let newTime = (getRandomNumber(3, 4) * 60000 );
+                                let newTime = (getRandomNumber(9, 11) * 60000 );
                                 // let newTime = (getRandomNumber(40, 60) * 1000);
                                 setTimer(newTime);
                                 setTimeout(() => {
@@ -242,7 +250,7 @@ ws.onmessage = function (event) {
             }
 
         }
-    // }
+    }
 
 };
 
@@ -619,7 +627,15 @@ function isWithinTimeRange() {
     const now = new Date();
     const hour = now.getHours(); // Get current hour (0-23)
 
-    return hour >= 5 && hour < 23; // Returns true if between 5 AM and 4 PM
+    let returnHours;
+    if((hour >= 6 && hour < 11) || (hour >= 13 && hour < 18) || (hour >= 20 && hour < 23)){
+        returnHours = true;
+    } else {
+        returnHours = false;
+    }
+
+
+    return returnHours; // Returns true if between 5 AM and 4 PM
 }
 
 function getRandomMarket(array, current){
