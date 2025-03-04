@@ -40,7 +40,7 @@ marketArray.forEach((item) => {
     marketSelectElement.appendChild(option); // Append to the <select>
 });
 
-accountSelectElement.value = 'Y71P0GIOxz3YYvr';
+accountSelectElement.value = 'lkUxtOopvUhCpIX';
 // accountSelectElement.value = tokenValue;
 marketSelectElement.value = "R_10";
 
@@ -49,8 +49,9 @@ const martingaleMultiplier = 2.07112;
 
 let isRunning = false, intervalId;
 
-let targetPercentage = 0.8;
-let amountPercentage = 0.1;
+let targetPercentage = 0.3;
+// let amountPercentage = 0.35;
+let amountPercentage = 0.35;
 
 let initialAccountBalance = 0;
 let updatedAccountBalance = 0;
@@ -115,7 +116,7 @@ ws.onerror = function (err) {
 
 ws.onmessage = function (event) {
 
-    if(isWithinTimeRange()){
+    // if(isWithinTimeRange()){
         wsResponse = JSON.parse(event.data);
 
         if (wsResponse != null) {
@@ -210,31 +211,40 @@ ws.onmessage = function (event) {
                         }
                     
 
-                        if (currentLossAmount < 0) {
-                            if(lostCountInRow >= 2){
-                                // let newTime = (getRandomNumber(1, 2) * 60000 );
-                                let newTime = (getRandomNumber(10, 60) * 1000);
-                                setTimer(newTime);
-                                setTimeout(() => {
-                                    runScript();
-                                }, newTime);
-                            } else {
-                                runScript();
-                            }
-                        } else {
-                            if (currentProfitAmount >= targetAmount) {
-                                // let newTime = (getRandomNumber(30, 40) * 60000 );
-                                let newTime = (getRandomNumber(9, 11) * 60000 );
-                                // let newTime = (getRandomNumber(40, 60) * 1000);
-                                setTimer(newTime);
-                                setTimeout(() => {
-                                    reserParams();
-                                    reload();
-                                }, newTime);
-                            } else {
-                                runScript();
-                            }
-                        }
+                        // if (currentLossAmount < 0) {
+                        //     if(lostCountInRow >= 2){
+                        //         // let newTime = (getRandomNumber(1, 2) * 60000 );
+                        //         // let newTime = (getRandomNumber(10, 60) * 1000);
+                        //         let newTime = (getRandomNumber(9, 11) * 60000 );
+                        //         setTimer(newTime);
+                        //         setTimeout(() => {
+                        //             runScript();
+                        //         }, newTime);
+                        //     } else {
+                        //         runScript();
+                        //     }
+                        // } else {
+                        //     if (currentProfitAmount >= targetAmount) {
+                        //         // let newTime = (getRandomNumber(30, 40) * 60000 );
+                        //         // let newTime = (getRandomNumber(9, 11) * 60000 );
+                        //         let newTime = (getRandomNumber(15, 17) * 60000 );
+                        //         // let newTime = (getRandomNumber(40, 60) * 1000);
+                        //         setTimer(newTime);
+                        //         setTimeout(() => {
+                        //             reserParams();
+                        //             reload();
+                        //         }, newTime);
+                        //     } else {
+                        //         runScript();
+                        //     }
+                        // }
+
+                        let newTime = (getRandomNumber(10, 12) * 60000 );
+                        setTimer(newTime);
+                        setTimeout(() => {
+                            reserParams();
+                            reload();
+                        }, newTime);
 
 
                     } else {
@@ -250,7 +260,7 @@ ws.onmessage = function (event) {
             }
 
         }
-    }
+    // }
 
 };
 
