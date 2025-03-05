@@ -40,7 +40,7 @@ marketArray.forEach((item) => {
     marketSelectElement.appendChild(option); // Append to the <select>
 });
 
-accountSelectElement.value = 'lkUxtOopvUhCpIX';
+accountSelectElement.value = 'Y71P0GIOxz3YYvr';
 // accountSelectElement.value = tokenValue;
 marketSelectElement.value = "R_10";
 
@@ -50,8 +50,8 @@ const martingaleMultiplier = 2.07112;
 let isRunning = false, intervalId;
 
 let targetPercentage = 0.3;
-// let amountPercentage = 0.35;
 let amountPercentage = 0.35;
+// let amountPercentage = 1;
 
 let initialAccountBalance = 0;
 let updatedAccountBalance = 0;
@@ -272,6 +272,7 @@ const getAuthentication = () => {
 
 
 const stakeChange = (status) => {
+    
     if (status == "Loss") {
         stake = stake * martingaleMultiplier;
     } else if (status == "Win") {

@@ -755,12 +755,12 @@ function resetParams() {
     // stake = Number(initialAccountBalance) * (Number(stakePercentage)/100);
 
     // targetAmount =  (initialAccountBalance * ((stakePercentage/5) / 100)).toFixed(2);
-    targetAmount =  (initialAccountBalance * (1 / 100)).toFixed(2);
-    // targetAmount =  0.3;
+    // targetAmount =  (initialAccountBalance * (0.8 / 100)).toFixed(2);
+    targetAmount =  0.3;
     setAccountInfo("targetAmount", `$ ${targetAmount}`);
     // amountPutForTrading = (initialAccountBalance * (stakePercentage / 100)).toFixed(2);
-    amountPutForTrading = (initialAccountBalance * (2 / 100)).toFixed(2);
-    // amountPutForTrading = 0.35;
+    // amountPutForTrading = (initialAccountBalance * (1 / 100)).toFixed(2);
+    amountPutForTrading = 0.35;
     setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
     stake = amountPutForTrading;
 }
