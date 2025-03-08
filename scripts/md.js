@@ -20,9 +20,9 @@ marketArray.forEach((item) => {
     marketSelectElement.appendChild(option); // Append to the <select>
 });
 
-accountSelectElement.value = 'hJfU1x5xpoSTwHe';
+accountSelectElement.value = 'lkUxtOopvUhCpIX';
 // accountSelectElement.value = tokenValue;
-marketSelectElement.value = "R_10";
+marketSelectElement.value = "1HZ25V";
 
 
 const martingaleMultiplier = 12;
@@ -33,7 +33,7 @@ let isRunning = false, intervalId;
 
 let targetPercentage = 0.3;
 // let amountPercentage = 0.35;
-let amountPercentage = 5;
+let amountPercentage = 1;
 
 let initialAccountBalance = 0;
 let updatedAccountBalance = 0;
@@ -64,7 +64,7 @@ let authSuccess = false;
 let isTradeOpen = false;
 let automation = false;
 let tradeProposal = null;
-let tickHistoryCount = 1000;
+let tickHistoryCount = 1001;
 let onTradesCount = 5;
 let lowestNumber = null;
 
@@ -160,19 +160,41 @@ function startWebSocket() {
     
     
             if (wsResponse.msg_type === 'history') {
+                // console.log(wsResponse);
                 const lastDigitList = wsResponse.history.prices;
-                let ldp = getLastDigitPercentage(lastDigitList);
-                console.log(ldp);
-                setAccountInfo("lowestNumber", `Lowest number is <span class="number">${ldp.lowest}</span>`)
+                // test(lastDigitList);
+                // let ldp = getLastDigitPercentage(lastDigitList);
 
 
-                if(ldp.lastDigitOfLastValue === ldp.lowest){
-                    placeTrade(ldp.lowest);
-                } else {
-                    setTimeout(() => {
-                        requestTicksHistory(market);
-                    }, 1000);
-                }
+                let prices = wsResponse.history.prices;
+                let digitStats = Array(10).fill(0); // Store count for each digit
+        
+                // Count occurrences of each last digit
+                prices.forEach(price => {
+                    let lastDigit = parseInt(price.toString().slice(-1));
+                    digitStats[lastDigit] += 1;
+                });
+        
+                // Convert counts to percentages
+                let totalTicks = prices.length;
+                let digitPercentages = digitStats.map(count => ((count / totalTicks) * 100).toFixed(1));
+        
+                console.log("Last Digit Percentages:", digitPercentages);
+
+                
+                // console.log(ldp);
+                // setAccountInfo("lowestNumber", `Lowest number is <span class="number">${ldp.lowest}</span>`)
+
+                setTimeout(() => {
+                            requestTicksHistory(market);
+                        }, 1000);
+                // if(ldp.lastDigitOfLastValue === ldp.lowest){
+                //     placeTrade(ldp.lowest);
+                // } else {
+                //     setTimeout(() => {
+                //         requestTicksHistory(market);
+                //     }, 1000);
+                // }
 
             }
     
@@ -233,7 +255,7 @@ function startWebSocket() {
                         const result = profit > 0 ? "Win" : "Loss";
     
                         setInfo(contract, profit);
-                        // stakeChange(result);
+                        stakeChange(result);
                         isTradeOpen = false;
     
                         if(profit < 0){
@@ -320,6 +342,7 @@ function startWebSocket() {
     };
     
     const requestTicksHistory = (symbol) => {
+        console.log('symbol: ', symbol);
         const ticksHistoryRequest = {
             ticks_history: symbol,
             end: 'latest',
@@ -344,7 +367,7 @@ function startWebSocket() {
                 basis: "stake",
                 contract_type: "DIGITDIFF", // Use 'DIGITDIFF' for Differs
                 currency: "USD",
-                duration: 1,
+                duration: getRandomNumber(1, 5),
                 duration_unit: "t",
                 symbol: "R_10",
                 barrier: lowestNumber, // Replace with the desired digit (0-9)
@@ -401,4 +424,27 @@ function weClose() {
         ws.close();
         ws = null;
     }
+}
+
+
+function test(arr) {
+    // Find the maximum decimal count
+    let maxDecimals = 0;
+    arr.forEach(num => {
+        const decimalPart = num.toString().split(".")[1];
+        if (decimalPart) {
+            maxDecimals = Math.max(maxDecimals, decimalPart.length);
+        }
+    });
+
+    // Get last digits considering the max decimal count
+    let lastDigits = arr.map(num => {
+        return Math.floor(num * Math.pow(10, maxDecimals)) % 10;
+    });
+
+    let counts = Array(10).fill(0);
+    lastDigits.forEach(digit => counts[digit]++);
+
+    console.log('counts: ', counts);
+
 }

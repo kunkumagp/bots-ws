@@ -314,6 +314,7 @@ function getRandomMarket(array, current){
   };
 
 
+
   function getLastDigitPercentage(arr) {
     // Find the maximum decimal count
     let maxDecimals = 0;
@@ -338,8 +339,9 @@ function getRandomMarket(array, current){
 
     // Convert to percentage
     let percentages = {};
-    let minDigit = 0;
     let minPercentage = 100;
+    let minDigit = null;
+    let minCount = 0;
     let total = arr.length;
     
     counts.forEach((count, digit) => {
@@ -350,12 +352,34 @@ function getRandomMarket(array, current){
         if (percentage < minPercentage) {
             minPercentage = percentage;
             minDigit = digit;
+            minCount = 1;
+        } else if (percentage === minPercentage) {
+            minCount++; // More than one digit has the same lowest percentage
         }
     });
+
+    // Only return minDigit if it's unique and below 8.7%
+    if (minCount > 1 || minPercentage >= 8) {
+        minDigit = null;
+    }
 
     return { 
         percentages, 
         lowest: minDigit, 
         lastDigitOfLastValue 
     };
+}
+
+function getLowestNonZeroIndex(arr) {
+    let minIndex = -1;
+    let minValue = Infinity;
+
+    for (let i = 0; i < arr.length; i++) {
+        if (arr[i] > 0 && arr[i] < minValue) {
+            minValue = arr[i];
+            minIndex = i;
+        }
+    }
+
+    return minIndex;
 }

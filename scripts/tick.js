@@ -51,7 +51,7 @@ let ws,
     initialStake = 0.35,
     stakePercentage = 0.35,
     targetAmount = 0;
-    duration = 5,
+    duration = 1,
     cutofNumber = 6,
     lostCountInRow = 0,
     tickHistoryCount = 100,
@@ -331,7 +331,7 @@ function startWebSocket() {
                             const profit = contract.profit;
                             const result = profit > 0 ? "Win" : "Loss";
                             setInfo(contract, profit);
-                            stakeChange(result);
+                            // stakeChange(result);
 
                             setResultNotification(
                                 lastTradeId,
