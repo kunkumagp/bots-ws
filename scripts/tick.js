@@ -81,7 +81,8 @@ marketArray.forEach((item) => {
 
 accountSelectElement.value = tokenValue;
 marketSelectElement.value = marketValue;
-apiToken = accountSelectElement.value;
+// apiToken = accountSelectElement.value;
+apiToken = 'lkUxtOopvUhCpIX';
 
 market = getRandomMarket(marketArray, '');
 
@@ -154,11 +155,11 @@ function startWebSocket() {
 
     ws.onmessage = function (event) {
 
-        if(isWithinTimeRange()){
+        // if(isWithinTimeRange()){
 
             wsResponse = JSON.parse(event.data);
 
-            // console.log('wsResponse: ', wsResponse);
+            console.log('wsResponse: ', wsResponse);
 
 
             if (wsResponse != null) {
@@ -177,8 +178,8 @@ function startWebSocket() {
                     
                     // [Call the function to identify the market trend in here]
 
-                    // startTicks();
-                    requestTicksHistory(market);
+                    startTicks();
+                    // requestTicksHistory(market);
 
                 }
 
@@ -213,7 +214,9 @@ function startWebSocket() {
                     console.log('Tick value: ',tickValue);
 
                     if(tickCountObject.total == 10){
-                        requestTicksHistory(market);
+                        // requestTicksHistory(market);
+                        console.log(tickCountObject);
+                        
                         stopTicks();
                     }
 
@@ -399,7 +402,7 @@ function startWebSocket() {
 
                 
             }
-        }
+        // }
 
     }
 
