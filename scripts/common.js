@@ -12,11 +12,31 @@ const accounts = [
 
 let marketArray = [
     { value: "R_10", name: "Volatility 10 Index" },
+    { value: "1HZ10V", name: "Volatility 10 (1s) Index" },
     { value: "R_25", name: "Volatility 25 Index" },
+    { value: "1HZ25V", name: "Volatility 25 (1s) Index" },
     { value: "R_50", name: "Volatility 50 Index" },
+    { value: "1HZ50V", name: "Volatility 50 (1s) Index" },
     { value: "R_75", name: "Volatility 75 Index" },
+    { value: "1HZ75V", name: "Volatility 75 (1s) Index" },
     { value: "R_100", name: "Volatility 100 Index" },
+    { value: "1HZ100V", name: "Volatility 100 (1s) Index" },
 ];
+
+const lastDigits = [
+    { name: 0, value: 0 },
+    { name: 1, value: 1 },
+    { name: 2, value: 2 },
+    { name: 3, value: 3 },
+    { name: 4, value: 4 },
+    { name: 5, value: 5 },
+    { name: 6, value: 6 },
+    { name: 7, value: 7 },
+    { name: 8, value: 8 },
+    { name: 9, value: 9 },
+];
+
+
 
 const accountSelectElement = document.getElementById("account_select");
 const marketSelectElement = document.getElementById("market");
@@ -25,7 +45,38 @@ const initialStakeInputElement = document.getElementById("initial_stake");
 const authenticateButton = document.getElementById("authenticateButton");
 const scriptButton = document.getElementById("scriptButton");
 const infoOutput = document.getElementById("info_output");
+const lowestDigitSelectElement = document.getElementById("lowest_digit");
 
+
+
+
+
+accounts.forEach((item) => {
+    const option = document.createElement("option");
+    option.value = item.value; // Set the value
+    if(item.value == "lkUxtOopvUhCpIX"){
+        option.selected = true;
+    }
+    option.textContent = item.name; // Set the display text
+    accountSelectElement.appendChild(option); // Append to the <select>
+});
+
+marketArray.forEach((item) => {
+    const option = document.createElement("option");
+    option.value = item.value; // Set the value
+    if(item.value == "1HZ100V"){
+        option.selected = true;
+    }
+    option.textContent = item.name; // Set the display text
+    marketSelectElement.appendChild(option); // Append to the <select>
+});
+
+lastDigits.forEach((item) => {
+    const option = document.createElement("option");
+    option.value = item.value; // Set the value
+    option.textContent = item.name; // Set the display text
+    lowestDigitSelectElement.appendChild(option); // Append to the <select>
+});
 
 function reserParams() {
     currentProfitAmount = 0;
