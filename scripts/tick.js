@@ -51,7 +51,7 @@ let ws,
     initialStake = 0.35,
     stakePercentage = 0.35,
     targetAmount = 0;
-    duration = 1,
+    duration = 5,
     cutofNumber = 6,
     lostCountInRow = 0,
     tickHistoryCount = 100,
@@ -83,9 +83,9 @@ accountSelectElement.value = tokenValue;
 marketSelectElement.value = marketValue;
 apiToken = accountSelectElement.value;
 
-market = getRandomMarket(marketArray, '');
+// market = getRandomMarket(marketArray, '');
 
-// market = marketSelectElement.value;
+market = marketSelectElement.value;
 
 
 accountSelectElement.addEventListener("change", () => {
@@ -154,7 +154,7 @@ function startWebSocket() {
 
     ws.onmessage = function (event) {
 
-        if(isWithinTimeRange()){
+        // if(isWithinTimeRange()){
 
             wsResponse = JSON.parse(event.data);
 
@@ -177,8 +177,8 @@ function startWebSocket() {
                     
                     // [Call the function to identify the market trend in here]
 
-                    // startTicks();
-                    requestTicksHistory(market);
+                    startTicks();
+                    // requestTicksHistory(market);
 
                 }
 
@@ -211,9 +211,13 @@ function startWebSocket() {
 
                     
                     console.log('Tick value: ',tickValue);
+                    console.log('tickCountObject: ',tickCountObject);
+                    setFlashNotification(`<span class="signal ">${tickCountObject.total}</span>.`, 0);
+                    
 
                     if(tickCountObject.total == 10){
-                        requestTicksHistory(market);
+                        // requestTicksHistory(market);
+                        tradeProccess();
                         stopTicks();
                     }
 
@@ -228,7 +232,7 @@ function startWebSocket() {
 
                     // console.log('trend: ',trend);
                     // console.log('last10Values: ',last10Values);
-                    // console.log('tickCountObject: ',upDownObject);
+                    console.log('upDownObject: ',upDownObject);
 
                     if(trend == "up" && marketSignal.signal == "up" && marketSignal.percentage >= `70%` ){
                         console.log('Trade Up');
@@ -238,7 +242,7 @@ function startWebSocket() {
                         setFlashNotification(`<span class="signal green">Strong Up</span>.`, 0);
 
                         // setTimeout(() => {
-                            placeTrade('up');
+                            // placeTrade('up');
                         // }, 1000);
 
                     } else if(trend == "down" && marketSignal.signal == "down" && marketSignal.percentage >= `70%` ){
@@ -248,7 +252,7 @@ function startWebSocket() {
                         tradeTypeDisplay = "Fall";
 
                         // setTimeout(() => {
-                            placeTrade('down');
+                            // placeTrade('down');
                         // }, 1000);
 
                     }  else {
@@ -352,35 +356,41 @@ function startWebSocket() {
                                     market = getRandomMarket(marketArray, market);
                                     console.log('change market');
                                 }
-                                setTimer(newTime);
+                                // setTimer(newTime);
                                 
-                                setTimeout(() => {
-                                    reset();
-                                    // startTicks();
-                                    requestTicksHistory(market);
-                                }, newTime);
+                                // setTimeout(() => {
+                                //     reset();
+                                //     // startTicks();
+                                //     requestTicksHistory(market);
+                                // }, newTime);
+
+                                reset();
+                                startTicks();
 
                             } else {
                                 if(currentProfitAmount < targetAmount){
-                                    if(lostCountInRow == 4){
-                                        newTime = (5 * 60000);
-                                    } else {
-                                        newTime = (1 * 60000);
-                                    }
-                                    setTimer(newTime);
-                                    setTimeout(() => {
-                                        reload();
-                                    }, newTime);
+                                    // if(lostCountInRow == 4){
+                                    //     newTime = (5 * 60000);
+                                    // } else {
+                                    //     newTime = (1 * 60000);
+                                    // }
+                                    // setTimer(newTime);
+                                    // setTimeout(() => {
+                                    //     reload();
+                                    // }, newTime);
 
                                 } else if(currentProfitAmount >= targetAmount){
-                                    newTime = ((10 + Number(lostCountInRow)) * 60000);
-                                    setTimer(newTime);
-                                    setTimeout(() => {
-                                        reload();
-                                    }, newTime);
+                                    // newTime = ((10 + Number(lostCountInRow)) * 60000);
+                                    // setTimer(newTime);
+                                    // setTimeout(() => {
+                                    //     reload();
+                                    // }, newTime);
                                 }
 
                                 lostCountInRow = 0;
+
+                                reset();
+                                startTicks();
                             }
                         
                         } else {
@@ -399,9 +409,35 @@ function startWebSocket() {
 
                 
             }
-        }
+        // }
 
     }
+
+    const tradeProccess = () => {
+        console.log('tickCountObject: ',tickCountObject);
+
+        if(tickCountObject.total == 10 && (tickCountObject.up >= 7 && tickCountObject.down <= 3)){
+            console.log('STRONG UP');
+            tradeTypeDisplay = "Rise";
+            setFlashNotification(`<span class="signal green">Strong Up</span>.`, 0);
+            placeTrade('up');
+        } else if(tickCountObject.total == 10 && (tickCountObject.down >= 7 && tickCountObject.up <= 3)){
+            console.log('STRONG DOWN');
+            tradeTypeDisplay = "Fall";
+            setFlashNotification(`<span class="signal red">Strong Down</span>.`, 0);
+            placeTrade('down');
+        } else {
+            console.log('Analizing...');
+            setFlashNotification(`<span class="signal blink_me">Analizing...</span>`, 0);
+
+            reset();
+            setTimeout(() => {
+                startTicks();
+            }, 3000);
+        }
+
+
+    };
 
 
 
