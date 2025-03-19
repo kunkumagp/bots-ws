@@ -21,13 +21,14 @@ const authenticateButton = document.getElementById("authenticateButton");
 const scriptButton = document.getElementById("scriptButton");
 const infoOutput = document.getElementById("info_output");
 
-const martingaleMultiplier = 2.07112;
+// const martingaleMultiplier = 2.07112;
+const martingaleMultiplier = 1.3;
 
 let isRunning = false, intervalId;
 let isConnectionOn = false;
 
-let targetPercentage = 0.8;
-let amountPercentage = 1;
+let targetPercentage = 0.08;
+let amountPercentage = 0.1;
 
 let initialAccountBalance = 0;
 let updatedAccountBalance = 0;
@@ -77,7 +78,7 @@ marketArray.forEach((item) => {
     marketSelectElement.appendChild(option); // Append to the <select>
 });
 
-accountSelectElement.value = "lkUxtOopvUhCpIX";
+accountSelectElement.value = "Y71P0GIOxz3YYvr";
 marketSelectElement.value = "R_10";
 apiToken = accountSelectElement.value;
 
@@ -156,7 +157,7 @@ function runBot() {
     
     ws.onmessage = function (event) {
     
-        if(isWithinTimeRange()){
+        // if(isWithinTimeRange()){
             wsResponse = JSON.parse(event.data);
     
             if (wsResponse != null) {
@@ -235,16 +236,21 @@ function runBot() {
                             setInfo(contract, profit);
                             stakeChange(result);
                             isTradeOpen = false;
+
+                            let newTime;
+
+                          
     
-                            if(profit < 0){
-                                lostCountInRow = lostCountInRow + 1;
-                            }
 
                             if (currentLossAmount < 0) {
-                                let newTime = (getRandomNumber(2, 3) * 60000 );
+                                // let newTime = (getRandomNumber(2, 3) * 60000 );
+                                
+                                newTime = 2000;
                                 
                                 if(lostCountInRow >= 2){
-                                    market = getRandomMarket(marketArray, market);
+                                    
+                                    // window.location = '../index.html';
+                                    // market = getRandomMarket(marketArray, market);
                                 }
     
                                 setTimer(newTime);
@@ -259,10 +265,13 @@ function runBot() {
                                     }
                                 }, newTime);
                             } else {
+                                
+
                                 if (currentProfitAmount >= targetAmount) {
                                     // let newTime = (getRandomNumber(30, 40) * 60000 );
                                     // let newTime = (getRandomNumber(5, 10) * 60000 );
-                                    let newTime = (getRandomNumber(50, 60) * 1000 );
+                                    // let newTime = (getRandomNumber(50, 60) * 1000 );
+                                    newTime = 5000 ;
                                     // let newTime = (getRandomNumber(5, 10) * 1000);
                                     setTimer(newTime);
                                     setTimeout(() => {
@@ -270,6 +279,16 @@ function runBot() {
                                         reload();
                                     }, newTime);
                                 } else {
+
+                                    if(profit > 0){
+                                        if(lostCountInRow >= 2){
+                                            newTime = (getRandomNumber(5, 6) * 60000 );
+                                        }
+                                    } else {
+                                        lostCountInRow = lostCountInRow + 1;
+                                    }
+
+                                    
                                     runScript();
                                 }
                             }
@@ -288,7 +307,7 @@ function runBot() {
                 }
     
             }
-        }
+        // }
     
     };
     
@@ -297,7 +316,8 @@ function runBot() {
     
     const stakeChange = (status) => {
         if (status == "Loss") {
-            stake = stake * martingaleMultiplier;
+            // stake = stake * martingaleMultiplier;
+            stake = Number(Math.abs(currentLossAmount)) * martingaleMultiplier;
         } else if (status == "Win") {
             stake = amountPutForTrading;
         }
@@ -643,8 +663,17 @@ function runBot() {
     function isWithinTimeRange() {
         const now = new Date();
         const hour = now.getHours(); // Get current hour (0-23)
+
+        let returnValue;
+
+        if((hour >= 5 && hour < 12) || hour >= 14 && hour < 18){
+            returnValue = true;
+        } else {
+            returnValue = false;
+        }
+
     
-        return hour >= 5 && hour < 18; // Returns true if between 5 AM and 4 PM
+        return returnValue; // Returns true if between 5 AM and 4 PM
     }
     
     function getRandomMarket(array, current){
