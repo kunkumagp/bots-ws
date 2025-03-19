@@ -33,7 +33,7 @@ let ws ;
 
 let startRapidTrading = false;
 let tradesInRow = 0;
-let tradeCountInRow = 3;
+let tradeCountInRow = 1;
 let decimalCount = null;
 
 let subscriptionId = null;
@@ -231,7 +231,7 @@ function startWebSocket() {
 
 
 
-                        stakeChange(result);
+                        // stakeChange(result);
                         isTradeOpen = false;
 
                         if(profit < 0){
@@ -264,24 +264,25 @@ function startWebSocket() {
 
     const startTrades = () => {
         isRunning = true;
+        placeTrade(ldp);
 
-        if(startRapidTrading == false){
-            console.log('Start initial trading.');
+        // if(startRapidTrading == false){
+        //     console.log('Start initial trading.');
 
-            startTicks();
-        } else if(startRapidTrading == true && tradesInRow < tradeCountInRow) {
-            console.log('Start rapid trading.');
+        //     startTicks();
+        // } else if(startRapidTrading == true && tradesInRow < tradeCountInRow) {
+        //     console.log('Start rapid trading.');
 
-            stopTicks();
-            placeTrade(ldp);
-        } else if(startRapidTrading == true && tradesInRow == tradeCountInRow){
-            console.log('Start tick again.');
+        //     stopTicks();
+        //     placeTrade(ldp);
+        // } else if(startRapidTrading == true && tradesInRow == tradeCountInRow){
+        //     console.log('Start tick again.');
 
-            startRapidTrading = false;
-            tradesInRow = 0;
+        //     startRapidTrading = false;
+        //     tradesInRow = 0;
             
-            startTicks();
-        }
+        //     startTicks();
+        // }
     };
 
 
@@ -405,8 +406,8 @@ function startWebSocket() {
 
 
 function resetUniqueParams() {
-    // amountPutForTrading = (initialAccountBalance * (amountPercentage / 100)).toFixed(2);
-    amountPutForTrading = Number(1);;
+    amountPutForTrading = (initialAccountBalance * (amountPercentage / 100)).toFixed(2);
+    // amountPutForTrading = Number(1);
     setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
     stake = amountPutForTrading;
     initStake = amountPutForTrading;
