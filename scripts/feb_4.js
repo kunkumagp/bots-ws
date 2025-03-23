@@ -21,14 +21,29 @@ const authenticateButton = document.getElementById("authenticateButton");
 const scriptButton = document.getElementById("scriptButton");
 const infoOutput = document.getElementById("info_output");
 
+const mgAraay = [
+    2.07112,
+    2,
+    1.8,
+    1.6,
+    1.5,
+    1.4,
+    1.3,
+    1.2,
+    1.15,
+    1.13,
+    1.11,
+    1.1
+];
+
 // const martingaleMultiplier = 2.07112;
-const martingaleMultiplier = 1.3;
+let martingaleMultiplier = 1.2;
 
 let isRunning = false, intervalId;
 let isConnectionOn = false;
 
-let targetPercentage = 0.08;
-let amountPercentage = 0.1;
+let targetPercentage = 0.5;
+let amountPercentage = 1;
 
 let initialAccountBalance = 0;
 let updatedAccountBalance = 0;
@@ -78,7 +93,7 @@ marketArray.forEach((item) => {
     marketSelectElement.appendChild(option); // Append to the <select>
 });
 
-accountSelectElement.value = "Y71P0GIOxz3YYvr";
+accountSelectElement.value = "lkUxtOopvUhCpIX";
 marketSelectElement.value = "R_10";
 apiToken = accountSelectElement.value;
 
@@ -234,21 +249,30 @@ function runBot() {
                             const result = profit > 0 ? "Win" : "Loss";
     
                             setInfo(contract, profit);
-                            stakeChange(result);
                             isTradeOpen = false;
 
                             let newTime;
 
-                          
-    
+                            // if(profit > 0){
+                            //     if(lostCountInRow >= 2){
+                            //         newTime = (getRandomNumber(5, 6) * 60000 );
+                            //     }
+                            // } else {
+                            //     lostCountInRow = lostCountInRow + 1;
+                            // }
+
+                            if(profit < 0){
+                                lostCountInRow = lostCountInRow + 1;
+                            }
+
 
                             if (currentLossAmount < 0) {
                                 // let newTime = (getRandomNumber(2, 3) * 60000 );
                                 
                                 newTime = 2000;
                                 
-                                if(lostCountInRow >= 2){
-                                    
+                                if(lostCountInRow >= 4){
+                                    newTime = (getRandomNumber(1, 20) * 1000 );
                                     // window.location = '../index.html';
                                     // market = getRandomMarket(marketArray, market);
                                 }
@@ -265,34 +289,38 @@ function runBot() {
                                     }
                                 }, newTime);
                             } else {
+
+                                // if(lostCountInRow >= 2){
+                                //     newTime = (getRandomNumber(60, 90) * 1000 );
+                                // } else {
+                                //     newTime = 5000 ;
+                                // }
+                                newTime = 5000 ;
+
                                 
 
-                                if (currentProfitAmount >= targetAmount) {
-                                    // let newTime = (getRandomNumber(30, 40) * 60000 );
-                                    // let newTime = (getRandomNumber(5, 10) * 60000 );
-                                    // let newTime = (getRandomNumber(50, 60) * 1000 );
-                                    newTime = 5000 ;
-                                    // let newTime = (getRandomNumber(5, 10) * 1000);
-                                    setTimer(newTime);
-                                    setTimeout(() => {
-                                        reserParams();
-                                        reload();
-                                    }, newTime);
-                                } else {
+                                // if (currentProfitAmount >= targetAmount) {
+                                //     // let newTime = (getRandomNumber(30, 40) * 60000 );
+                                //     // let newTime = (getRandomNumber(5, 10) * 60000 );
+                                //     // let newTime = (getRandomNumber(50, 60) * 1000 );
+                                //     // let newTime = (getRandomNumber(5, 10) * 1000);
+                                //     setTimer(newTime);
+                                //     setTimeout(() => {
+                                //         reserParams();
+                                //         reload();
+                                //     }, newTime);
+                                // } else {
+                                //     runScript();
+                                // }
+                                setTimer(newTime);
+                                setTimeout(() => {
+                                    reserParams();
+                                    reload();
+                                }, newTime);
 
-                                    if(profit > 0){
-                                        if(lostCountInRow >= 2){
-                                            newTime = (getRandomNumber(5, 6) * 60000 );
-                                        }
-                                    } else {
-                                        lostCountInRow = lostCountInRow + 1;
-                                    }
-
-                                    
-                                    runScript();
-                                }
                             }
     
+                            stakeChange(result);
     
                         } else {
                             setTimeout(() => {
@@ -316,7 +344,18 @@ function runBot() {
     
     const stakeChange = (status) => {
         if (status == "Loss") {
+            let newMartingale = 0;
             // stake = stake * martingaleMultiplier;
+
+            let mtgl = mgAraay[(lostCountInRow - 1)];
+
+            if(mtgl != undefined || mtgl != '' || mtgl != null){
+                newMartingale = mtgl;
+            } else {
+                newMartingale = martingaleMultiplier;
+            }
+
+            // stake = Number(Math.abs(currentLossAmount)) * newMartingale;
             stake = Number(Math.abs(currentLossAmount)) * martingaleMultiplier;
         } else if (status == "Win") {
             stake = amountPutForTrading;
@@ -359,8 +398,8 @@ function runBot() {
             stake = Number(stake);
             stake < 0.35 ? (stake = 0.35) : (stake = stake);
     
-            // tickCount = 1;
-            tickCount = getRandomNumber(5, 8);
+            tickCount = 1;
+            // tickCount = getRandomNumber(5, 8);
     
             const tradeRequest = {
                 proposal: 1,
@@ -711,9 +750,11 @@ function setAccountInfo(elementId, message) {
 }
 
 function resetParams() {
-    targetAmount =  (initialAccountBalance * (targetPercentage / 100)).toFixed(2);
+    // targetAmount =  (initialAccountBalance * (targetPercentage / 100)).toFixed(2);
+    targetAmount =  Number(0.30);
     setAccountInfo("targetAmount", `$ ${targetAmount}`);
-    amountPutForTrading = (initialAccountBalance * (amountPercentage / 100)).toFixed(2);
+    // amountPutForTrading = (initialAccountBalance * (amountPercentage / 100)).toFixed(2);
+    amountPutForTrading = Number(0.35);
     setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
     stake = amountPutForTrading;
 }
