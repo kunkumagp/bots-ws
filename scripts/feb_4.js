@@ -94,7 +94,7 @@ marketArray.forEach((item) => {
 });
 
 accountSelectElement.value = "lkUxtOopvUhCpIX";
-marketSelectElement.value = "R_10";
+marketSelectElement.value = "R_100";
 apiToken = accountSelectElement.value;
 
 
