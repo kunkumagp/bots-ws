@@ -21,7 +21,9 @@ const authenticateButton = document.getElementById("authenticateButton");
 const scriptButton = document.getElementById("scriptButton");
 const infoOutput = document.getElementById("info_output");
 
+// const martingaleMultiplier = 1.2;
 const martingaleMultiplier = 2.07112;
+
 
 let isRunning = false, intervalId;
 
@@ -77,7 +79,7 @@ marketArray.forEach((item) => {
 });
 
 accountSelectElement.value = "Y71P0GIOxz3YYvr";
-marketSelectElement.value = "R_10";
+marketSelectElement.value = "R_100";
 apiToken = accountSelectElement.value;
 
 
@@ -190,11 +192,12 @@ ws.onmessage = function (event) {
                             lostCountInRow = lostCountInRow + 1;
                         }
                     
+                        let newTime;
 
                         if (currentLossAmount < 0) {
                             if(lostCountInRow >= 2){
-                                // let newTime = (getRandomNumber(1, 2) * 60000 );
-                                let newTime = (getRandomNumber(10, 20) * 1000);
+                                newTime = (getRandomNumber(60, 90) * 1000 );
+                                // let newTime = (getRandomNumber(10, 20) * 1000);
                                 setTimer(newTime);
                                 setTimeout(() => {
                                     runScript();
@@ -205,8 +208,14 @@ ws.onmessage = function (event) {
                         } else {
                             if (currentProfitAmount >= targetAmount) {
                                 // let newTime = (getRandomNumber(30, 40) * 60000 );
-                                let newTime = (getRandomNumber(2, 3) * 60000 );
                                 // let newTime = (getRandomNumber(40, 60) * 1000);
+
+
+                                if(lostCountInRow >= 2){
+                                    newTime = (getRandomNumber(2, 3) * 60000 );
+                                } else {
+                                    newTime = (getRandomNumber(3, 5) * 60000 );
+                                }
                                 setTimer(newTime);
                                 setTimeout(() => {
                                     reserParams();
@@ -216,6 +225,14 @@ ws.onmessage = function (event) {
                                 runScript();
                             }
                         }
+
+                        // let newTime = (getRandomNumber(2, 3) * 60000 );
+                        // // let newTime = (getRandomNumber(40, 60) * 1000);
+                        // setTimer(newTime);
+                        // setTimeout(() => {
+                        //     reserParams();
+                        //     reload();
+                        // }, newTime);
 
 
                     } else {
@@ -244,7 +261,8 @@ const getAuthentication = () => {
 
 const stakeChange = (status) => {
     if (status == "Loss") {
-        stake = stake * martingaleMultiplier;
+        // stake = stake * martingaleMultiplier;
+        stake = Number(Math.abs(currentLossAmount)) * martingaleMultiplier;
     } else if (status == "Win") {
         stake = amountPutForTrading;
     }
