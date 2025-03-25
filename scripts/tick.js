@@ -99,8 +99,8 @@ marketSelectElement.addEventListener("change", () => {
 });
 
 
-// scriptButton.addEventListener('click', runScript);
-runScript();
+scriptButton.addEventListener('click', runScript);
+// runScript();
 
 
 function runScript() {
@@ -208,16 +208,38 @@ function startWebSocket() {
                             reset();
                         }
 
+                        setFlashNotification(`<span class="signal blink_me">${tickCountObject.total}</span>`, 0);
+
                     }
 
                     
                     console.log('Tick value: ',tickValue);
 
                     if(tickCountObject.total == 10){
+                        let time;
                         // requestTicksHistory(market);
                         console.log(tickCountObject);
-                        
                         stopTicks();
+
+                        if((tickCountObject.up > tickCountObject.down) && (tickCountObject.up >= 6)){
+                            setFlashNotification(`<span class="signal green">Strong Up</span>.`, 0);
+                            time = 10000;
+                        } else if((tickCountObject.up < tickCountObject.down) && (tickCountObject.down >= 6)){
+                            setFlashNotification(`<span class="signal red">Strong Down</span>.`, 0);
+                            time = 10000;
+                        } else {
+                            setFlashNotification(`<span class="signal blink_me">Analizing...</span>`, 0);
+                            time = 5000;
+                        }
+
+
+                        reset();
+                        setTimer(time);
+                        setTimeout(() => {
+                            startTicks();
+                        }, time);
+                        
+                        
                     }
 
                 }

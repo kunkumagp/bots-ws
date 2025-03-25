@@ -41,6 +41,7 @@ let subscriptionId = null;
 
 
 apiToken = accountSelectElement.value;
+market = marketSelectElement.value;
 
 accountSelectElement.addEventListener("change", () => {
     apiToken = accountSelectElement.value;
@@ -50,7 +51,10 @@ lowestDigitSelectElement.addEventListener("change", () => {
     ldp = Number(lowestDigitSelectElement.value);
 });
 
-market = marketSelectElement.value;
+
+marketSelectElement.addEventListener("change", () => {
+    market = marketSelectElement.value;
+});
 
 scriptButton.addEventListener('click', runScript);
 

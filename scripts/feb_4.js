@@ -89,13 +89,16 @@ let ws;
 
 
 apiToken = accountSelectElement.value;
-
+market = marketSelectElement.value;
 
 accountSelectElement.addEventListener("change", () => {
     apiToken = accountSelectElement.value;
 });
 
-market = marketSelectElement.value;
+marketSelectElement.addEventListener("change", () => {
+    market = marketSelectElement.value;
+});
+
 // market = getRandomMarket(marketArray, '');
 
 botRun();
