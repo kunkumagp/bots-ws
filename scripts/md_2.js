@@ -167,7 +167,7 @@ function startWebSocket() {
                 }
 
                 if(lastDigit === ldp){
-                    placeTrade(ldp);
+                    placeTrade();
                 }
 
 
@@ -230,9 +230,6 @@ function startWebSocket() {
     
                         setInfo(contract, profit);
 
-                      
-
-
 
 
                         // stakeChange(result);
@@ -241,12 +238,17 @@ function startWebSocket() {
                         if(profit < 0){
                             startRapidTrading = false;
                             tradesInRow = 0;
+                            setTimeout(() => {
+                                market = getRandomMarket(marketArray, market);
+                                startTrades();
+                            }, getRandomNumber(2, 5) * 1000);
                         } else {
                             startRapidTrading = true;
+                            setTimeout(() => {
+                                startTrades();
+                            }, getRandomNumber(1, 4) * 1000);
                         }
-                        
-
-                        startTrades();
+                      
 
                     } else {
                         setTimeout(() => {
@@ -268,7 +270,7 @@ function startWebSocket() {
 
     const startTrades = () => {
         isRunning = true;
-        placeTrade(ldp);
+        placeTrade();
 
         // if(startRapidTrading == false){
         //     console.log('Start initial trading.');
@@ -278,7 +280,7 @@ function startWebSocket() {
         //     console.log('Start rapid trading.');
 
         //     stopTicks();
-        //     placeTrade(ldp);
+        //     placeTrade();
         // } else if(startRapidTrading == true && tradesInRow == tradeCountInRow){
         //     console.log('Start tick again.');
 
@@ -290,7 +292,7 @@ function startWebSocket() {
     };
 
 
-    const placeTrade = (ldp) => {
+    const placeTrade = (ldp=null) => {
         if (isTradeOpen == false) {
             stake = Number(stake);
             stake < 0.35 ? (stake = 0.35) : (stake = stake);
@@ -303,7 +305,7 @@ function startWebSocket() {
                 duration: 1,
                 duration_unit: "t",
                 symbol: market,
-                barrier: ldp, // Replace with the desired digit (0-9)
+                barrier: getRandomNumber(0, 9), // Replace with the desired digit (0-9)
             };
     
             // Send the trade request to the WebSocket
@@ -395,7 +397,7 @@ function startWebSocket() {
 
 
         if (currentLoss > 0) {
-            stake = initStake * martingaleMultiplier;
+            stake = stake * martingaleMultiplier;
         } else if (status == "Win") {
             stake = initStake;
         }

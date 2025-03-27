@@ -45,12 +45,15 @@ accountSelectElement.value = 'lkUxtOopvUhCpIX';
 marketSelectElement.value = "R_100";
 
 
-const martingaleMultiplier = 2.07112;
+// const martingaleMultiplier = 2.07112;
+const martingaleMultiplier = 1.15;
+
+const targetForDay = 1000;
 
 let isRunning = false, intervalId;
 
 let targetPercentage = 0.3;
-let amountPercentage = 0.35;
+let amountPercentage = 0.1;
 // let amountPercentage = 1;
 
 let initialAccountBalance = 0;
@@ -115,6 +118,9 @@ function botRun() {
     ws.onclose = function () {
         console.log("Connection closed");
         console.log("-----------------------------\n");
+        if(!isTradeOpen){
+            reload();
+        }
     };
 
     ws.onerror = function (err) {
@@ -138,18 +144,19 @@ function botRun() {
                     authenticateButton.disabled = true;
 
 
+                    if(initialAccountBalance < targetForDay){
+                        resetParams();
+                        requestTicksHistory(market);
+                    } else {
+                        setFlashNotification("Day target completed.", 0);
+                        console.log('Day target completed.');
+                    }
 
-
-                    resetParams();
+                    
                         // scriptButton.innerHTML = "Bot started....";
                         // placeTrade();
 
-
-                    if(currentLossAmount < 0){
-                        stake = Number(Math.abs(currentLossAmount)) + stake;
-                    }
-
-                        runScript();
+                        // runScript();
 
                     // if(dTargetValue != null && Number(dTargetValue) > Number(initialAccountBalance)){
                     //     resetParams();
@@ -159,6 +166,25 @@ function botRun() {
                     // } else {
                     //     setFlashNotification("Target covered...", 0);
                     // }
+                }
+
+                if (wsResponse.msg_type === 'history') {
+                    const lastDigitList = wsResponse.history.prices;
+                    const lastDigits = getLastDigits(lastDigitList);
+                    let prediction = predictNextParity(lastDigits);
+                    console.log(prediction); 
+
+                    let rate = parsePercentage(prediction.confidence);
+
+                    if(rate >= 75){
+                        tradeType = prediction.prediction;
+                        runScript();
+                    } else {
+                        setTimeout(() => {
+                            requestTicksHistory(market);
+                        }, 1000);
+                    }
+
                 }
 
 
@@ -222,38 +248,71 @@ function botRun() {
                             stakeChange(result);
                             isTradeOpen = false;
 
-                            if(profit < 0){
-                                lostCountInRow = lostCountInRow + 1;
-                            } else {
-                                lostCountInRow = 0;
-                            }
-                            
                             let newTime;
-                            
-                            if(lostCountInRow >= 2){
-                                // newTime = (getRandomNumber(5, 10) * 60000 );
-                                newTime = (getRandomNumber(1, 2) * 60000 );
-                                setTimer(newTime);
-                                setTimeout(() => {
-                                    botRun();
-                                }, newTime);
-                            } else {
-                                newTime = (getRandomNumber(5, 10) * 1000 );
-                                
-                                if(profit < 0){
+
+                            if(profit < 0){
+                                market = getRandomMarket(marketArray, market);
+                                lostCountInRow = lostCountInRow + 1;
+
+                                if(lostCountInRow == 0){
+                                    requestTicksHistory(market);
+                                } else {
+                                    if(lostCountInRow >= 4){
+                                        newTime = (getRandomNumber(120, 300) * 1000 );
+                                    } else if(lostCountInRow >= 3){
+                                        newTime = (getRandomNumber(20, 90) * 1000 );
+                                    } else if(lostCountInRow >= 2){
+                                        newTime = (getRandomNumber(5, 10) * 1000 );
+                                    } else if(lostCountInRow >= 1){
+                                        newTime = (getRandomNumber(1, 5) * 1000 );
+                                    }
+
                                     setTimer(newTime);
                                     setTimeout(() => {
-                                        runScript();
+                                        requestTicksHistory(market);
                                     }, newTime);
-                                } else {
+                                }
+                                
+                            } else {
+                                if(lostCountInRow >= 1){
+                                    newTime = 2000;
                                     setTimer(newTime);
                                     setTimeout(() => {
                                         reserParams();
                                         reload();
                                     }, newTime);
+                                } else {
+                                    lostCountInRow = 0;
+                                    requestTicksHistory(market);
                                 }
-                                
                             }
+                            
+                            
+                            
+                            // if(lostCountInRow >= 2){
+                            //     // newTime = (getRandomNumber(5, 10) * 60000 );
+                            //     newTime = (getRandomNumber(1, 2) * 60000 );
+                            //     setTimer(newTime);
+                            //     setTimeout(() => {
+                            //         botRun();
+                            //     }, newTime);
+                            // } else {
+                            //     newTime = (getRandomNumber(5, 10) * 1000 );
+                                
+                            //     if(profit < 0){
+                            //         setTimer(newTime);
+                            //         setTimeout(() => {
+                            //             runScript();
+                            //         }, newTime);
+                            //     } else {
+                            //         setTimer(newTime);
+                            //         setTimeout(() => {
+                            //             reserParams();
+                            //             reload();
+                            //         }, newTime);
+                            //     }
+                                
+                            // }
 
                             
                         
@@ -312,11 +371,22 @@ function botRun() {
         ws.send(JSON.stringify({ authorize: apiToken }));
     };
 
+    const requestTicksHistory = (symbol) => {
+        const ticksHistoryRequest = {
+            ticks_history: symbol,
+            end: 'latest',
+            count: 1001, // Increased count for a larger dataset (more ticks for better prediction)
+            style: 'ticks'
+        };
+        ws.send(JSON.stringify(ticksHistoryRequest));
+    };
+
 
     const stakeChange = (status) => {
         
         if (status == "Loss") {
-            stake = stake * martingaleMultiplier;
+            // stake = stake * martingaleMultiplier;
+            stake = Number(Math.abs(currentLossAmount)) * martingaleMultiplier;
         } else if (status == "Win") {
             stake = amountPutForTrading;
         }
@@ -341,26 +411,18 @@ function botRun() {
 
     const placeTrade = (result = null) => {
         if (isTradeOpen == false) {
-            if (result != null) {
-                if (result == "even") {
-                    tradeState = "DIGITODD";
-                } else if (result == "odd") {
-                    tradeState = "DIGITEVEN";
-                }
-            } else {
-                if (tradeType == "even") {
-                    tradeState = "DIGITEVEN";
-                    tradeType = "odd";
-                } else if (tradeType == "odd") {
-                    tradeState = "DIGITODD";
-                    tradeType = "even";
-                }
+            
+            if (tradeType == "even") {
+                tradeState = "DIGITEVEN";
+            } else if (tradeType == "odd") {
+                tradeState = "DIGITODD";
             }
+
             stake = Number(stake);
             stake < 0.35 ? (stake = 0.35) : (stake = stake);
 
-            // tickCount = 1;
-            tickCount = getRandomNumber(5, 8);
+            tickCount = 1;
+            // tickCount = getRandomNumber(5, 8);
 
             const tradeRequest = {
                 proposal: 1,
@@ -409,7 +471,8 @@ function botRun() {
 
 
 function reload() {
-    location.reload();
+    // location.reload();
+    botRun();
 }
 
 function reserParams() {
@@ -443,7 +506,13 @@ function reserParams() {
 function resetParams() {
     targetAmount =  (initialAccountBalance * (targetPercentage / 100)).toFixed(2);
     setAccountInfo("targetAmount", `$ ${targetAmount}`);
-    amountPutForTrading = (initialAccountBalance * (amountPercentage / 100)).toFixed(2);
+
+    if(currentLossAmount != 0){
+        amountPutForTrading = Number(Math.abs(currentLossAmount)) * martingaleMultiplier;
+    } else {
+        amountPutForTrading = (initialAccountBalance * (amountPercentage / 100)).toFixed(2);
+    }
+
     setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
     stake = amountPutForTrading;
 }
@@ -705,3 +774,119 @@ function getRandomMarket(array, current){
   
     return randomMarket.value;
   };
+
+  function predictNextParity(sequence) {
+    if (!sequence || sequence.length === 0) {
+      return { error: "Sequence must have at least one number." };
+    }
+  
+    // 1. Calculate historical even/odd ratio
+    const evens = sequence.filter(n => n % 2 === 0).length;
+    const odds = sequence.length - evens;
+    const evenProbability = evens / sequence.length;
+    const oddProbability = odds / sequence.length;
+  
+    // 2. Check for alternating pattern (e.g., [odd, even, odd, even...])
+    let isAlternating = true;
+    for (let i = 1; i < sequence.length; i++) {
+      if (sequence[i] % 2 === sequence[i - 1] % 2) {
+        isAlternating = false;
+        break;
+      }
+    }
+  
+    // 3. Check for constant parity (all even or all odd)
+    const allEven = evens === sequence.length;
+    const allOdd = odds === sequence.length;
+  
+    // 4. Check arithmetic sequence parity changes (e.g., +3 flips parity)
+    let isArithmeticFlip = false;
+    if (sequence.length >= 2) {
+      const diff = sequence[1] - sequence[0];
+      if (Math.abs(diff) % 2 === 1) { // Odd difference flips parity
+        isArithmeticFlip = true;
+      }
+    }
+  
+    // 5. Determine prediction and confidence
+    let prediction;
+    let confidence;
+  
+    if (allEven) {
+      prediction = "even";
+      confidence = 0.95; // 95% confidence next is even
+    } else if (allOdd) {
+      prediction = "odd";
+      confidence = 0.95; // 95% confidence next is odd
+    } else if (isAlternating) {
+      prediction = sequence[sequence.length - 1] % 2 === 0 ? "odd" : "even";
+      confidence = 0.85; // 85% confidence in alternation
+    } else if (isArithmeticFlip) {
+      const lastParity = sequence[sequence.length - 1] % 2;
+      prediction = lastParity === 0 ? "odd" : "even";
+      confidence = 0.75; // 75% confidence in arithmetic flip
+    } else {
+      // Fallback: Predict based on historical bias
+      prediction = evenProbability > oddProbability ? "even" : "odd";
+      confidence = Math.max(evenProbability, oddProbability);
+    }
+  
+    // 6. Return result
+    return {
+      sequence: sequence,
+      prediction: prediction,
+      confidence: (confidence * 100).toFixed(1) + "%",
+      stats: {
+        evens: evens,
+        odds: odds,
+        evenRate: (evenProbability * 100).toFixed(1) + "%",
+        oddRate: (oddProbability * 100).toFixed(1) + "%",
+      },
+    };
+  }
+
+  function mostCommonDecimalPlaces(arr) {
+    const decimalCounts = arr.map(num => {
+        const decimalPart = num.toString().split(".")[1];
+        return decimalPart ? decimalPart.length : 0;
+    });
+
+    const frequency = {};
+    decimalCounts.forEach(count => {
+        frequency[count] = (frequency[count] || 0) + 1;
+    });
+
+    return Object.keys(frequency).reduce((a, b) => frequency[a] >= frequency[b] ? Number(a) : Number(b));
+}
+
+// function getLastDecimalDigit(num, decimalPlaces) {
+//     const decimalPart = num.toString().split(".")[1] || ""; // Get decimal part or empty string
+//     const paddedDecimal = decimalPart.padEnd(decimalPlaces, "0"); // Pad with zeros if needed
+//     return Number(paddedDecimal.charAt(decimalPlaces - 1)); // Get the desired decimal place
+// }
+
+
+
+// For decimal parts with only 1 digit, adds a '0' to make it 2 digits
+function getLastDigits(numbers) {
+    return numbers.map(num => {
+        // Convert number to string
+        const numStr = num.toString();
+        
+        // Check if there's a decimal point
+        if (numStr.includes('.')) {
+            const parts = numStr.split('.');
+            // Ensure there are exactly 2 decimal places
+            const decimalPart = parts[1].length === 1 ? parts[1] + '0' : parts[1];
+            return parseInt(decimalPart.slice(-1));
+        } else {
+            // If no decimal point, last digit is 0 (like 1855 -> 1855.00)
+            return 0;
+        }
+    });
+}
+
+function parsePercentage(str) {
+    const num = parseFloat(str);
+    return str.includes('%') ? num : num / 100;
+}
