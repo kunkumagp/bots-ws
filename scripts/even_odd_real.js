@@ -5,12 +5,17 @@ const accounts = [
     { name: "W H K G Prasanna 85", value: "iVOpdm24hBhw3JI" },
 ];
 
-const marketArray = [
+let marketArray = [
     { value: "R_10", name: "Volatility 10 Index" },
+    { value: "1HZ10V", name: "Volatility 10 (1s) Index" },
     { value: "R_25", name: "Volatility 25 Index" },
-    // { value: "R_50", name: "Volatility 50 Index" },
+    { value: "1HZ25V", name: "Volatility 25 (1s) Index" },
+    { value: "R_50", name: "Volatility 50 Index" },
+    { value: "1HZ50V", name: "Volatility 50 (1s) Index" },
     { value: "R_75", name: "Volatility 75 Index" },
+    { value: "1HZ75V", name: "Volatility 75 (1s) Index" },
     { value: "R_100", name: "Volatility 100 Index" },
+    { value: "1HZ100V", name: "Volatility 100 (1s) Index" },
 ];
 
 const accountSelectElement = document.getElementById("account_select");
@@ -21,12 +26,13 @@ const authenticateButton = document.getElementById("authenticateButton");
 const scriptButton = document.getElementById("scriptButton");
 const infoOutput = document.getElementById("info_output");
 
-const martingaleMultiplier = 2.07112;
+// const martingaleMultiplier = 2.07112;
+const martingaleMultiplier = 1.2;
 
 let isRunning = false, intervalId;
 
-let targetPercentage = 0.3;
-let amountPercentage = 0.35;
+let targetPercentage = 0.01;
+let amountPercentage = 0.1;
 
 let initialAccountBalance = 0;
 let updatedAccountBalance = 0;
@@ -76,8 +82,8 @@ marketArray.forEach((item) => {
     marketSelectElement.appendChild(option); // Append to the <select>
 });
 
-accountSelectElement.value = "Y71P0GIOxz3YYvr";
-marketSelectElement.value = "R_10";
+accountSelectElement.value = "lkUxtOopvUhCpIX";
+marketSelectElement.value = "R_100";
 apiToken = accountSelectElement.value;
 
 
@@ -106,11 +112,14 @@ ws.onerror = function (err) {
 
 ws.onmessage = function (event) {
 
-    // if(isWithinTimeRange()){
+    if(isWithinTimeRange()){
         wsResponse = JSON.parse(event.data);
 
         if (wsResponse != null) {
-            if (wsResponse.msg_type === "authorize") {
+
+            if (wsResponse.msg_type === "authorize" && wsResponse.authorize === undefined) {
+                reload();
+            } else if (wsResponse.msg_type === "authorize") {
                 console.log("Authorization successful.\n-----------------------------\n\n");
                 setFlashNotification("Authorization successful", 0);
                 initialAccountBalance = wsResponse.authorize.balance;
@@ -124,7 +133,6 @@ ws.onmessage = function (event) {
                 // placeTrade();
                 runScript();
             }
-
 
             if (wsResponse.msg_type === "proposal") {
                 if (
@@ -189,24 +197,35 @@ ws.onmessage = function (event) {
                         if(profit < 0){
                             lostCountInRow = lostCountInRow + 1;
                         }
-                    
+                        let newTime;
 
                         if (currentLossAmount < 0) {
-                            if(lostCountInRow >= 2){
-                                // let newTime = (getRandomNumber(1, 2) * 60000 );
-                                let newTime = (getRandomNumber(10, 20) * 1000);
+
+                            if(lostCountInRow != 0){
+
+                                if(lostCountInRow >= 5){
+                                    newTime = (getRandomNumber(60, 90) * 1000);
+                                } else if(lostCountInRow >= 4){
+                                    newTime = (getRandomNumber(20, 60) * 1000);
+                                } else if(lostCountInRow >= 2){
+                                    newTime = (getRandomNumber(10, 20) * 1000);
+                                }
+
                                 setTimer(newTime);
                                 setTimeout(() => {
                                     runScript();
                                 }, newTime);
+
                             } else {
                                 runScript();
                             }
+
                         } else {
                             if (currentProfitAmount >= targetAmount) {
                                 // let newTime = (getRandomNumber(30, 40) * 60000 );
-                                let newTime = (getRandomNumber(2, 3) * 60000 );
+                                // let newTime = (getRandomNumber(2, 3) * 60000 );
                                 // let newTime = (getRandomNumber(40, 60) * 1000);
+                                newTime = (getRandomNumber(10, 20) * 1000);
                                 setTimer(newTime);
                                 setTimeout(() => {
                                     reserParams();
@@ -231,7 +250,7 @@ ws.onmessage = function (event) {
             }
 
         }
-    // }
+    }
 
 };
 
@@ -244,7 +263,8 @@ const getAuthentication = () => {
 
 const stakeChange = (status) => {
     if (status == "Loss") {
-        stake = stake * martingaleMultiplier;
+        stake = Number(Math.abs(currentLossAmount)) * martingaleMultiplier;
+            // stake = stake * martingaleMultiplier;
     } else if (status == "Win") {
         stake = amountPutForTrading;
     }
@@ -368,7 +388,15 @@ function reserParams() {
 function resetParams() {
     targetAmount =  (initialAccountBalance * (targetPercentage / 100)).toFixed(2);
     setAccountInfo("targetAmount", `$ ${targetAmount}`);
-    amountPutForTrading = (initialAccountBalance * (amountPercentage / 100)).toFixed(2);
+
+    let currentLoss = Number(Math.abs(currentLossAmount));
+    if(currentLoss != 0){
+        amountPutForTrading = currentLoss * martingaleMultiplier;
+    } else {
+        amountPutForTrading = (initialAccountBalance * (amountPercentage / 100)).toFixed(2);
+    }
+
+    // amountPutForTrading = (initialAccountBalance * (amountPercentage / 100)).toFixed(2);
     setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
     stake = amountPutForTrading;
 }
@@ -608,7 +636,13 @@ function isWithinTimeRange() {
     const now = new Date();
     const hour = now.getHours(); // Get current hour (0-23)
 
-    return hour >= 5 && hour < 23; // Returns true if between 5 AM and 4 PM
+    let returnValue = false;
+
+    if(hour >= 5 && hour < 24){
+        returnValue = true;
+    }
+
+    return returnValue; // Returns true if between 5 AM and 4 PM
 }
 
 function getRandomMarket(array, current){
