@@ -2,7 +2,7 @@ const accounts = [
     { name: "KunkumaGP", value: "lkUxtOopvUhCpIX" },
     { name: "KUNKUMAGP Real", value: "Y71P0GIOxz3YYvr" },
     { name: "Kunkuma Trading", value: "hJfU1x5xpoSTwHe" },
-    { name: "W H K G Prasanna 85", value: "iVOpdm24hBhw3JI" },
+    { name: "W H K G Prasanna 85", value: "E2IzNwWok71Ydsc" },
 ];
 
 let marketArray = [
@@ -32,7 +32,7 @@ const martingaleMultiplier = 1.2;
 let isRunning = false, intervalId;
 
 let targetPercentage = 0.01;
-let amountPercentage = 0.1;
+let amountPercentage = 10;
 
 let initialAccountBalance = 0;
 let updatedAccountBalance = 0;
@@ -82,7 +82,7 @@ marketArray.forEach((item) => {
     marketSelectElement.appendChild(option); // Append to the <select>
 });
 
-accountSelectElement.value = "lkUxtOopvUhCpIX";
+accountSelectElement.value = "E2IzNwWok71Ydsc";
 marketSelectElement.value = "R_100";
 apiToken = accountSelectElement.value;
 
@@ -197,46 +197,53 @@ ws.onmessage = function (event) {
                         if(profit < 0){
                             lostCountInRow = lostCountInRow + 1;
                         }
-                        let newTime;
+                        let newTime = 2000;
 
-                        if (currentLossAmount < 0) {
+                        // if(winTradeCount >= 2){
+                            newTime = (getRandomNumber(10, 20) * 60000);
+                        // }
+                        setTimer(newTime);
+                        setTimeout(() => {
+                            reserParams();
+                            reload();
+                        }, newTime);
 
-                            if(lostCountInRow != 0){
+                        // if (currentLossAmount < 0) {
 
-                                if(lostCountInRow >= 6){
-                                    newTime = (getRandomNumber(90, 100) * 1000);
-                                } else if(lostCountInRow >= 5){
-                                    newTime = (getRandomNumber(60, 90) * 1000);
-                                } else if(lostCountInRow >= 4){
-                                    newTime = (getRandomNumber(20, 60) * 1000);
-                                } else if(lostCountInRow >= 2){
-                                    newTime = (getRandomNumber(10, 20) * 1000);
-                                }
+                        //     if(lostCountInRow != 0){
 
-                                setTimer(newTime);
-                                setTimeout(() => {
-                                    runScript();
-                                }, newTime);
+                        //         if(lostCountInRow >= 5){
+                        //             newTime = (getRandomNumber(60, 90) * 1000);
+                        //         } else if(lostCountInRow >= 4){
+                        //             newTime = (getRandomNumber(20, 60) * 1000);
+                        //         } else if(lostCountInRow >= 2){
+                        //             newTime = (getRandomNumber(10, 20) * 1000);
+                        //         }
 
-                            } else {
-                                runScript();
-                            }
+                        //         setTimer(newTime);
+                        //         setTimeout(() => {
+                        //             runScript();
+                        //         }, newTime);
 
-                        } else {
-                            if (currentProfitAmount >= targetAmount) {
-                                // let newTime = (getRandomNumber(30, 40) * 60000 );
-                                // let newTime = (getRandomNumber(2, 3) * 60000 );
-                                // let newTime = (getRandomNumber(40, 60) * 1000);
-                                newTime = (getRandomNumber(10, 20) * 1000);
-                                setTimer(newTime);
-                                setTimeout(() => {
-                                    reserParams();
-                                    reload();
-                                }, newTime);
-                            } else {
-                                runScript();
-                            }
-                        }
+                        //     } else {
+                        //         runScript();
+                        //     }
+
+                        // } else {
+                        //     if (currentProfitAmount >= targetAmount) {
+                        //         // let newTime = (getRandomNumber(30, 40) * 60000 );
+                        //         // let newTime = (getRandomNumber(2, 3) * 60000 );
+                        //         // let newTime = (getRandomNumber(40, 60) * 1000);
+                        //         newTime = (getRandomNumber(10, 20) * 1000);
+                        //         setTimer(newTime);
+                        //         setTimeout(() => {
+                        //             reserParams();
+                        //             reload();
+                        //         }, newTime);
+                        //     } else {
+                        //         runScript();
+                        //     }
+                        // }
 
 
                     } else {
@@ -640,7 +647,7 @@ function isWithinTimeRange() {
 
     let returnValue = false;
 
-    if((hour >= 7 && hour < 16) || (hour >= 18 && hour < 24)){
+    if(hour >= 5 && hour < 24){
         returnValue = true;
     }
 
