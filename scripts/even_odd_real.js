@@ -7,15 +7,15 @@ const accounts = [
 
 let marketArray = [
     { value: "R_10", name: "Volatility 10 Index" },
-    { value: "1HZ10V", name: "Volatility 10 (1s) Index" },
+    // { value: "1HZ10V", name: "Volatility 10 (1s) Index" },
     { value: "R_25", name: "Volatility 25 Index" },
-    { value: "1HZ25V", name: "Volatility 25 (1s) Index" },
-    { value: "R_50", name: "Volatility 50 Index" },
-    { value: "1HZ50V", name: "Volatility 50 (1s) Index" },
+    // { value: "1HZ25V", name: "Volatility 25 (1s) Index" },
+    // { value: "R_50", name: "Volatility 50 Index" },
+    // { value: "1HZ50V", name: "Volatility 50 (1s) Index" },
     { value: "R_75", name: "Volatility 75 Index" },
-    { value: "1HZ75V", name: "Volatility 75 (1s) Index" },
+    // { value: "1HZ75V", name: "Volatility 75 (1s) Index" },
     { value: "R_100", name: "Volatility 100 Index" },
-    { value: "1HZ100V", name: "Volatility 100 (1s) Index" },
+    // { value: "1HZ100V", name: "Volatility 100 (1s) Index" },
 ];
 
 const accountSelectElement = document.getElementById("account_select");
@@ -31,8 +31,8 @@ const martingaleMultiplier = 1.2;
 
 let isRunning = false, intervalId;
 
-let targetPercentage = 0.01;
-let amountPercentage = 0.1;
+let targetPercentage = 0.005;
+let amountPercentage = 0.05;
 
 let initialAccountBalance = 0;
 let updatedAccountBalance = 0;
@@ -202,6 +202,10 @@ ws.onmessage = function (event) {
                         if (currentLossAmount < 0) {
 
                             if(lostCountInRow != 0){
+
+                                if(lostCountInRow >= 2){
+                                    market = getRandomMarket(marketArray, market);
+                                }
 
                                 if(lostCountInRow >= 5){
                                     newTime = (getRandomNumber(60, 90) * 1000);
@@ -638,7 +642,7 @@ function isWithinTimeRange() {
 
     let returnValue = false;
 
-    if(hour >= 5 && hour < 24){
+    if((hour >= 7 && hour < 16) || (hour >= 18 && hour < 23)){
         returnValue = true;
     }
 
