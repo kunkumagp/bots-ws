@@ -26,13 +26,16 @@ const authenticateButton = document.getElementById("authenticateButton");
 const scriptButton = document.getElementById("scriptButton");
 const infoOutput = document.getElementById("info_output");
 
+
 // const martingaleMultiplier = 2.07112;
 const martingaleMultiplier = 1.2;
+
+const dayTarget = 300;
 
 let isRunning = false, intervalId;
 
 let targetPercentage = 0.005;
-let amountPercentage = 0.05;
+let amountPercentage = 0.35;
 
 let initialAccountBalance = 0;
 let updatedAccountBalance = 0;
@@ -117,6 +120,7 @@ function botRun() {
     };
     
     ws.onmessage = function (event) {
+        const modal = document.getElementById("myModal");
     
         // if(isWithinTimeRange()){
             wsResponse = JSON.parse(event.data);
@@ -139,7 +143,16 @@ function botRun() {
                         resetParams();
                         // scriptButton.innerHTML = "Bot started....";
                         // placeTrade();
-                        runScript();
+                        // runScript();
+
+                        if(dayTarget > 0 && updatedAccountBalance >= dayTarget){
+                            modal.style.display = "block";
+                        } else {
+                            runScript();
+                        }
+
+                        
+                        
 
                 }
     
@@ -217,7 +230,9 @@ function botRun() {
                                         market = getRandomMarket(marketArray, market);
                                     }
 
-                                    if(lostCountInRow >= 2){
+                                    if(lostCountInRow >= 3){
+                                        newTime = (getRandomNumber(300, 400) * 1000);
+                                    } else if(lostCountInRow >= 2){
                                         newTime = (getRandomNumber(10, 300) * 1000);
                                     }
     
