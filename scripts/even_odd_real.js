@@ -10,7 +10,7 @@ let marketArray = [
     // { value: "1HZ10V", name: "Volatility 10 (1s) Index" },
     { value: "R_25", name: "Volatility 25 Index" },
     // { value: "1HZ25V", name: "Volatility 25 (1s) Index" },
-    // { value: "R_50", name: "Volatility 50 Index" },
+    { value: "R_50", name: "Volatility 50 Index" },
     // { value: "1HZ50V", name: "Volatility 50 (1s) Index" },
     { value: "R_75", name: "Volatility 75 Index" },
     // { value: "1HZ75V", name: "Volatility 75 (1s) Index" },
@@ -30,11 +30,12 @@ const infoOutput = document.getElementById("info_output");
 // const martingaleMultiplier = 2.07112;
 const martingaleMultiplier = 1.2;
 
-const dayTarget = 300;
+const dayTarget = 150;
 
 let isRunning = false, intervalId;
 
 let targetPercentage = 0.005;
+// let amountPercentage = 0.01;
 let amountPercentage = 0.35;
 
 let initialAccountBalance = 0;
@@ -122,7 +123,7 @@ function botRun() {
     ws.onmessage = function (event) {
         const modal = document.getElementById("myModal");
     
-        // if(isWithinTimeRange()){
+        if(isWithinTimeRange()){
             wsResponse = JSON.parse(event.data);
     
             if (wsResponse != null) {
@@ -225,25 +226,15 @@ function botRun() {
                             if (currentLossAmount < 0) {
     
                                 if(lostCountInRow != 0){
+                                    market = getRandomMarket(marketArray, market);
     
-                                    if(lostCountInRow >= 2){
-                                        market = getRandomMarket(marketArray, market);
+                                    if(lostCountInRow >= 4){
+                                        newTime = (getRandomNumber(60, 300) * 1000);
+                                    } else {
+                                        newTime = (getRandomNumber(1, 5) * 1000);
                                     }
+                                    
 
-                                    if(lostCountInRow >= 3){
-                                        newTime = (getRandomNumber(300, 400) * 1000);
-                                    } else if(lostCountInRow >= 2){
-                                        newTime = (getRandomNumber(10, 300) * 1000);
-                                    }
-    
-                                    // if(lostCountInRow >= 5){
-                                    //     newTime = (getRandomNumber(60, 90) * 1000);
-                                    // } else if(lostCountInRow >= 4){
-                                    //     newTime = (getRandomNumber(20, 60) * 1000);
-                                    // } else if(lostCountInRow >= 2){
-                                    //     newTime = (getRandomNumber(10, 20) * 1000);
-                                    // }
-    
                                     setTimer(newTime);
                                     setTimeout(() => {
                                         if(isConnectionOpen){
@@ -287,7 +278,7 @@ function botRun() {
                 }
     
             }
-        // }
+        }
     
     };
     
@@ -332,19 +323,22 @@ function botRun() {
                     tradeState = "DIGITEVEN";
                 }
             } else {
-                if (tradeType == "even") {
-                    tradeState = "DIGITEVEN";
-                    tradeType = "odd";
-                } else if (tradeType == "odd") {
-                    tradeState = "DIGITODD";
-                    tradeType = "even";
-                }
+
+                    if (tradeType == "even") {
+                        tradeState = "DIGITEVEN";
+                        tradeType = "odd";
+                    } else if (tradeType == "odd") {
+                        tradeState = "DIGITODD";
+                        tradeType = "even";
+                    }
+
             }
             stake = Number(stake);
             stake < 0.35 ? (stake = 0.35) : (stake = stake);
     
             // tickCount = 1;
-            tickCount = getRandomNumber(5, 8);
+            // tickCount = getRandomNumber(5, 8);
+            tickCount = getRandomNumber(1, 3);
     
             const tradeRequest = {
                 proposal: 1,
