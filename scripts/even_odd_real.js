@@ -30,13 +30,13 @@ const infoOutput = document.getElementById("info_output");
 // const martingaleMultiplier = 2.07112;
 const martingaleMultiplier = 1.2;
 
-const dayTarget = 150;
+const dayTarget = 250;
 
 let isRunning = false, intervalId;
 
 let targetPercentage = 0.005;
 // let amountPercentage = 0.01;
-let amountPercentage = 0.35;
+let amountPercentage = 0.1;
 
 let initialAccountBalance = 0;
 let updatedAccountBalance = 0;
