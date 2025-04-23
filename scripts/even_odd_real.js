@@ -30,7 +30,7 @@ const infoOutput = document.getElementById("info_output");
 // const martingaleMultiplier = 2.07112;
 const martingaleMultiplier = 1.2;
 
-const dayTarget = 250;
+const dayTarget = 225;
 
 let isRunning = false, intervalId;
 
@@ -149,13 +149,76 @@ function botRun() {
                         if(dayTarget > 0 && updatedAccountBalance >= dayTarget){
                             modal.style.display = "block";
                         } else {
-                            runScript();
+                            // runScript();
+                            requestTicksHistory(market);
                         }
 
                         
                         
 
                 }
+
+
+
+                if (wsResponse.msg_type === 'history') {
+                    const lastDigitList = wsResponse.history.prices;
+                    const lastDigits = getLastDigits(lastDigitList);
+
+                    const probabilities = predictNextThirdNumberParity(lastDigits);
+                    // console.log(probabilities); 
+
+                    const newProbabilities = predictNextParity(lastDigits);
+                    const number = parseFloat(newProbabilities.confidence.replace('%', '')) / 100;
+
+                    console.log(newProbabilities);
+
+                    // const result = predictNextThird(lastDigits);
+                    // console.log(result);
+                    // const number = parseFloat(result.confidence.replace('%', '')) / 100;
+
+
+
+
+                    if(newProbabilities.prediction == "even" && number > 0.7){
+                        tradeType = 'even';
+                        runScript();
+                    } else if(newProbabilities.prediction == "odd" && number > 0.7){
+                        tradeType = 'odd';
+                        runScript();
+                    } else {
+                        setTimeout(() => {
+                            requestTicksHistory(market);
+                        }, 1000);
+                    }
+
+
+                    // if(result.prediction == "even" && number > 0.7){
+                    //     tradeType = 'even';
+                    //     runScript();
+                    // } else if(result.prediction == "odd" && number > 0.7){
+                    //     tradeType = 'odd';
+                    //     runScript();
+                    // } else {
+                    //     setTimeout(() => {
+                    //         requestTicksHistory(market);
+                    //     }, 1000);
+                    // }
+
+
+                    // if(probabilities.even > 0.6){
+                    //     tradeType = 'even';
+                    //     runScript();
+                    // } else if(probabilities.odd > 0.6){
+                    //     tradeType = 'odd';
+                    //     runScript();
+                    // } else {
+                    //     setTimeout(() => {
+                    //         requestTicksHistory(market);
+                    //     }, 1000);
+                    // }
+
+                }
+
     
                 if (wsResponse.msg_type === "proposal") {
                     if (
@@ -227,21 +290,23 @@ function botRun() {
     
                                 if(lostCountInRow != 0){
                                     market = getRandomMarket(marketArray, market);
-    
-                                    if(lostCountInRow >= 4){
-                                        newTime = (getRandomNumber(60, 300) * 1000);
+                                    // newTime = (getRandomNumber(60, 180) * 1000);
+                                    
+                                    if(lostCountInRow >= 3){
+                                        // newTime = (getRandomNumber(60, 300) * 1000);
+                                        newTime = (getRandomNumber(60, 90) * 1000);
                                     } else {
                                         newTime = (getRandomNumber(1, 5) * 1000);
                                     }
-                                    
 
                                     setTimer(newTime);
                                     setTimeout(() => {
-                                        if(isConnectionOpen){
-                                            runScript();
-                                        } else {
-                                            botRun();
-                                        }
+                                        // if(isConnectionOpen){
+                                        //     runScript();
+                                        // } else {
+                                        //     botRun();
+                                        // }
+                                        botRun();
                                     }, newTime);
     
                                 } else {
@@ -336,9 +401,9 @@ function botRun() {
             stake = Number(stake);
             stake < 0.35 ? (stake = 0.35) : (stake = stake);
     
-            // tickCount = 1;
+            tickCount = 1;
             // tickCount = getRandomNumber(5, 8);
-            tickCount = getRandomNumber(1, 3);
+            // tickCount = getRandomNumber(1, 3);
     
             const tradeRequest = {
                 proposal: 1,
@@ -370,6 +435,17 @@ function botRun() {
         };
     
         ws.send(JSON.stringify(contractDetailsRequest));
+    };
+
+
+    const requestTicksHistory = (symbol) => {
+        const ticksHistoryRequest = {
+            ticks_history: symbol,
+            end: 'latest',
+            count: 500, // Increased count for a larger dataset (more ticks for better prediction)
+            style: 'ticks'
+        };
+        ws.send(JSON.stringify(ticksHistoryRequest));
     };
     
     
@@ -728,3 +804,251 @@ function getRandomMarket(array, current){
   
     return randomMarket.value;
   };
+
+  function predictNextThirdNumberParity(numberSeries) {
+    // Validate input
+    if (!Array.isArray(numberSeries) || numberSeries.length < 3) {
+        throw new Error("Input must be an array with at least 3 numbers");
+    }
+
+    // Extract every third number from the series (starting from index 2)
+    const thirdNumbers = [];
+    for (let i = 2; i < numberSeries.length; i += 3) {
+        if (typeof numberSeries[i] !== 'number') {
+            throw new Error("All elements in the series must be numbers");
+        }
+        thirdNumbers.push(numberSeries[i]);
+    }
+
+    // If we don't have at least 2 third numbers to analyze pattern, return basic probability
+    if (thirdNumbers.length < 2) {
+        const last = numberSeries[numberSeries.length - 1];
+        const isLastEven = last % 2 === 0;
+        return {
+            even: isLastEven ? 0.75 : 0.25,
+            odd: isLastEven ? 0.25 : 0.75
+        };
+    }
+
+    // Calculate historical probabilities
+    let evenCount = 0;
+    let oddCount = 0;
+    
+    for (const num of thirdNumbers) {
+        if (num % 2 === 0) {
+            evenCount++;
+        } else {
+            oddCount++;
+        }
+    }
+
+    // Calculate probabilities based on history
+    const total = evenCount + oddCount;
+    const baseEvenProb = evenCount / total;
+    const baseOddProb = oddCount / total;
+
+    // Apply simple pattern detection (alternating pattern)
+    let patternAdjustment = 0;
+    if (thirdNumbers.length >= 3) {
+        const last1 = thirdNumbers[thirdNumbers.length - 1];
+        const last2 = thirdNumbers[thirdNumbers.length - 2];
+        const last3 = thirdNumbers[thirdNumbers.length - 3];
+        
+        // Check for alternating pattern
+        if ((last1 % 2 !== last2 % 2) && (last2 % 2 !== last3 % 2)) {
+            const lastParity = last1 % 2;
+            patternAdjustment = 0.2; // Slightly increase probability of opposite
+            return {
+                even: lastParity === 0 ? 0.3 : 0.7,
+                odd: lastParity === 0 ? 0.7 : 0.3
+            };
+        }
+        
+        // Check for repeating pattern (3 in a row same parity)
+        if ((last1 % 2 === last2 % 2) && (last2 % 2 === last3 % 2)) {
+            patternAdjustment = 0.3; // Stronger adjustment for breaking streak
+            return {
+                even: last1 % 2 === 0 ? 0.4 : 0.6,
+                odd: last1 % 2 === 0 ? 0.6 : 0.4
+            };
+        }
+    }
+
+    // Return base probabilities if no clear pattern
+    return {
+        even: baseEvenProb,
+        odd: baseOddProb
+    };
+}
+
+
+
+
+function predictNextParity(sequence) {
+    if (!sequence || sequence.length === 0) {
+      return { error: "Sequence must have at least one number." };
+    }
+  
+    // 1. Calculate historical even/odd ratio
+    const evens = sequence.filter(n => n % 2 === 0).length;
+    const odds = sequence.length - evens;
+    const evenProbability = evens / sequence.length;
+    const oddProbability = odds / sequence.length;
+  
+    // 2. Check for alternating pattern (e.g., [odd, even, odd, even...])
+    let isAlternating = true;
+    for (let i = 1; i < sequence.length; i++) {
+      if (sequence[i] % 2 === sequence[i - 1] % 2) {
+        isAlternating = false;
+        break;
+      }
+    }
+  
+    // 3. Check for constant parity (all even or all odd)
+    const allEven = evens === sequence.length;
+    const allOdd = odds === sequence.length;
+  
+    // 4. Check arithmetic sequence parity changes (e.g., +3 flips parity)
+    let isArithmeticFlip = false;
+    if (sequence.length >= 2) {
+      const diff = sequence[1] - sequence[0];
+      if (Math.abs(diff) % 2 === 1) { // Odd difference flips parity
+        isArithmeticFlip = true;
+      }
+    }
+  
+    // 5. Determine prediction and confidence
+    let prediction;
+    let confidence;
+  
+    if (allEven) {
+      prediction = "even";
+      confidence = 0.95; // 95% confidence next is even
+    } else if (allOdd) {
+      prediction = "odd";
+      confidence = 0.95; // 95% confidence next is odd
+    } else if (isAlternating) {
+      prediction = sequence[sequence.length - 1] % 2 === 0 ? "odd" : "even";
+      confidence = 0.85; // 85% confidence in alternation
+    } else if (isArithmeticFlip) {
+      const lastParity = sequence[sequence.length - 1] % 2;
+      prediction = lastParity === 0 ? "odd" : "even";
+      confidence = 0.75; // 75% confidence in arithmetic flip
+    } else {
+      // Fallback: Predict based on historical bias
+      prediction = evenProbability > oddProbability ? "even" : "odd";
+      confidence = Math.max(evenProbability, oddProbability);
+    }
+  
+    // 6. Return result
+    return {
+      sequence: sequence,
+      prediction: prediction,
+      confidence: (confidence * 100).toFixed(1) + "%",
+      stats: {
+        evens: evens,
+        odds: odds,
+        evenRate: (evenProbability * 100).toFixed(1) + "%",
+        oddRate: (oddProbability * 100).toFixed(1) + "%",
+      },
+    };
+  }
+
+  function mostCommonDecimalPlaces(arr) {
+    const decimalCounts = arr.map(num => {
+        const decimalPart = num.toString().split(".")[1];
+        return decimalPart ? decimalPart.length : 0;
+    });
+
+    const frequency = {};
+    decimalCounts.forEach(count => {
+        frequency[count] = (frequency[count] || 0) + 1;
+    });
+
+    return Object.keys(frequency).reduce((a, b) => frequency[a] >= frequency[b] ? Number(a) : Number(b));
+}
+
+// function getLastDecimalDigit(num, decimalPlaces) {
+//     const decimalPart = num.toString().split(".")[1] || ""; // Get decimal part or empty string
+//     const paddedDecimal = decimalPart.padEnd(decimalPlaces, "0"); // Pad with zeros if needed
+//     return Number(paddedDecimal.charAt(decimalPlaces - 1)); // Get the desired decimal place
+// }
+
+
+
+// For decimal parts with only 1 digit, adds a '0' to make it 2 digits
+function getLastDigits(numbers) {
+    return numbers.map(num => {
+        // Convert number to string
+        const numStr = num.toString();
+        
+        // Check if there's a decimal point
+        if (numStr.includes('.')) {
+            const parts = numStr.split('.');
+            // Ensure there are exactly 2 decimal places
+            const decimalPart = parts[1].length === 1 ? parts[1] + '0' : parts[1];
+            return parseInt(decimalPart.slice(-1));
+        } else {
+            // If no decimal point, last digit is 0 (like 1855 -> 1855.00)
+            return 0;
+        }
+    });
+}
+
+function parsePercentage(str) {
+    const num = parseFloat(str);
+    return str.includes('%') ? num : num / 100;
+}
+
+
+
+
+
+
+
+function predictNextThird(lastDigits) {
+    if (lastDigits.length < 3) {
+      return { prediction: null, message: "Need at least 3 digits to start predicting." };
+    }
+  
+    const patternMap = {};
+    let totalPatterns = 0;
+  
+    // Learn from sequences
+    for (let i = 0; i < lastDigits.length - 2; i++) {
+      const key = `${lastDigits[i]},${lastDigits[i + 1]}`;
+      const third = lastDigits[i + 2];
+      const isEven = third % 2 === 0;
+  
+      if (!patternMap[key]) {
+        patternMap[key] = { even: 0, odd: 0 };
+      }
+  
+      if (isEven) {
+        patternMap[key].even++;
+      } else {
+        patternMap[key].odd++;
+      }
+  
+      totalPatterns++;
+    }
+  
+    // Use the last 2 digits to predict the 3rd
+    const lastKey = `${lastDigits[lastDigits.length - 2]},${lastDigits[lastDigits.length - 1]}`;
+    const data = patternMap[lastKey];
+  
+    if (!data) {
+      return { prediction: null, message: "Pattern not found in data." };
+    }
+  
+    const prediction = data.even > data.odd ? "even" : "odd";
+    const confidence = ((Math.max(data.even, data.odd) / (data.even + data.odd)) * 100).toFixed(2);
+  
+    return {
+      prediction,
+      confidence: `${confidence}%`,
+      sampleSize: data.even + data.odd,
+      message: `Prediction based on ${data.even + data.odd} matches of pattern [${lastKey}]`
+    };
+  }
+  
