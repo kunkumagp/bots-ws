@@ -30,7 +30,7 @@ const infoOutput = document.getElementById("info_output");
 // const martingaleMultiplier = 2.07112;
 const martingaleMultiplier = 1.2;
 
-const dayTarget = 225;
+const dayTarget = 354;
 
 let isRunning = false, intervalId;
 
@@ -204,7 +204,7 @@ function botRun() {
                     //     }, 1000);
                     // }
 
-
+                    
                     // if(probabilities.even > 0.6){
                     //     tradeType = 'even';
                     //     runScript();
@@ -401,7 +401,7 @@ function botRun() {
             stake = Number(stake);
             stake < 0.35 ? (stake = 0.35) : (stake = stake);
     
-            tickCount = 1;
+            tickCount = 2;
             // tickCount = getRandomNumber(5, 8);
             // tickCount = getRandomNumber(1, 3);
     
