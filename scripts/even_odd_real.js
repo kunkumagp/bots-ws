@@ -26,11 +26,15 @@ const authenticateButton = document.getElementById("authenticateButton");
 const scriptButton = document.getElementById("scriptButton");
 const infoOutput = document.getElementById("info_output");
 
+const params = new URLSearchParams(window.location.search);
+let dayTarget = 0;
+
+if(params.get("target")){
+    dayTarget = Number(params.get("target"));
+}
 
 // const martingaleMultiplier = 2.07112;
 const martingaleMultiplier = 1.2;
-
-const dayTarget = 250;
 
 let isRunning = false, intervalId;
 
@@ -227,8 +231,9 @@ function botRun() {
     
                                 if(lostCountInRow != 0){
                                     market = getRandomMarket(marketArray, market);
+                                    // newTime = (getRandomNumber(60, 600) * 1000);
     
-                                    if(lostCountInRow >= 4){
+                                    if(lostCountInRow >= 3){
                                         newTime = (getRandomNumber(60, 300) * 1000);
                                     } else {
                                         newTime = (getRandomNumber(1, 5) * 1000);
@@ -336,9 +341,9 @@ function botRun() {
             stake = Number(stake);
             stake < 0.35 ? (stake = 0.35) : (stake = stake);
     
-            // tickCount = 1;
+            tickCount = 1;
             // tickCount = getRandomNumber(5, 8);
-            tickCount = getRandomNumber(1, 3);
+            // tickCount = getRandomNumber(1, 3);
     
             const tradeRequest = {
                 proposal: 1,
