@@ -40,7 +40,8 @@ let isRunning = false, intervalId;
 
 let targetPercentage = 0.005;
 // let amountPercentage = 0.01;
-let amountPercentage = 0.1;
+// let amountPercentage = 0.1;
+let amountPercentage = 1;
 
 let initialAccountBalance = 0;
 let updatedAccountBalance = 0;
@@ -73,6 +74,7 @@ let isTradeOpen = false;
 let automation = false;
 let tradeProposal = null;
 let isConnectionOpen = false;
+let tradeCountInRow = 0;
 
 let stopTimer = false;
 let ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=1089");
@@ -102,6 +104,12 @@ accountSelectElement.addEventListener("change", () => {
 
 // market = marketSelectElement.value;
 market = getRandomMarket(marketArray, '');
+
+scriptButton.addEventListener('click', runScriptManually);
+
+function runScriptManually() {
+    botRun();
+}
 
 botRun();
 function botRun() {
@@ -226,48 +234,60 @@ function botRun() {
                             }
                             let newTime;
 
-    
-                            if (currentLossAmount < 0) {
-    
-                                if(lostCountInRow != 0){
-                                    market = getRandomMarket(marketArray, market);
-                                    // newTime = (getRandomNumber(60, 600) * 1000);
-    
-                                    if(lostCountInRow >= 3){
-                                        newTime = (getRandomNumber(60, 300) * 1000);
-                                    } else {
-                                        newTime = (getRandomNumber(1, 5) * 1000);
-                                    }
-                                    
+                            tradeCountInRow = tradeCountInRow + 1;
 
-                                    setTimer(newTime);
-                                    setTimeout(() => {
-                                        if(isConnectionOpen){
-                                            runScript();
+    
+                            if(tradeCountInRow < 4){
+                                if (currentLossAmount < 0) {
+    
+                                    if(lostCountInRow != 0){
+                                        market = getRandomMarket(marketArray, market);
+                                        // newTime = (getRandomNumber(60, 600) * 1000);
+        
+                                        if(lostCountInRow >= 3){
+                                            newTime = (getRandomNumber(60, 300) * 1000);
                                         } else {
-                                            botRun();
+                                            newTime = (getRandomNumber(1, 5) * 1000);
                                         }
-                                    }, newTime);
+                                        
     
+                                        setTimer(newTime);
+                                        setTimeout(() => {
+                                            if(isConnectionOpen){
+                                                runScript();
+                                            } else {
+                                                botRun();
+                                            }
+                                        }, newTime);
+        
+                                    } else {
+                                        runScript();
+                                    }
+        
                                 } else {
-                                    runScript();
+                                    if (currentProfitAmount >= targetAmount) {
+                                        // let newTime = (getRandomNumber(30, 40) * 60000 );
+                                        // let newTime = (getRandomNumber(2, 3) * 60000 );
+                                        // let newTime = (getRandomNumber(40, 60) * 1000);
+                                        newTime = (getRandomNumber(1, 5) * 1000);
+                                        setTimer(newTime);
+                                        setTimeout(() => {
+                                            reserParams();
+                                            reload();
+                                        }, newTime);
+                                    } else {
+                                        runScript();
+                                    }
                                 }
-    
                             } else {
-                                if (currentProfitAmount >= targetAmount) {
-                                    // let newTime = (getRandomNumber(30, 40) * 60000 );
-                                    // let newTime = (getRandomNumber(2, 3) * 60000 );
-                                    // let newTime = (getRandomNumber(40, 60) * 1000);
-                                    newTime = (getRandomNumber(1, 5) * 1000);
-                                    setTimer(newTime);
-                                    setTimeout(() => {
-                                        reserParams();
-                                        reload();
-                                    }, newTime);
-                                } else {
-                                    runScript();
-                                }
+                                newTime = (getRandomNumber(15, 30) * 60000);
+                                setTimer(newTime);
+                                setTimeout(() => {
+                                    reserParams();
+                                    reload();
+                                }, newTime);
                             }
+                            
     
     
                         } else {
