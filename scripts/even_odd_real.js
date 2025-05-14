@@ -23,6 +23,13 @@ const infoOutput = document.getElementById("info_output");
 
 const martingaleMultiplier = 2.07112;
 
+const params = new URLSearchParams(window.location.search);
+let dayTarget = 0;
+
+if(params.get("target")){
+    dayTarget = Number(params.get("target"));
+}
+
 let isRunning = false, intervalId;
 
 let targetPercentage = 0.3;
@@ -76,8 +83,8 @@ marketArray.forEach((item) => {
     marketSelectElement.appendChild(option); // Append to the <select>
 });
 
-accountSelectElement.value = "Y71P0GIOxz3YYvr";
-marketSelectElement.value = "R_10";
+accountSelectElement.value = "lkUxtOopvUhCpIX";
+marketSelectElement.value = "R_100";
 apiToken = accountSelectElement.value;
 
 
@@ -122,7 +129,13 @@ ws.onmessage = function (event) {
                 resetParams();
                 // scriptButton.innerHTML = "Bot started....";
                 // placeTrade();
-                runScript();
+
+                if(dayTarget > 0 && updatedAccountBalance >= dayTarget){
+                    setFlashNotification("Day target is done", 0);
+                    console.log("Day target is done");
+                } else {
+                    runScript();
+                }
             }
 
 
@@ -192,7 +205,14 @@ ws.onmessage = function (event) {
                     
 
                         if (currentLossAmount < 0) {
-                            if(lostCountInRow >= 2){
+                            if(lostCountInRow >= 4){
+                                // let newTime = (getRandomNumber(1, 2) * 60000 );
+                                let newTime = (getRandomNumber(60, 90) * 1000);
+                                setTimer(newTime);
+                                setTimeout(() => {
+                                    runScript();
+                                }, newTime);
+                            } else if(lostCountInRow >= 2){
                                 // let newTime = (getRandomNumber(1, 2) * 60000 );
                                 let newTime = (getRandomNumber(10, 20) * 1000);
                                 setTimer(newTime);
