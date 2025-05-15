@@ -41,7 +41,7 @@ let isRunning = false, intervalId;
 let targetPercentage = 0.005;
 // let amountPercentage = 0.01;
 // let amountPercentage = 0.1;
-let amountPercentage = 1;
+let amountPercentage = 0.5;
 
 let initialAccountBalance = 0;
 let updatedAccountBalance = 0;
