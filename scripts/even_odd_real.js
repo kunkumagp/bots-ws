@@ -41,7 +41,7 @@ let isRunning = false, intervalId;
 let targetPercentage = 0.005;
 // let amountPercentage = 0.01;
 // let amountPercentage = 0.1;
-let amountPercentage = 0.5;
+let amountPercentage = 0.1;
 
 let initialAccountBalance = 0;
 let updatedAccountBalance = 0;
@@ -245,7 +245,7 @@ function botRun() {
                                         // newTime = (getRandomNumber(60, 600) * 1000);
         
                                         if(lostCountInRow >= 3){
-                                            newTime = (getRandomNumber(60, 300) * 1000);
+                                            newTime = (getRandomNumber(1, 20) * 1000);
                                         } else {
                                             newTime = (getRandomNumber(1, 5) * 1000);
                                         }
