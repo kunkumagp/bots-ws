@@ -307,7 +307,7 @@ const placeTrade = (result = null) => {
         stake < 0.35 ? (stake = 0.35) : (stake = stake);
 
         // tickCount = 1;
-        tickCount = getRandomNumber(1, 8);
+        tickCount = getRandomNumber(5, 8);
 
         const tradeRequest = {
             proposal: 1,
