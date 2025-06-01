@@ -1,8 +1,8 @@
 const accounts = [
-    { name: "KunkumaGP", value: "lkUxtOopvUhCpIX" },
-    { name: "KUNKUMAGP Real", value: "Y71P0GIOxz3YYvr" },
-    { name: "Kunkuma Trading", value: "xMwOhRBsClvZSLs" },
-    { name: "W H K G Prasanna 85", value: "iVOpdm24hBhw3JI" },
+    { id:1, name: "KunkumaGP", value: "lkUxtOopvUhCpIX" },
+    { id:2,  name: "KUNKUMAGP Real", value: "Y71P0GIOxz3YYvr" },
+    { id:3,  name: "Kunkuma Trading", value: "xMwOhRBsClvZSLs" },
+    { id:4,  name: "W H K G Prasanna 85", value: "iVOpdm24hBhw3JI" },
 ];
 
 const marketArray = [
@@ -25,9 +25,14 @@ const martingaleMultiplier = 2.07112;
 
 const params = new URLSearchParams(window.location.search);
 let dayTarget = 0;
+let account = 0;
 
 if(params.get("target")){
     dayTarget = Number(params.get("target"));
+}
+
+if(params.get("account")){
+    account = Number(params.get("account"));
 }
 
 let isRunning = false, intervalId;
@@ -84,7 +89,9 @@ marketArray.forEach((item) => {
     marketSelectElement.appendChild(option); // Append to the <select>
 });
 
-accountSelectElement.value = "xMwOhRBsClvZSLs";
+const result = accounts.find(acc => acc.id === account);
+
+accountSelectElement.value = result.value;
 marketSelectElement.value = "R_100";
 apiToken = accountSelectElement.value;
 
