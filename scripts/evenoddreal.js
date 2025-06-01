@@ -37,7 +37,7 @@ if(params.get("account")){
 
 let isRunning = false, intervalId;
 
-let targetPercentage = 1.5;
+let targetPercentage = 1;
 let amountPercentage = 0.35;
 
 let initialAccountBalance = 0;
