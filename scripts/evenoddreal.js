@@ -37,7 +37,7 @@ if(params.get("account")){
 
 let isRunning = false, intervalId;
 
-let targetPercentage = 1;
+let targetPercentage = 0.75;
 let amountPercentage = 0.35;
 
 let initialAccountBalance = 0;
@@ -220,7 +220,7 @@ function botScript() {
                             if (currentLossAmount < 0) {
                                 if(lostCountInRow >= 4){
                                     // let newTime = (getRandomNumber(1, 2) * 60000 );
-                                    let newTime = (getRandomNumber(60, 90) * 1000);
+                                    let newTime = (getRandomNumber(0, 90) * 1000);
                                     setTimer(newTime);
                                     setTimeout(() => {
                                         runScript();
@@ -235,11 +235,12 @@ function botScript() {
                                 } else {
                                     runScript();
                                 }
+                                
                             } else {
                                 if (currentProfitAmount >= targetAmount) {
                                     // let newTime = (getRandomNumber(30, 40) * 60000 );
                                     // let newTime = (getRandomNumber(2, 3) * 60000 );
-                                    let newTime = (getRandomNumber(180, 300) * 1000 );
+                                    let newTime = (getRandomNumber(300, 600) * 1000 );
                                     // let newTime = (getRandomNumber(40, 60) * 1000);
                                     setTimer(newTime);
                                     setTimeout(() => {
@@ -315,7 +316,7 @@ function botScript() {
                 }
             } else {
 
-                tradeType = getRandomEvenOdd();
+                // tradeType = getRandomEvenOdd();
 
                 if (tradeType == "even") {
                     tradeState = "DIGITEVEN";
