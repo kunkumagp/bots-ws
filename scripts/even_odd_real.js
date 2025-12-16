@@ -39,6 +39,13 @@ const infoOutput = document.getElementById("info_output");
 
 const martingaleMultiplier = 2.07112;
 
+// Anti-detection randomization flags
+let tradeDelayVariation = true; // Enable random delays before trades
+let humanizeStakes = true; // Add small random variations to stakes
+let randomizeTickDuration = true; // Vary tick durations
+let varyConfidenceThreshold = true; // Change confidence threshold randomly
+let probabilisticBehavior = true; // Add probabilistic decisions
+
 let isRunning = false, intervalId;
 let pingIntervalId;
 let targetPercentage = 0.3;
@@ -67,7 +74,13 @@ let totalTradeCount = 0;
 let winTradeCount = 0;
 let lossTradeCount = 0;
 
-let lostCountInRow = 0;
+let lostCountInRow = parseInt(localStorage.getItem('lostCountInRow') || '0');
+
+// Pattern detection variables for first 3 trades (persisted in localStorage)
+let firstThreeTradesLossCount = parseInt(localStorage.getItem('firstThreeTradesLossCount') || '0'); 
+let currentSessionTradeCount = parseInt(localStorage.getItem('currentSessionTradeCount') || '0'); 
+let currentSessionLossCount = parseInt(localStorage.getItem('currentSessionLossCount') || '0'); 
+let flipTradeStateFlag = (localStorage.getItem('flipTradeStateFlag') === 'true'); 
 
 let lastTradeId = null;
 let tradeTypeDisplay = null;
@@ -200,18 +213,43 @@ function startWebSocket(){
                 const number = parseFloat(newProbabilities.confidence.replace('%', '')) / 100;
                 console.log('Predicted Probabilities: ', newProbabilities);
                 
+                // Vary confidence threshold randomly between 0.65-0.75 (instead of fixed 0.7)
+                let confidenceThreshold = 0.7;
+                if (varyConfidenceThreshold) {
+                    confidenceThreshold = 0.65 + (Math.random() * 0.1); // 0.65 to 0.75
+                    console.log('Dynamic confidence threshold:', confidenceThreshold.toFixed(3));
+                }
+                
+                // 5% chance to randomly skip a trade opportunity (human-like behavior)
+                const shouldSkipTrade = probabilisticBehavior && Math.random() < 0.05;
 
-
-                if(newProbabilities.prediction == "even" && number > 0.7){
+                if(newProbabilities.prediction == "even" && number > confidenceThreshold && !shouldSkipTrade){
                     tradeType = 'even';
-                    runScript();
-                } else if(newProbabilities.prediction == "odd" && number > 0.7){
+                    
+                    // Add random delay before executing (0-3 seconds) to simulate human thinking
+                    const humanDelay = tradeDelayVariation ? getRandomNumber(0, 3000) : 0;
+                    setTimeout(() => {
+                        runScript();
+                    }, humanDelay);
+                    
+                } else if(newProbabilities.prediction == "odd" && number > confidenceThreshold && !shouldSkipTrade){
                     tradeType = 'odd';
-                    runScript();
+                    
+                    // Add random delay before executing (0-3 seconds) to simulate human thinking
+                    const humanDelay = tradeDelayVariation ? getRandomNumber(0, 3000) : 0;
+                    setTimeout(() => {
+                        runScript();
+                    }, humanDelay);
+                    
                 } else {
+                    if(shouldSkipTrade) {
+                        console.log('Trade opportunity skipped (random behavior)');
+                    }
+                    // Add random variation to retry delay (1-5 seconds instead of fixed 1)
+                    const retryDelay = getRandomNumber(1000, 5000);
                     setTimeout(() => {
                         requestTicksHistory(market);
-                    }, 1000);
+                    }, retryDelay);
                 }
 
             }
@@ -277,18 +315,75 @@ function startWebSocket(){
                             stakeChange(result);
                             isTradeOpen = false;
 
+                            // Track first 3 trades pattern
+                            currentSessionTradeCount++;
+                            localStorage.setItem('currentSessionTradeCount', currentSessionTradeCount.toString());
+                            
                             if(profit < 0){
                                 lostCountInRow = lostCountInRow + 1;
+                                localStorage.setItem('lostCountInRow', lostCountInRow.toString());
+                                currentSessionLossCount++;
+                                localStorage.setItem('currentSessionLossCount', currentSessionLossCount.toString());
+                                
                                 // Store total loss amount in localStorage
                                 let storedLoss = parseFloat(localStorage.getItem('totalLossInRow') || '0');
                                 storedLoss += Math.abs(profit);
                                 localStorage.setItem('totalLossInRow', storedLoss.toString());
                                 console.log('Total loss in row stored:', storedLoss);
+                                console.log('Lost count in row:', lostCountInRow);
                             } else {
                                 // Clear loss counter and localStorage on win
                                 lostCountInRow = 0;
+                                localStorage.removeItem('lostCountInRow');
                                 localStorage.removeItem('totalLossInRow');
                                 console.log('Win! Loss counter reset and localStorage cleared');
+                                
+                                // Reset pattern detection on any win
+                                if (flipTradeStateFlag) {
+                                    flipTradeStateFlag = false;
+                                    firstThreeTradesLossCount = 0;
+                                    
+                                    // Clear all pattern detection from localStorage
+                                    localStorage.removeItem('flipTradeStateFlag');
+                                    localStorage.removeItem('firstThreeTradesLossCount');
+                                    localStorage.removeItem('currentSessionTradeCount');
+                                    localStorage.removeItem('currentSessionLossCount');
+                                    
+                                    console.log('✅ Losing streak broken! Pattern flag reset to false');
+                                    setFlashNotification('Losing streak broken! Trading normally', 5);
+                                }
+                            }
+                            
+                            // Check if we completed a 3-trade session
+                            if (currentSessionTradeCount >= 3) {
+                                // If all 3 trades were losses
+                                if (currentSessionLossCount >= 3) {
+                                    firstThreeTradesLossCount++;
+                                    localStorage.setItem('firstThreeTradesLossCount', firstThreeTradesLossCount.toString());
+                                    console.log(`⚠️ First 3 trades all lost! Count: ${firstThreeTradesLossCount}/3`);
+                                    
+                                    // If this happened 3 times in a row, set the flag
+                                    if (firstThreeTradesLossCount >= 3 && !flipTradeStateFlag) {
+                                        flipTradeStateFlag = true;
+                                        localStorage.setItem('flipTradeStateFlag', 'true');
+                                        console.log('🔄 PATTERN DETECTED: 3 consecutive times first 3 trades lost!');
+                                        console.log('🔄 Trade state flip FLAG activated!');
+                                        setFlashNotification('Pattern detected! Trade state will be flipped', 8);
+                                    }
+                                } else {
+                                    // Reset if pattern broken (not all 3 trades lost)
+                                    if (firstThreeTradesLossCount > 0 && !flipTradeStateFlag) {
+                                        console.log('Pattern broken - not all 3 trades were losses');
+                                        firstThreeTradesLossCount = 0;
+                                        localStorage.removeItem('firstThreeTradesLossCount');
+                                    }
+                                }
+                                
+                                // Reset session counters for next 3 trades
+                                currentSessionTradeCount = 0;
+                                currentSessionLossCount = 0;
+                                localStorage.setItem('currentSessionTradeCount', '0');
+                                localStorage.setItem('currentSessionLossCount', '0');
                             }
                         
                             let intervalTime;
@@ -304,29 +399,38 @@ function startWebSocket(){
                             
                             if (currentLossAmount < 0) {
                                 if(lostCountInRow >= 3){
-                                    // Increase interval to 5-6 minutes after 3 losses
-                                    intervalTime = (getRandomNumber(300, 360) * 1000); // 5-6 minutes
+                                    // Take a 10-minute rest after 3 consecutive losses
+                                    intervalTime = (10 * 60 * 1000); // 10 minutes
+                                    console.log('🛑 3 losses in a row detected - Taking 10-minute rest');
+                                    setFlashNotification('⏸️ 3 losses in a row - Taking 10-minute rest', 15);
 
                                 } else if(lostCountInRow >= 2){
-                                    intervalTime = (getRandomNumber(1, 20) * 1000 );
+                                    // More variation: 5-45 seconds
+                                    intervalTime = (getRandomNumber(5, 45) * 1000);
 
                                 } else {
-                                    intervalTime = (getRandomNumber(1, 10) * 1000 );
+                                    // More variation: 2-20 seconds
+                                    intervalTime = (getRandomNumber(2, 20) * 1000);
 
                                 }
 
-                                newMarket = getRandomMarket(marketArray, market);
-
-                                if(market == newMarket){
+                                // 60% chance to switch market after loss (not always)
+                                const shouldSwitchMarket = probabilisticBehavior ? Math.random() > 0.4 : true;
+                                
+                                if (shouldSwitchMarket) {
                                     newMarket = getRandomMarket(marketArray, market);
-                                }else {
-                                    market = newMarket;
+                                    if(market == newMarket){
+                                        newMarket = getRandomMarket(marketArray, market);
+                                    } else {
+                                        market = newMarket;
+                                    }
+                                    console.log('Market switched to:', market);
                                 }
 
                                 setTimer(intervalTime);
                                 setTimeout(() => {
-                                    // After 4 losses, flip the trade state
-                                    if(lostCountInRow >= 4) {
+                                    // After 4 losses, 70% chance to flip (not always)
+                                    if(lostCountInRow >= 4 && (!probabilisticBehavior || Math.random() > 0.3)) {
                                         // Flip the tradeType for next trade
                                         if(tradeType === 'even') {
                                             tradeType = 'odd';
@@ -336,13 +440,16 @@ function startWebSocket(){
                                             console.log('Trade state flipped to EVEN after 4 losses');
                                         }
                                     }
-                                    requestTicksHistory(market);
-                                    console.log('loss: trade again');
+                                    
+                                    // Reload page after loss instead of continuing trade
+                                    console.log('Reloading page after loss...');
+                                    reload();
                                     
                                 }, intervalTime);
                             } else {
                                 if (currentProfitAmount >= targetAmount) {
-                                    intervalTime = (getRandomNumber(1, 10) * 1000 );
+                                    // More variation: 5-20 seconds
+                                    intervalTime = (getRandomNumber(5, 20) * 1000);
 
                                     setTimer(intervalTime);
                                     setTimeout(() => {
@@ -350,7 +457,8 @@ function startWebSocket(){
                                         reload();
                                     }, intervalTime);
                                 } else {
-                                    intervalTime = (getRandomNumber(1, 10) * 1000 );
+                                    // More variation: 3-15 seconds
+                                    intervalTime = (getRandomNumber(3, 15) * 1000);
 
                                     setTimer(intervalTime);
                                     setTimeout(() => {
@@ -387,8 +495,22 @@ function startWebSocket(){
     const stakeChange = (status) => {
         if (status == "Loss") {
             stake = stake * martingaleMultiplier;
+            
+            // Add small random variation to stake after loss (±1-5%) to avoid exact patterns
+            if (humanizeStakes) {
+                const variation = 1 + (Math.random() * 0.1 - 0.05); // ±5%
+                stake = stake * variation;
+                console.log('Stake varied by:', ((variation - 1) * 100).toFixed(2) + '%');
+            }
         } else if (status == "Win") {
             stake = amountPutForTrading;
+            
+            // Add tiny variation to base stake on wins too (±1-3%)
+            if (humanizeStakes) {
+                const variation = 1 + (Math.random() * 0.06 - 0.03); // ±3%
+                stake = stake * variation;
+                console.log('Base stake varied by:', ((variation - 1) * 100).toFixed(2) + '%');
+            }
         }
     };
 
@@ -417,19 +539,45 @@ function startWebSocket(){
                     tradeState = "DIGITEVEN";
                 }
             } else {
-                if (tradeType == "even") {
-                    tradeState = "DIGITEVEN";
-                    // tradeType = "odd";
-                } else if (tradeType == "odd") {
-                    tradeState = "DIGITODD";
-                    // tradeType = "even";
+                // Check if flip flag is active - flip the trade state from prediction
+                if (flipTradeStateFlag) {
+                    // Flip the trade state opposite to prediction
+                    if (tradeType == "even") {
+                        tradeState = "DIGITODD"; // Opposite of DIGITEVEN
+                        console.log('🔄 FLAG ACTIVE: Flipping trade state - predicted EVEN, trading ODD');
+                    } else if (tradeType == "odd") {
+                        tradeState = "DIGITEVEN"; // Opposite of DIGITODD
+                        console.log('🔄 FLAG ACTIVE: Flipping trade state - predicted ODD, trading EVEN');
+                    }
+                } else {
+                    // Normal trading - follow prediction
+                    if (tradeType == "even") {
+                        tradeState = "DIGITEVEN";
+                        // tradeType = "odd";
+                    } else if (tradeType == "odd") {
+                        tradeState = "DIGITODD";
+                        // tradeType = "even";
+                    }
                 }
             }
             stake = Number(stake);
             stake < 0.35 ? (stake = 0.35) : (stake = stake);
+            
+            // Check if account balance is sufficient for the stake
+            if (updatedAccountBalance > 0 && stake > updatedAccountBalance) {
+                console.log(`⚠️ Insufficient balance! Stake: $${stake.toFixed(2)}, Balance: $${updatedAccountBalance.toFixed(2)}`);
+                stake = updatedAccountBalance;
+                console.log(`✅ Stake adjusted to account balance: $${stake.toFixed(2)}`);
+                setFlashNotification(`Stake adjusted to remaining balance: $${stake.toFixed(2)}`, 5);
+            }
 
-            tickCount = 1;
-            // tickCount = getRandomNumber(5, 8);
+            // Randomize tick duration (1-3 ticks instead of always 1) - more human-like
+            if (randomizeTickDuration) {
+                tickCount = getRandomNumber(1, 3);
+                console.log('Using random tick count:', tickCount);
+            } else {
+                tickCount = 1;
+            }
 
             const tradeRequest = {
                 proposal: 1,
@@ -444,7 +592,7 @@ function startWebSocket(){
 
             onTradeCount = 1;
             // Send the trade request to the WebSocket
-            console.log("Sending Rise/Fall trade request:", tradeRequest);
+            console.log("Sending trade request:", tradeRequest);
             ws.send(JSON.stringify(tradeRequest));
         }
     };
@@ -479,12 +627,16 @@ function startWebSocket(){
 
 
     const requestTicksHistory = (symbol) => {
+        // Vary history count between 800-1200 instead of fixed 1000 (makes analysis window unpredictable)
+        const variedHistoryCount = getRandomNumber(800, 1200);
+        
         const ticksHistoryRequest = {
             ticks_history: symbol,
             end: 'latest',
-            count: historyTickCount, // Increased count for a larger dataset (more ticks for better prediction)
+            count: variedHistoryCount,
             style: 'ticks'
         };
+        console.log('Requesting', variedHistoryCount, 'ticks for analysis');
         ws.send(JSON.stringify(ticksHistoryRequest));
     };
 }
@@ -504,8 +656,19 @@ function reserParams() {
     currentLossAmount = 0;
     lostCountInRow = 0;
     
-    // Clear localStorage when resetting params
+    // Reset pattern detection variables
+    firstThreeTradesLossCount = 0;
+    currentSessionTradeCount = 0;
+    currentSessionLossCount = 0;
+    flipTradeStateFlag = false;
+    
+    // Clear all localStorage including pattern detection
     localStorage.removeItem('totalLossInRow');
+    localStorage.removeItem('lostCountInRow');
+    localStorage.removeItem('flipTradeStateFlag');
+    localStorage.removeItem('firstThreeTradesLossCount');
+    localStorage.removeItem('currentSessionTradeCount');
+    localStorage.removeItem('currentSessionLossCount');
 
     let currentProfitAmountDisplay = null;
     if (currentProfitAmount < 0) {
@@ -531,14 +694,52 @@ function reserParams() {
 }
 
 function resetParams() {
-    // targetAmount =  (initialAccountBalance * (targetPercentage / 100)).toFixed(2);
-    targetAmount =  targetPercentage.toFixed(2);
+    targetAmount =  (initialAccountBalance * (targetPercentage / 100)).toFixed(2);
+    // targetAmount =  targetPercentage.toFixed(2);
     setAccountInfo("targetAmount", `$ ${targetAmount}`);
-    // amountPutForTrading = (initialAccountBalance * (amountPercentage / 100)).toFixed(2);
-    amountPutForTrading = amountPercentage.toFixed(2);
+    amountPutForTrading = (initialAccountBalance * (amountPercentage / 100)).toFixed(2);
+    // amountPutForTrading = amountPercentage.toFixed(2);
     setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
-    // stake = amountPutForTrading;
-    stake = amountPutForTrading;
+    
+    // Load pattern detection state from localStorage on page load/reload
+    console.log('📊 Pattern Detection Status:');
+    console.log('   Lost count in row:', lostCountInRow);
+    console.log('   First 3 trades loss count:', firstThreeTradesLossCount);
+    console.log('   Current session trade count:', currentSessionTradeCount);
+    console.log('   Current session loss count:', currentSessionLossCount);
+    console.log('   Flip flag active:', flipTradeStateFlag);
+    
+    if (lostCountInRow >= 3) {
+        setFlashNotification(`⚠️ ${lostCountInRow} consecutive losses detected - Will take 10-min rest`, 10);
+    }
+    
+    if (flipTradeStateFlag) {
+        setFlashNotification('⚠️ Pattern flag is ACTIVE - Trade state will be flipped!', 10);
+    }
+    
+    // Check if there's a stored loss from previous session
+    const storedLoss = parseFloat(localStorage.getItem('totalLossInRow') || '0');
+    
+    if (storedLoss > 0) {
+        // Calculate stake needed to recover the loss
+        // Assuming profit is approximately 95% of stake for even/odd trades
+        const profitPercentage = 0.95; // Adjust based on your payout ratio
+        const requiredStake = storedLoss / profitPercentage;
+        
+        stake = requiredStake;
+        
+        // Ensure stake is at least the minimum
+        if (stake < 0.35) {
+            stake = 0.35;
+        }
+        
+        console.log(`Recovery mode: Found stored loss of $${storedLoss.toFixed(2)}`);
+        console.log(`Setting stake to $${stake.toFixed(2)} to recover loss`);
+        setFlashNotification(`Recovery mode: Setting stake to recover $${storedLoss.toFixed(2)} loss`, 10);
+    } else {
+        // No stored loss, use normal stake
+        stake = amountPutForTrading;
+    }
 }
 
 
@@ -770,8 +971,6 @@ function isWithinTimeRange() {
     const hour = now.getHours(); // Get current hour (0-23)
     let returnValue = false
     if(hour >= 5 && hour < 18) {
-        returnValue = true
-    } else if(hour >= 18 && hour < 24) {
         returnValue = true
     }
 
