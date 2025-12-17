@@ -80,7 +80,12 @@ let lostCountInRow = parseInt(localStorage.getItem('lostCountInRow') || '0');
 let firstThreeTradesLossCount = parseInt(localStorage.getItem('firstThreeTradesLossCount') || '0'); 
 let currentSessionTradeCount = parseInt(localStorage.getItem('currentSessionTradeCount') || '0'); 
 let currentSessionLossCount = parseInt(localStorage.getItem('currentSessionLossCount') || '0'); 
-let flipTradeStateFlag = (localStorage.getItem('flipTradeStateFlag') === 'true'); 
+let flipTradeStateFlag = (localStorage.getItem('flipTradeStateFlag') === 'true');
+
+// Daily target tracking
+let dailyTargetData = JSON.parse(localStorage.getItem('dailyTargetData') || 'null');
+let targetCapital = 0;
+let targetCompleted = false; 
 
 let lastTradeId = null;
 let tradeTypeDisplay = null;
@@ -332,11 +337,44 @@ function startWebSocket(){
                                 console.log('Total loss in row stored:', storedLoss);
                                 console.log('Lost count in row:', lostCountInRow);
                             } else {
-                                // Clear loss counter and localStorage on win
+                                // Win trade - subtract profit from stored loss incrementally
+                                let storedLoss = parseFloat(localStorage.getItem('totalLossInRow') || '0');
+                                
+                                if (storedLoss > 0) {
+                                    // Calculate remaining loss after this win
+                                    const remainingLoss = storedLoss - profit;
+                                    
+                                    console.log('💰 Win Trade Recovery:');
+                                    console.log(`   Previous total loss: $${storedLoss.toFixed(2)}`);
+                                    console.log(`   This win profit: $${profit.toFixed(2)}`);
+                                    console.log(`   Remaining loss: $${Math.max(0, remainingLoss).toFixed(2)}`);
+                                    
+                                    if (remainingLoss > 0) {
+                                        // Still have loss to recover - update localStorage with remaining amount
+                                        localStorage.setItem('totalLossInRow', remainingLoss.toString());
+                                        setFlashNotification(`Partial recovery: $${profit.toFixed(2)} recovered. Remaining: $${remainingLoss.toFixed(2)}`, 8);
+                                        console.log(`📊 Partial recovery - $${remainingLoss.toFixed(2)} still to recover`);
+                                    } else {
+                                        // Fully recovered (or exceeded) - clear localStorage
+                                        localStorage.removeItem('totalLossInRow');
+                                        const exceededAmount = Math.abs(remainingLoss);
+                                        if (exceededAmount > 0) {
+                                            console.log(`✅ FULL RECOVERY + PROFIT! Extra profit: $${exceededAmount.toFixed(2)}`);
+                                            setFlashNotification(`🎉 Full recovery achieved + $${exceededAmount.toFixed(2)} profit!`, 8);
+                                        } else {
+                                            console.log('✅ FULL RECOVERY ACHIEVED!');
+                                            setFlashNotification('🎉 Full recovery achieved!', 8);
+                                        }
+                                    }
+                                } else {
+                                    // No stored loss - normal win
+                                    console.log('Win! No previous loss to recover');
+                                }
+                                
+                                // Clear loss counter on win
                                 lostCountInRow = 0;
                                 localStorage.removeItem('lostCountInRow');
-                                localStorage.removeItem('totalLossInRow');
-                                console.log('Win! Loss counter reset and localStorage cleared');
+                                console.log('Win! Loss counter reset');
                                 
                                 // Reset pattern detection on any win
                                 if (flipTradeStateFlag) {
@@ -390,7 +428,7 @@ function startWebSocket(){
                             let newMarket;
                             
                             // Stop trading after 5 losses in a row
-                            if (lostCountInRow >= 5) {
+                            if (lostCountInRow >= 7) {
                                 setFlashNotification("Trading stopped: 5 losses in a row reached", 0);
                                 console.log('Trading stopped: 5 losses in a row');
                                 isRunning = false;
@@ -398,19 +436,23 @@ function startWebSocket(){
                             }
                             
                             if (currentLossAmount < 0) {
-                                if(lostCountInRow >= 3){
+                                if(lostCountInRow >= 4){
                                     // Take a 10-minute rest after 3 consecutive losses
-                                    intervalTime = (10 * 60 * 1000); // 10 minutes
+                                    intervalTime = (getRandomNumber(5, 15) * getRandomNumber(50, 70) * 1000); // 10 minutes
                                     console.log('🛑 3 losses in a row detected - Taking 10-minute rest');
                                     setFlashNotification('⏸️ 3 losses in a row - Taking 10-minute rest', 15);
 
+                                } else if(lostCountInRow >= 3){
+                                    // More variation: 5-45 seconds
+                                    intervalTime = (getRandomNumber(15, 25) * 1000);
+
                                 } else if(lostCountInRow >= 2){
                                     // More variation: 5-45 seconds
-                                    intervalTime = (getRandomNumber(5, 45) * 1000);
+                                    intervalTime = (getRandomNumber(5, 15) * 1000);
 
                                 } else {
                                     // More variation: 2-20 seconds
-                                    intervalTime = (getRandomNumber(2, 20) * 1000);
+                                    intervalTime = (getRandomNumber(1, 5) * 1000);
 
                                 }
 
@@ -447,6 +489,22 @@ function startWebSocket(){
                                     
                                 }, intervalTime);
                             } else {
+                                // Check if daily target capital is reached
+                                if (dailyTargetData && updatedAccountBalance >= dailyTargetData.targetCapital) {
+                                    dailyTargetData.targetCompleted = true;
+                                    targetCompleted = true;
+                                    localStorage.setItem('dailyTargetData', JSON.stringify(dailyTargetData));
+                                    
+                                    console.log('🎯🎉 DAILY TARGET REACHED!');
+                                    console.log(`   Target Capital: $${dailyTargetData.targetCapital.toFixed(2)}`);
+                                    console.log(`   Current Balance: $${updatedAccountBalance.toFixed(2)}`);
+                                    console.log('   Trading stopped for today.');
+                                    
+                                    setFlashNotification(`🎯🎉 Daily target reached! $${dailyTargetData.targetCapital.toFixed(2)} achieved! Trading stopped.`, 0);
+                                    isRunning = false;
+                                    return;
+                                }
+                                
                                 if (currentProfitAmount >= targetAmount) {
                                     // More variation: 5-20 seconds
                                     intervalTime = (getRandomNumber(5, 20) * 1000);
@@ -693,13 +751,75 @@ function reserParams() {
     setAccountInfo("currentLossAmount", `${currentLossAmountDisplay}`);
 }
 
+function initializeDailyTarget() {
+    const today = new Date().toDateString(); // e.g., "Mon Dec 16 2025"
+    
+    // Check if we have data and if it's from today
+    if (!dailyTargetData || dailyTargetData.tradingDate !== today) {
+        // NEW DAY - Calculate fresh targets only when date changes
+        const dailyTargetAmount = initialAccountBalance * 0.50; // 50% of initial capital
+        const dailyTargetCapital = parseFloat(initialAccountBalance) + dailyTargetAmount; // Initial + 50%
+        
+        dailyTargetData = {
+            tradingDate: today,
+            targetAmount: dailyTargetAmount,
+            targetCapital: dailyTargetCapital,
+            targetCompleted: false,
+            initialCapital: initialAccountBalance
+        };
+        
+        localStorage.setItem('dailyTargetData', JSON.stringify(dailyTargetData));
+        
+        console.log('📅 ✨ NEW TRADING DAY - Fresh targets calculated:');
+        console.log(`   Date: ${today}`);
+        console.log(`   Initial Capital: $${initialAccountBalance}`);
+        console.log(`   Target Amount: $${dailyTargetAmount.toFixed(2)} (50%)`);
+        console.log(`   Target Capital: $${dailyTargetCapital.toFixed(2)}`);
+        console.log(`   Status: New day initialized`);
+        
+        targetCompleted = false;
+    } else {
+        // SAME DAY - Keep existing targets (no recalculation)
+        targetCompleted = dailyTargetData.targetCompleted;
+        
+        console.log('📅 ♻️ CONTINUING TODAY - Using existing targets:');
+        console.log(`   Date: ${today}`);
+        console.log(`   Target Amount: $${parseFloat(dailyTargetData.targetAmount).toFixed(2)} (unchanged)`);
+        console.log(`   Target Capital: $${parseFloat(dailyTargetData.targetCapital).toFixed(2)} (unchanged)`);
+        console.log(`   Initial Capital: $${parseFloat(dailyTargetData.initialCapital).toFixed(2)} (from this morning)`);
+        console.log(`   Target Completed: ${targetCompleted ? 'YES ✅' : 'NO ⏳'}`);
+    }
+}
+
 function resetParams() {
+    // Check and initialize daily target
+    initializeDailyTarget();
+    
+    // Check if target already completed for today
+    if (targetCompleted) {
+        console.log('🎯 Daily target already completed!');
+        setFlashNotification('🎯 Daily target completed! Trading stopped for today.', 0);
+        isRunning = false;
+        return;
+    }
+    
     targetAmount =  (initialAccountBalance * (targetPercentage / 100)).toFixed(2);
     // targetAmount =  targetPercentage.toFixed(2);
     setAccountInfo("targetAmount", `$ ${targetAmount}`);
     amountPutForTrading = (initialAccountBalance * (amountPercentage / 100)).toFixed(2);
     // amountPutForTrading = amountPercentage.toFixed(2);
     setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
+    
+    // Display daily target info (with safety check)
+    if (dailyTargetData) {
+        const dailyTargetAmountEl = document.getElementById("dailyTargetAmount");
+        const dailyTargetCapitalEl = document.getElementById("dailyTargetCapital");
+        
+        if (dailyTargetAmountEl && dailyTargetCapitalEl) {
+            dailyTargetAmountEl.innerHTML = `$ ${dailyTargetData.targetAmount.toFixed(2)}`;
+            dailyTargetCapitalEl.innerHTML = `$ ${dailyTargetData.targetCapital.toFixed(2)}`;
+        }
+    }
     
     // Load pattern detection state from localStorage on page load/reload
     console.log('📊 Pattern Detection Status:');
@@ -717,11 +837,11 @@ function resetParams() {
         setFlashNotification('⚠️ Pattern flag is ACTIVE - Trade state will be flipped!', 10);
     }
     
-    // Check if there's a stored loss from previous session
+    // Check if there's a stored loss from previous session (including partial recovery)
     const storedLoss = parseFloat(localStorage.getItem('totalLossInRow') || '0');
     
     if (storedLoss > 0) {
-        // Calculate stake needed to recover the loss
+        // Calculate stake needed to recover the REMAINING loss
         // Assuming profit is approximately 95% of stake for even/odd trades
         const profitPercentage = 0.95; // Adjust based on your payout ratio
         const requiredStake = storedLoss / profitPercentage;
@@ -733,12 +853,13 @@ function resetParams() {
             stake = 0.35;
         }
         
-        console.log(`Recovery mode: Found stored loss of $${storedLoss.toFixed(2)}`);
-        console.log(`Setting stake to $${stake.toFixed(2)} to recover loss`);
-        setFlashNotification(`Recovery mode: Setting stake to recover $${storedLoss.toFixed(2)} loss`, 10);
+        console.log(`💪 Recovery mode: Remaining loss to recover: $${storedLoss.toFixed(2)}`);
+        console.log(`   Setting stake to $${stake.toFixed(2)} to recover remaining loss`);
+        setFlashNotification(`Recovery mode: $${storedLoss.toFixed(2)} remaining to recover`, 10);
     } else {
         // No stored loss, use normal stake
         stake = amountPutForTrading;
+        console.log('✅ No losses to recover - using normal stake');
     }
 }
 
