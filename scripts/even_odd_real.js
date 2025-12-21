@@ -548,6 +548,17 @@ function startWebSocket(){
         setFlashNotification("Authenticating....", 0);
         console.log("Authenticating....");
         ws.send(JSON.stringify({ authorize: apiToken }));
+        
+        // Set timeout to reload page if authentication doesn't complete within 2 seconds
+        setTimeout(() => {
+            if (!authSuccess) {
+                console.log("⚠️ Authentication timeout - Reloading page...");
+                setFlashNotification("Authentication timeout - Reloading...", 2);
+                setTimeout(() => {
+                    reload();
+                }, 1000);
+            }
+        }, 2000);
     };
 
 
