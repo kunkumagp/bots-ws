@@ -437,12 +437,18 @@ function startWebSocket(){
                             }
                             
                             if (currentLossAmount < 0) {
-                                if(lostCountInRow >= 4){
+                                if(lostCountInRow >= 6){
                                     // Take a 10-minute rest after 3 consecutive losses
                                     intervalTime = (getRandomNumber(5, 15) * getRandomNumber(50, 70) * 1000); // 10 minutes
                                     console.log('🛑 3 losses in a row detected - Taking 10-minute rest');
                                     setFlashNotification('⏸️ 3 losses in a row - Taking 10-minute rest', 15);
 
+                                } else if(lostCountInRow >= 5){
+                                    // More variation: 5-45 seconds
+                                    intervalTime = (getRandomNumber(75, 90) * 1000);
+                                } else if(lostCountInRow >= 4){
+                                    // More variation: 5-45 seconds
+                                    intervalTime = (getRandomNumber(35, 60) * 1000);
                                 } else if(lostCountInRow >= 3){
                                     // More variation: 5-45 seconds
                                     intervalTime = (getRandomNumber(15, 25) * 1000);
@@ -610,25 +616,33 @@ function startWebSocket(){
                 }
             } else {
                 // Check if lost count >= 4, flip the trade state from prediction
-                if (lostCountInRow >= 4) {
-                    // Flip the trade state opposite to prediction
-                    if (tradeType == "even") {
-                        tradeState = "DIGITODD"; // Opposite of DIGITEVEN
-                        console.log('🔄 3+ LOSSES: Flipping trade state - predicted EVEN, trading ODD');
-                    } else if (tradeType == "odd") {
-                        tradeState = "DIGITEVEN"; // Opposite of DIGITODD
-                        console.log('🔄 3+ LOSSES: Flipping trade state - predicted ODD, trading EVEN');
-                    }
-                } else {
-                    // Normal trading - follow prediction
-                    if (tradeType == "even") {
+                // if (lostCountInRow >= 4) {
+                //     // Flip the trade state opposite to prediction
+                //     // if (tradeType == "even") {
+                //     //     tradeState = "DIGITODD"; // Opposite of DIGITEVEN
+                //     //     console.log('🔄 3+ LOSSES: Flipping trade state - predicted EVEN, trading ODD');
+                //     // } else if (tradeType == "odd") {
+                //     //     tradeState = "DIGITEVEN"; // Opposite of DIGITODD
+                //     //     console.log('🔄 3+ LOSSES: Flipping trade state - predicted ODD, trading EVEN');
+                //     // }
+                // } else {
+                //     // Normal trading - follow prediction
+                //     if (tradeType == "even") {
+                //         tradeState = "DIGITEVEN";
+                //         // tradeType = "odd";
+                //     } else if (tradeType == "odd") {
+                //         tradeState = "DIGITODD";
+                //         // tradeType = "even";
+                //     }
+                // }
+
+                if (tradeType == "even") {
                         tradeState = "DIGITEVEN";
                         // tradeType = "odd";
                     } else if (tradeType == "odd") {
                         tradeState = "DIGITODD";
                         // tradeType = "even";
                     }
-                }
             }
             stake = Number(stake);
             stake < 0.35 ? (stake = 0.35) : (stake = stake);
@@ -769,8 +783,8 @@ function initializeDailyTarget() {
     // Check if we have data and if it's from today
     if (!dailyTargetData || dailyTargetData.tradingDate !== today) {
         // NEW DAY - Calculate fresh targets only when date changes
-        const dailyTargetAmount = initialAccountBalance * 1; // 100% of initial capital
-        const dailyTargetCapital = parseFloat(initialAccountBalance) + dailyTargetAmount; // Initial + 100%
+        const dailyTargetAmount = initialAccountBalance * 0.20; // 20% of initial capital
+        const dailyTargetCapital = parseFloat(initialAccountBalance) + dailyTargetAmount; // Initial + 20%
         
         dailyTargetData = {
             tradingDate: today,
