@@ -1,0 +1,386 @@
+[2025-12-19T11:56:06.175Z] [INFO] 📊 Fetching 1000 ticks for R_100...
+[2025-12-19T11:56:06.622Z] [INFO] 🎯 Prediction Analysis:
+[2025-12-19T11:56:06.623Z] [INFO]    Prediction: ODD
+[2025-12-19T11:56:06.623Z] [INFO]    Confidence: 52.4%
+[2025-12-19T11:56:06.623Z] [INFO]    Threshold: 73.4%
+[2025-12-19T11:56:06.623Z] [INFO]    Stats: 45.6% even, 54.4% odd
+[2025-12-19T11:56:06.623Z] [INFO] ⏭️  Skipping: Confidence below threshold
+[2025-12-19T11:56:08.348Z] [INFO] 📊 Fetching 1000 ticks for R_100...
+[2025-12-19T11:56:08.860Z] [INFO] 🎯 Prediction Analysis:
+[2025-12-19T11:56:08.861Z] [INFO]    Prediction: ODD
+[2025-12-19T11:56:08.862Z] [INFO]    Confidence: 54.0%
+[2025-12-19T11:56:08.862Z] [INFO]    Threshold: 68.3%
+[2025-12-19T11:56:08.862Z] [INFO]    Stats: 45.6% even, 54.4% odd
+[2025-12-19T11:56:08.862Z] [INFO] ⏭️  Skipping: Confidence below threshold
+[2025-12-19T11:56:12.460Z] [INFO] 📊 Fetching 1000 ticks for R_100...
+[2025-12-19T11:56:13.087Z] [INFO] 🎯 Prediction Analysis:
+[2025-12-19T11:56:13.088Z] [INFO]    Prediction: ODD
+[2025-12-19T11:56:13.088Z] [INFO]    Confidence: 55.6%
+[2025-12-19T11:56:13.088Z] [INFO]    Threshold: 65.2%
+[2025-12-19T11:56:13.089Z] [INFO]    Stats: 45.7% even, 54.3% odd
+[2025-12-19T11:56:13.089Z] [INFO] ⏭️  Skipping: Confidence below threshold
+[2025-12-19T11:56:15.761Z] [INFO] 📊 Fetching 1000 ticks for R_100...
+[2025-12-19T11:56:16.118Z] [INFO] 🎯 Prediction Analysis:
+[2025-12-19T11:56:16.119Z] [INFO]    Prediction: ODD
+[2025-12-19T11:56:16.119Z] [INFO]    Confidence: 55.2%
+[2025-12-19T11:56:16.119Z] [INFO]    Threshold: 70.6%
+[2025-12-19T11:56:16.120Z] [INFO]    Stats: 45.7% even, 54.3% odd
+[2025-12-19T11:56:16.120Z] [INFO] ⏭️  Skipping: Confidence below threshold
+[2025-12-19T11:56:17.434Z] [INFO] 📊 Fetching 1000 ticks for R_100...
+[2025-12-19T11:56:18.539Z] [INFO] 🎯 Prediction Analysis:
+[2025-12-19T11:56:18.540Z] [INFO]    Prediction: ODD
+[2025-12-19T11:56:18.540Z] [INFO]    Confidence: 55.8%
+[2025-12-19T11:56:18.540Z] [INFO]    Threshold: 72.2%
+[2025-12-19T11:56:18.540Z] [INFO]    Stats: 45.8% even, 54.2% odd
+[2025-12-19T11:56:18.541Z] [INFO] ⏭️  Skipping: Confidence below threshold
+[2025-12-19T11:56:20.316Z] [INFO] 📊 Fetching 1000 ticks for R_100...
+[2025-12-19T11:56:20.678Z] [INFO] 🎯 Prediction Analysis:
+[2025-12-19T11:56:20.679Z] [INFO]    Prediction: EVEN
+[2025-12-19T11:56:20.680Z] [INFO]    Confidence: 78.5%
+[2025-12-19T11:56:20.680Z] [INFO]    Threshold: 65.7%
+[2025-12-19T11:56:20.680Z] [INFO]    Stats: 45.8% even, 54.2% odd
+[2025-12-19T11:56:20.680Z] [INFO] 📈 Placing trade: DIGITEVEN on R_100
+[2025-12-19T11:56:20.680Z] [INFO]    Stake: $8.85
+[2025-12-19T11:56:21.293Z] [INFO] ✅ Trade placed: Contract 302051295948
+[2025-12-19T11:56:21.294Z] [INFO] ⏳ Waiting for contract to settle...
+[2025-12-19T11:56:25.602Z] [INFO] Trade logged
+{
+  "contractId": 302051295948,
+  "market": "R_100",
+  "type": "DIGITEVEN",
+  "stake": 8.850211350125743,
+  "profit": 8.44,
+  "status": "WIN",
+  "balance": 147.34,
+  "prediction": "even",
+  "confidence": "78.5%"
+}
+[2025-12-19T11:56:25.602Z] [INFO] ✅ WIN! Profit: $8.44 | Balance: $147.34
+[2025-12-19T11:56:25.602Z] [INFO] 💰 Win Trade Recovery:
+[2025-12-19T11:56:25.603Z] [INFO]    Previous total loss: $8.04
+[2025-12-19T11:56:25.603Z] [INFO]    This win profit: $8.44
+[2025-12-19T11:56:25.603Z] [INFO]    Remaining loss: $0.00
+[2025-12-19T11:56:25.603Z] [INFO] ✅ FULL RECOVERY + PROFIT! Extra: $0.40
+[2025-12-19T11:56:25.603Z] [INFO] ✅ Win! Loss counter reset
+[2025-12-19T11:56:25.604Z] [INFO] 📊 Current Session Stats:
+[2025-12-19T11:56:25.604Z] [INFO]    Trades: 8 (3W / 5L)
+[2025-12-19T11:56:25.604Z] [INFO]    Balance: $147.34
+[2025-12-19T11:56:25.604Z] [INFO]    Next Stake: $0.52
+[2025-12-19T11:56:25.605Z] [INFO] 📈 All-Time Stats (from logs):
+[2025-12-19T11:56:25.605Z] [INFO]    Total Trades: 0
+[2025-12-19T11:56:25.606Z] [INFO]    Win Rate: 0%
+[2025-12-19T11:56:25.606Z] [INFO]    Net Profit: $0.00
+[2025-12-19T11:56:25.606Z] [INFO] ⏳ Waiting 5.0s before next trade...
+[2025-12-19T11:56:30.603Z] [INFO] 📊 Fetching 1000 ticks for R_100...
+[2025-12-19T11:56:30.956Z] [INFO] 🎯 Prediction Analysis:
+[2025-12-19T11:56:30.957Z] [INFO]    Prediction: EVEN
+[2025-12-19T11:56:30.957Z] [INFO]    Confidence: 75.4%
+[2025-12-19T11:56:30.958Z] [INFO]    Threshold: 67.5%
+[2025-12-19T11:56:30.958Z] [INFO]    Stats: 45.8% even, 54.2% odd
+[2025-12-19T11:56:30.958Z] [INFO] 📈 Placing trade: DIGITEVEN on R_100
+[2025-12-19T11:56:30.958Z] [INFO]    Stake: $0.52
+[2025-12-19T11:56:31.591Z] [INFO] ✅ Trade placed: Contract 302051306208
+[2025-12-19T11:56:31.592Z] [INFO] ⏳ Waiting for contract to settle...
+[2025-12-19T11:56:34.886Z] [INFO] Trade logged
+{
+  "contractId": 302051306208,
+  "market": "R_100",
+  "type": "DIGITEVEN",
+  "stake": 0.51569,
+  "profit": -0.52,
+  "status": "LOSS",
+  "balance": 146.82,
+  "prediction": "even",
+  "confidence": "75.4%"
+}
+[2025-12-19T11:56:34.888Z] [WARN] ❌ LOSS: $-0.52 | Balance: $146.82
+[2025-12-19T11:56:34.888Z] [WARN] 📉 Loss recorded: $-0.52
+[2025-12-19T11:56:34.888Z] [WARN]    Consecutive losses: 1
+[2025-12-19T11:56:34.888Z] [WARN]    Total loss in row: $0.52
+[2025-12-19T11:56:34.888Z] [INFO] 📊 Current Session Stats:
+[2025-12-19T11:56:34.889Z] [INFO]    Trades: 9 (3W / 6L)
+[2025-12-19T11:56:34.889Z] [INFO]    Balance: $146.82
+[2025-12-19T11:56:34.889Z] [INFO]    Next Stake: $1.09
+[2025-12-19T11:56:34.889Z] [INFO] 📈 All-Time Stats (from logs):
+[2025-12-19T11:56:34.890Z] [INFO]    Total Trades: 1
+[2025-12-19T11:56:34.890Z] [INFO]    Win Rate: 0.00%
+[2025-12-19T11:56:34.890Z] [INFO]    Net Profit: $-0.52
+[2025-12-19T11:56:34.891Z] [INFO] ⏳ Waiting 4.1s before next trade...
+[2025-12-19T11:56:39.040Z] [INFO] 📊 Fetching 1000 ticks for R_100...
+[2025-12-19T11:56:39.481Z] [INFO] 🎯 Prediction Analysis:
+[2025-12-19T11:56:39.482Z] [INFO]    Prediction: EVEN
+[2025-12-19T11:56:39.482Z] [INFO]    Confidence: 73.1%
+[2025-12-19T11:56:39.483Z] [INFO]    Threshold: 68.6%
+[2025-12-19T11:56:39.483Z] [INFO]    Stats: 45.7% even, 54.3% odd
+[2025-12-19T11:56:39.483Z] [INFO] 📈 Placing trade: DIGITEVEN on R_100
+[2025-12-19T11:56:39.484Z] [INFO]    Stake: $1.09
+[2025-12-19T11:56:40.065Z] [INFO] ✅ Trade placed: Contract 302051314668
+[2025-12-19T11:56:40.066Z] [INFO] ⏳ Waiting for contract to settle...
+[2025-12-19T11:56:43.372Z] [INFO] Trade logged
+{
+  "contractId": 302051314668,
+  "market": "R_100",
+  "type": "DIGITEVEN",
+  "stake": 1.0944406115771985,
+  "profit": -1.09,
+  "status": "LOSS",
+  "balance": 145.73,
+  "prediction": "even",
+  "confidence": "73.1%"
+}
+[2025-12-19T11:56:43.373Z] [WARN] ❌ LOSS: $-1.09 | Balance: $145.73
+[2025-12-19T11:56:43.373Z] [WARN] 📉 Loss recorded: $-1.09
+[2025-12-19T11:56:43.374Z] [WARN]    Consecutive losses: 2
+[2025-12-19T11:56:43.374Z] [WARN]    Total loss in row: $1.61
+[2025-12-19T11:56:43.374Z] [INFO] 📊 Current Session Stats:
+[2025-12-19T11:56:43.374Z] [INFO]    Trades: 10 (3W / 7L)
+[2025-12-19T11:56:43.375Z] [INFO]    Balance: $145.73
+[2025-12-19T11:56:43.375Z] [INFO]    Next Stake: $2.38
+[2025-12-19T11:56:43.375Z] [INFO] 📈 All-Time Stats (from logs):
+[2025-12-19T11:56:43.375Z] [INFO]    Total Trades: 2
+[2025-12-19T11:56:43.375Z] [INFO]    Win Rate: 0.00%
+[2025-12-19T11:56:43.375Z] [INFO]    Net Profit: $-1.61
+[2025-12-19T11:56:43.376Z] [INFO] ⏳ Waiting 14.4s before next trade...
+[2025-12-19T11:56:57.747Z] [INFO] 📊 Fetching 1000 ticks for R_100...
+[2025-12-19T11:56:59.065Z] [INFO] 🎯 Prediction Analysis:
+[2025-12-19T11:56:59.066Z] [INFO]    Prediction: ODD
+[2025-12-19T11:56:59.066Z] [INFO]    Confidence: 75.6%
+[2025-12-19T11:56:59.066Z] [INFO]    Threshold: 69.7%
+[2025-12-19T11:56:59.066Z] [INFO]    Stats: 45.4% even, 54.6% odd
+[2025-12-19T11:56:59.067Z] [INFO] 📈 Placing trade: DIGITODD on R_100
+[2025-12-19T11:56:59.067Z] [INFO]    Stake: $2.38
+[2025-12-19T11:56:59.667Z] [INFO] ✅ Trade placed: Contract 302051334868
+[2025-12-19T11:56:59.668Z] [INFO] ⏳ Waiting for contract to settle...
+[2025-12-19T11:57:03.978Z] [INFO] Trade logged
+{
+  "contractId": 302051334868,
+  "market": "R_100",
+  "type": "DIGITODD",
+  "stake": 2.376084773763984,
+  "profit": 2.27,
+  "status": "WIN",
+  "balance": 148,
+  "prediction": "odd",
+  "confidence": "75.6%"
+}
+[2025-12-19T11:57:03.979Z] [INFO] ✅ WIN! Profit: $2.27 | Balance: $148.00
+[2025-12-19T11:57:03.979Z] [INFO] 💰 Win Trade Recovery:
+[2025-12-19T11:57:03.979Z] [INFO]    Previous total loss: $1.61
+[2025-12-19T11:57:03.979Z] [INFO]    This win profit: $2.27
+[2025-12-19T11:57:03.979Z] [INFO]    Remaining loss: $0.00
+[2025-12-19T11:57:03.980Z] [INFO] ✅ FULL RECOVERY + PROFIT! Extra: $0.66
+[2025-12-19T11:57:03.980Z] [INFO] ✅ Win! Loss counter reset
+[2025-12-19T11:57:03.980Z] [INFO] 📊 Current Session Stats:
+[2025-12-19T11:57:03.980Z] [INFO]    Trades: 11 (4W / 7L)
+[2025-12-19T11:57:03.981Z] [INFO]    Balance: $148.00
+[2025-12-19T11:57:03.981Z] [INFO]    Next Stake: $0.52
+[2025-12-19T11:57:03.981Z] [INFO] 📈 All-Time Stats (from logs):
+[2025-12-19T11:57:03.981Z] [INFO]    Total Trades: 3
+[2025-12-19T11:57:03.981Z] [INFO]    Win Rate: 33.33%
+[2025-12-19T11:57:03.981Z] [INFO]    Net Profit: $0.66
+[2025-12-19T11:57:03.982Z] [INFO] ⏳ Waiting 1.5s before next trade...
+[2025-12-19T11:57:05.456Z] [INFO] 📊 Fetching 1000 ticks for R_100...
+[2025-12-19T11:57:05.978Z] [INFO] 🎯 Prediction Analysis:
+[2025-12-19T11:57:05.979Z] [INFO]    Prediction: ODD
+[2025-12-19T11:57:05.979Z] [INFO]    Confidence: 54.0%
+[2025-12-19T11:57:05.980Z] [INFO]    Threshold: 73.7%
+[2025-12-19T11:57:05.980Z] [INFO]    Stats: 45.3% even, 54.7% odd
+[2025-12-19T11:57:05.980Z] [INFO] ⏭️  Skipping: Confidence below threshold
+[2025-12-19T11:57:09.957Z] [INFO] 📊 Fetching 1000 ticks for R_100...
+[2025-12-19T11:57:10.481Z] [INFO] 🎯 Prediction Analysis:
+[2025-12-19T11:57:10.482Z] [INFO]    Prediction: ODD
+[2025-12-19T11:57:10.483Z] [INFO]    Confidence: 73.7%
+[2025-12-19T11:57:10.483Z] [INFO]    Threshold: 73.7%
+[2025-12-19T11:57:10.483Z] [INFO]    Stats: 45.1% even, 54.9% odd
+[2025-12-19T11:57:10.483Z] [INFO] ⏭️  Skipping: Confidence below threshold
+[2025-12-19T11:57:13.419Z] [INFO] 📊 Fetching 1000 ticks for R_100...
+[2025-12-19T11:57:13.914Z] [INFO] 🎯 Prediction Analysis:
+[2025-12-19T11:57:13.915Z] [INFO]    Prediction: ODD
+[2025-12-19T11:57:13.915Z] [INFO]    Confidence: 77.6%
+[2025-12-19T11:57:13.915Z] [INFO]    Threshold: 74.2%
+[2025-12-19T11:57:13.916Z] [INFO]    Stats: 45.1% even, 54.9% odd
+[2025-12-19T11:57:13.916Z] [INFO] 📈 Placing trade: DIGITODD on R_100
+[2025-12-19T11:57:13.916Z] [INFO]    Stake: $0.52
+[2025-12-19T11:57:14.580Z] [INFO] ✅ Trade placed: Contract 302051349748
+[2025-12-19T11:57:14.581Z] [INFO] ⏳ Waiting for contract to settle...
+[2025-12-19T11:57:19.915Z] [INFO] Trade logged
+{
+  "contractId": 302051349748,
+  "market": "R_100",
+  "type": "DIGITODD",
+  "stake": 0.5179999999999999,
+  "profit": 0.48,
+  "status": "WIN",
+  "balance": 148.48,
+  "prediction": "odd",
+  "confidence": "77.6%"
+}
+[2025-12-19T11:57:19.916Z] [INFO] ✅ WIN! Profit: $0.48 | Balance: $148.48
+[2025-12-19T11:57:19.916Z] [INFO] ✅ Win! Loss counter reset
+[2025-12-19T11:57:19.916Z] [INFO] 📊 Current Session Stats:
+[2025-12-19T11:57:19.916Z] [INFO]    Trades: 12 (5W / 7L)
+[2025-12-19T11:57:19.916Z] [INFO]    Balance: $148.48
+[2025-12-19T11:57:19.917Z] [INFO]    Next Stake: $0.52
+[2025-12-19T11:57:19.917Z] [INFO] 📈 All-Time Stats (from logs):
+[2025-12-19T11:57:19.917Z] [INFO]    Total Trades: 4
+[2025-12-19T11:57:19.917Z] [INFO]    Win Rate: 50.00%
+[2025-12-19T11:57:19.917Z] [INFO]    Net Profit: $1.14
+[2025-12-19T11:57:19.917Z] [INFO] ⏳ Waiting 4.4s before next trade...
+[2025-12-19T11:57:24.312Z] [INFO] 📊 Fetching 1000 ticks for R_100...
+[2025-12-19T11:57:24.739Z] [INFO] 🎯 Prediction Analysis:
+[2025-12-19T11:57:24.740Z] [INFO]    Prediction: ODD
+[2025-12-19T11:57:24.740Z] [INFO]    Confidence: 73.2%
+[2025-12-19T11:57:24.741Z] [INFO]    Threshold: 66.8%
+[2025-12-19T11:57:24.741Z] [INFO]    Stats: 45.0% even, 55.0% odd
+[2025-12-19T11:57:24.742Z] [INFO] 📈 Placing trade: DIGITODD on R_100
+[2025-12-19T11:57:24.742Z] [INFO]    Stake: $0.52
+[2025-12-19T11:57:25.392Z] [INFO] ✅ Trade placed: Contract 302051359788
+[2025-12-19T11:57:25.393Z] [INFO] ⏳ Waiting for contract to settle...
+[2025-12-19T11:57:29.688Z] [INFO] Trade logged
+{
+  "contractId": 302051359788,
+  "market": "R_100",
+  "type": "DIGITODD",
+  "stake": 0.5196799999999999,
+  "profit": -0.52,
+  "status": "LOSS",
+  "balance": 147.95999999999998,
+  "prediction": "odd",
+  "confidence": "73.2%"
+}
+[2025-12-19T11:57:29.689Z] [WARN] ❌ LOSS: $-0.52 | Balance: $147.96
+[2025-12-19T11:57:29.689Z] [WARN] 📉 Loss recorded: $-0.52
+[2025-12-19T11:57:29.690Z] [WARN]    Consecutive losses: 1
+[2025-12-19T11:57:29.690Z] [WARN]    Total loss in row: $0.52
+[2025-12-19T11:57:29.690Z] [INFO] 📊 Current Session Stats:
+[2025-12-19T11:57:29.690Z] [INFO]    Trades: 13 (5W / 8L)
+[2025-12-19T11:57:29.690Z] [INFO]    Balance: $147.96
+[2025-12-19T11:57:29.691Z] [INFO]    Next Stake: $1.03
+[2025-12-19T11:57:29.691Z] [INFO] 📈 All-Time Stats (from logs):
+[2025-12-19T11:57:29.691Z] [INFO]    Total Trades: 5
+[2025-12-19T11:57:29.691Z] [INFO]    Win Rate: 40.00%
+[2025-12-19T11:57:29.691Z] [INFO]    Net Profit: $0.62
+[2025-12-19T11:57:29.692Z] [INFO] ⏳ Waiting 3.2s before next trade...
+[2025-12-19T11:57:32.844Z] [INFO] 📊 Fetching 1000 ticks for R_100...
+[2025-12-19T11:57:33.373Z] [INFO] 🎯 Prediction Analysis:
+[2025-12-19T11:57:33.374Z] [INFO]    Prediction: ODD
+[2025-12-19T11:57:33.375Z] [INFO]    Confidence: 75.8%
+[2025-12-19T11:57:33.375Z] [INFO]    Threshold: 74.6%
+[2025-12-19T11:57:33.375Z] [INFO]    Stats: 45.2% even, 54.8% odd
+[2025-12-19T11:57:33.376Z] [INFO] 📈 Placing trade: DIGITODD on R_100
+[2025-12-19T11:57:33.376Z] [INFO]    Stake: $1.03
+[2025-12-19T11:57:33.965Z] [INFO] ✅ Trade placed: Contract 302051367228
+[2025-12-19T11:57:33.966Z] [INFO] ⏳ Waiting for contract to settle...
+[2025-12-19T11:57:37.279Z] [INFO] Trade logged
+{
+  "contractId": 302051367228,
+  "market": "R_100",
+  "type": "DIGITODD",
+  "stake": 1.029888069275821,
+  "profit": -1.03,
+  "status": "LOSS",
+  "balance": 146.92999999999998,
+  "prediction": "odd",
+  "confidence": "75.8%"
+}
+[2025-12-19T11:57:37.280Z] [WARN] ❌ LOSS: $-1.03 | Balance: $146.93
+[2025-12-19T11:57:37.280Z] [WARN] 📉 Loss recorded: $-1.03
+[2025-12-19T11:57:37.280Z] [WARN]    Consecutive losses: 2
+[2025-12-19T11:57:37.280Z] [WARN]    Total loss in row: $1.55
+[2025-12-19T11:57:37.280Z] [INFO] 📊 Current Session Stats:
+[2025-12-19T11:57:37.281Z] [INFO]    Trades: 14 (5W / 9L)
+[2025-12-19T11:57:37.281Z] [INFO]    Balance: $146.93
+[2025-12-19T11:57:37.281Z] [INFO]    Next Stake: $2.18
+[2025-12-19T11:57:37.281Z] [INFO] 📈 All-Time Stats (from logs):
+[2025-12-19T11:57:37.281Z] [INFO]    Total Trades: 6
+[2025-12-19T11:57:37.282Z] [INFO]    Win Rate: 33.33%
+[2025-12-19T11:57:37.282Z] [INFO]    Net Profit: $-0.41
+[2025-12-19T11:57:37.282Z] [INFO] ⏳ Waiting 9.0s before next trade...
+[2025-12-19T11:57:46.323Z] [INFO] 📊 Fetching 1000 ticks for R_100...
+[2025-12-19T11:57:46.717Z] [INFO] 🎯 Prediction Analysis:
+[2025-12-19T11:57:46.718Z] [INFO]    Prediction: ODD
+[2025-12-19T11:57:46.718Z] [INFO]    Confidence: 56.9%
+[2025-12-19T11:57:46.719Z] [INFO]    Threshold: 65.5%
+[2025-12-19T11:57:46.719Z] [INFO]    Stats: 45.2% even, 54.8% odd
+[2025-12-19T11:57:46.719Z] [INFO] ⏭️  Skipping: Confidence below threshold
+[2025-12-19T11:57:51.379Z] [INFO] 📊 Fetching 1000 ticks for R_100...
+[2025-12-19T11:57:51.880Z] [INFO] 🎯 Prediction Analysis:
+[2025-12-19T11:57:51.881Z] [INFO]    Prediction: ODD
+[2025-12-19T11:57:51.882Z] [INFO]    Confidence: 72.0%
+[2025-12-19T11:57:51.882Z] [INFO]    Threshold: 69.9%
+[2025-12-19T11:57:51.882Z] [INFO]    Stats: 45.3% even, 54.7% odd
+[2025-12-19T11:57:51.882Z] [INFO] 📈 Placing trade: DIGITODD on R_100
+[2025-12-19T11:57:51.882Z] [INFO]    Stake: $2.18
+[2025-12-19T11:57:52.572Z] [INFO] ✅ Trade placed: Contract 302051383728
+[2025-12-19T11:57:52.573Z] [INFO] ⏳ Waiting for contract to settle...
+[2025-12-19T11:57:57.867Z] [INFO] Trade logged
+{
+  "contractId": 302051383728,
+  "market": "R_100",
+  "type": "DIGITODD",
+  "stake": 2.1798412957275795,
+  "profit": -2.18,
+  "status": "LOSS",
+  "balance": 144.74999999999997,
+  "prediction": "odd",
+  "confidence": "72.0%"
+}
+[2025-12-19T11:57:57.867Z] [WARN] ❌ LOSS: $-2.18 | Balance: $144.75
+[2025-12-19T11:57:57.868Z] [WARN] 📉 Loss recorded: $-2.18
+[2025-12-19T11:57:57.868Z] [WARN]    Consecutive losses: 3
+[2025-12-19T11:57:57.868Z] [WARN]    Total loss in row: $3.73
+[2025-12-19T11:57:57.868Z] [WARN] ⚠️ First 3 trades all lost! Count: 2/3
+[2025-12-19T11:57:57.869Z] [INFO] 📊 Current Session Stats:
+[2025-12-19T11:57:57.869Z] [INFO]    Trades: 15 (5W / 10L)
+[2025-12-19T11:57:57.869Z] [INFO]    Balance: $144.75
+[2025-12-19T11:57:57.869Z] [INFO]    Next Stake: $4.66
+[2025-12-19T11:57:57.869Z] [INFO] 📈 All-Time Stats (from logs):
+[2025-12-19T11:57:57.869Z] [INFO]    Total Trades: 7
+[2025-12-19T11:57:57.870Z] [INFO]    Win Rate: 28.57%
+[2025-12-19T11:57:57.870Z] [INFO]    Net Profit: $-2.59
+[2025-12-19T11:57:57.870Z] [INFO] ⏳ Waiting 16.0s before next trade...
+[2025-12-19T11:58:13.909Z] [INFO] 📊 Fetching 1000 ticks for R_100...
+[2025-12-19T11:58:14.376Z] [INFO] 🎯 Prediction Analysis:
+[2025-12-19T11:58:14.377Z] [INFO]    Prediction: ODD
+[2025-12-19T11:58:14.377Z] [INFO]    Confidence: 74.7%
+[2025-12-19T11:58:14.377Z] [INFO]    Threshold: 73.4%
+[2025-12-19T11:58:14.378Z] [INFO]    Stats: 45.3% even, 54.7% odd
+[2025-12-19T11:58:14.378Z] [INFO] 📈 Placing trade: DIGITODD on R_100
+[2025-12-19T11:58:14.378Z] [INFO]    Stake: $4.66
+[2025-12-19T11:58:15.089Z] [INFO] ✅ Trade placed: Contract 302051409508
+[2025-12-19T11:58:15.090Z] [INFO] ⏳ Waiting for contract to settle...
+[2025-12-19T11:58:19.390Z] [INFO] Trade logged
+{
+  "contractId": 302051409508,
+  "market": "R_100",
+  "type": "DIGITODD",
+  "stake": 4.6566367761211325,
+  "profit": -4.66,
+  "status": "LOSS",
+  "balance": 140.08999999999997,
+  "prediction": "odd",
+  "confidence": "74.7%"
+}
+[2025-12-19T11:58:19.391Z] [WARN] ❌ LOSS: $-4.66 | Balance: $140.09
+[2025-12-19T11:58:19.391Z] [WARN] 📉 Loss recorded: $-4.66
+[2025-12-19T11:58:19.391Z] [WARN]    Consecutive losses: 4
+[2025-12-19T11:58:19.391Z] [WARN]    Total loss in row: $8.39
+[2025-12-19T11:58:19.391Z] [INFO] 📊 Current Session Stats:
+[2025-12-19T11:58:19.392Z] [INFO]    Trades: 16 (5W / 11L)
+[2025-12-19T11:58:19.392Z] [INFO]    Balance: $140.09
+[2025-12-19T11:58:19.392Z] [INFO]    Next Stake: $9.98
+[2025-12-19T11:58:19.392Z] [INFO] 📈 All-Time Stats (from logs):
+[2025-12-19T11:58:19.392Z] [INFO]    Total Trades: 8
+[2025-12-19T11:58:19.392Z] [INFO]    Win Rate: 25.00%
+[2025-12-19T11:58:19.392Z] [INFO]    Net Profit: $-7.25
+[2025-12-19T11:58:19.393Z] [INFO] ⏳ Waiting 737.3s before next trade...
+[2025-12-19T11:59:01.875Z] [INFO] 🛑 Stopping bot...
+[2025-12-19T11:59:01.875Z] [INFO] 📊 Current Session Stats:
+[2025-12-19T11:59:01.876Z] [INFO]    Trades: 16 (5W / 11L)
+[2025-12-19T11:59:01.876Z] [INFO]    Balance: $140.09
+[2025-12-19T11:59:01.876Z] [INFO]    Next Stake: $9.98
+[2025-12-19T11:59:01.876Z] [INFO] 📈 All-Time Stats (from logs):
+[2025-12-19T11:59:01.876Z] [INFO]    Total Trades: 8
+[2025-12-19T11:59:01.876Z] [INFO]    Win Rate: 25.00%
+[2025-12-19T11:59:01.876Z] [INFO]    Net Profit: $-7.25
+[2025-12-19T11:59:01.877Z] [INFO] ✅ Bot stopped successfully

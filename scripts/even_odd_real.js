@@ -206,7 +206,8 @@ function startWebSocket(){
         }
 
         // Only process trading messages during allowed time range
-        if (isWithinTimeRange() && wsResponse != null) {
+        // if (isWithinTimeRange() && wsResponse != null) {
+        if (wsResponse != null) {
             if (wsResponse.msg_type === 'history') {
                 const priceList = wsResponse.history.prices;
                 const lastDigits = priceList.map(p => Number(String(p).slice(-1)));
@@ -507,7 +508,7 @@ function startWebSocket(){
                                 
                                 if (currentProfitAmount >= targetAmount) {
                                     // More variation: 5-20 seconds
-                                    intervalTime = (getRandomNumber(5, 20) * 1000);
+                                    intervalTime = (getRandomNumber(1, 3) * 1000);
 
                                     setTimer(intervalTime);
                                     setTimeout(() => {
@@ -516,7 +517,7 @@ function startWebSocket(){
                                     }, intervalTime);
                                 } else {
                                     // More variation: 3-15 seconds
-                                    intervalTime = (getRandomNumber(3, 15) * 1000);
+                                    intervalTime = (getRandomNumber(1, 3) * 1000);
 
                                     setTimer(intervalTime);
                                     setTimeout(() => {
@@ -597,15 +598,15 @@ function startWebSocket(){
                     tradeState = "DIGITEVEN";
                 }
             } else {
-                // Check if flip flag is active - flip the trade state from prediction
-                if (flipTradeStateFlag) {
+                // Check if lost count >= 4, flip the trade state from prediction
+                if (lostCountInRow >= 4) {
                     // Flip the trade state opposite to prediction
                     if (tradeType == "even") {
                         tradeState = "DIGITODD"; // Opposite of DIGITEVEN
-                        console.log('🔄 FLAG ACTIVE: Flipping trade state - predicted EVEN, trading ODD');
+                        console.log('🔄 3+ LOSSES: Flipping trade state - predicted EVEN, trading ODD');
                     } else if (tradeType == "odd") {
                         tradeState = "DIGITEVEN"; // Opposite of DIGITODD
-                        console.log('🔄 FLAG ACTIVE: Flipping trade state - predicted ODD, trading EVEN');
+                        console.log('🔄 3+ LOSSES: Flipping trade state - predicted ODD, trading EVEN');
                     }
                 } else {
                     // Normal trading - follow prediction
@@ -757,8 +758,8 @@ function initializeDailyTarget() {
     // Check if we have data and if it's from today
     if (!dailyTargetData || dailyTargetData.tradingDate !== today) {
         // NEW DAY - Calculate fresh targets only when date changes
-        const dailyTargetAmount = initialAccountBalance * 0.50; // 50% of initial capital
-        const dailyTargetCapital = parseFloat(initialAccountBalance) + dailyTargetAmount; // Initial + 50%
+        const dailyTargetAmount = initialAccountBalance * 1; // 100% of initial capital
+        const dailyTargetCapital = parseFloat(initialAccountBalance) + dailyTargetAmount; // Initial + 100%
         
         dailyTargetData = {
             tradingDate: today,
@@ -843,7 +844,7 @@ function resetParams() {
     if (storedLoss > 0) {
         // Calculate stake needed to recover the REMAINING loss
         // Assuming profit is approximately 95% of stake for even/odd trades
-        const profitPercentage = 0.95; // Adjust based on your payout ratio
+        const profitPercentage = 0.90; // Adjust based on your payout ratio
         const requiredStake = storedLoss / profitPercentage;
         
         stake = requiredStake;
