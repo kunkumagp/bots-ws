@@ -87,6 +87,23 @@ let dailyTargetData = JSON.parse(localStorage.getItem('dailyTargetData') || 'nul
 let targetCapital = 0;
 let targetCompleted = false; 
 
+// 🎯 TWO-SESSION TRADING SYSTEM
+const SESSION_1_PROFIT_PERCENTAGE = 10; // First session: 10% profit
+const SESSION_2_PROFIT_PERCENTAGE = 10; // Second session: 10% profit
+const TOTAL_DAILY_PROFIT_PERCENTAGE = 20; // Total: 20% daily
+const SESSION_BREAK_MIN_MINUTES = 30; // Minimum break between sessions
+const SESSION_BREAK_MAX_MINUTES = 60; // Maximum break between sessions
+
+// 🕐 TRADING HOURS (Avoid 12 PM - 2 PM)
+const TRADING_HOURS = {
+    morning: { start: 7, end: 12 },    // 7 AM - 12 PM
+    afternoon: { start: 14, end: 19 }  // 2 PM - 7 PM
+};
+
+let sessionData = JSON.parse(localStorage.getItem('sessionData') || 'null');
+let currentSession = 1; // 1 or 2
+let sessionBreakEndTime = null; 
+
 let lastTradeId = null;
 let tradeTypeDisplay = null;
 let tradeType = "even";
@@ -206,7 +223,8 @@ function startWebSocket(){
         }
 
         // Only process trading messages during allowed time range
-        if (isWithinTimeRange() && wsResponse != null) {
+        if (wsResponse != null) {
+        // if (isWithinTimeRange() && wsResponse != null) {
             if (wsResponse.msg_type === 'history') {
                 const priceList = wsResponse.history.prices;
                 const lastDigits = priceList.map(p => Number(String(p).slice(-1)));
@@ -428,7 +446,7 @@ function startWebSocket(){
                             let newMarket;
                             
                             // Stop trading after 5 losses in a row
-                            if (lostCountInRow >= 7) {
+                            if (lostCountInRow >= 5) {
                                 setFlashNotification("Trading stopped: 5 losses in a row reached", 0);
                                 console.log('Trading stopped: 5 losses in a row');
                                 isRunning = false;
@@ -489,7 +507,28 @@ function startWebSocket(){
                                     
                                 }, intervalTime);
                             } else {
-                                // Check if daily target capital is reached
+                                // 🎯 CHECK SESSION COMPLETION
+                                const sessionCompleted = checkSessionCompletion(updatedAccountBalance);
+                                
+                                if (sessionCompleted) {
+                                    if (sessionData.currentSession === 1 && sessionData.session1.completed) {
+                                        // Session 1 completed - take break
+                                        console.log('🎯 Session 1 target reached! Taking break...');
+                                        setFlashNotification('✅ Session 1 Complete! Bot will stop for break.', 0);
+                                        isRunning = false;
+                                        weClose();
+                                        return;
+                                    } else if (sessionData.currentSession === 2 && sessionData.session2.completed) {
+                                        // Session 2 completed - daily target achieved
+                                        console.log('🎉 Session 2 target reached! Daily target achieved!');
+                                        setFlashNotification('🎉 Daily Target Complete! Trading stopped.', 0);
+                                        isRunning = false;
+                                        weClose();
+                                        return;
+                                    }
+                                }
+                                
+                                // Legacy daily target check (backup)
                                 if (dailyTargetData && updatedAccountBalance >= dailyTargetData.targetCapital) {
                                     dailyTargetData.targetCompleted = true;
                                     targetCompleted = true;
@@ -547,6 +586,17 @@ function startWebSocket(){
         setFlashNotification("Authenticating....", 0);
         console.log("Authenticating....");
         ws.send(JSON.stringify({ authorize: apiToken }));
+
+        // Set timeout to reload page if authentication doesn't complete within 2 seconds
+        setTimeout(() => {
+            if (!authSuccess) {
+                console.log("⚠️ Authentication timeout - Reloading page...");
+                setFlashNotification("Authentication timeout - Reloading...", 2);
+                setTimeout(() => {
+                    reload();
+                }, 1000);
+            }
+        }, 2000);
     };
 
 
@@ -685,6 +735,37 @@ function startWebSocket(){
 
 
     const requestTicksHistory = (symbol) => {
+        // 🕐 CHECK TRADING HOURS BEFORE EACH TRADE REQUEST
+        const tradingHoursCheck = isWithinTradingHours();
+        if (!tradingHoursCheck.allowed) {
+            const now = new Date();
+            const currentHour = now.getHours();
+            let message = '';
+            
+            if (currentHour >= TRADING_HOURS.morning.end && currentHour < TRADING_HOURS.afternoon.start) {
+                message = `☕ Lunch Break (12 PM - 2 PM)! Trading paused. Current: ${now.toLocaleTimeString()}`;
+            } else {
+                message = `⏰ Outside trading hours! Bot stopped. Current: ${now.toLocaleTimeString()}`;
+            }
+            
+            console.log(message);
+            setFlashNotification(message, 0);
+            isRunning = false;
+            weClose();
+            return;
+        }
+        
+        // 🎯 CHECK IF IN BREAK PERIOD
+        const breakCheck = isInBreakPeriod();
+        if (breakCheck.inBreak) {
+            const message = `⏸️ Session Break! Resume in ${breakCheck.minutesLeft} min at ${breakCheck.breakEnd.toLocaleTimeString()}`;
+            console.log(message);
+            setFlashNotification(message, 0);
+            isRunning = false;
+            weClose();
+            return;
+        }
+        
         // Vary history count between 800-1200 instead of fixed 1000 (makes analysis window unpredictable)
         const variedHistoryCount = getRandomNumber(800, 1200);
         
@@ -751,14 +832,211 @@ function reserParams() {
     setAccountInfo("currentLossAmount", `${currentLossAmountDisplay}`);
 }
 
+// 🕐 CHECK IF CURRENT TIME IS WITHIN TRADING HOURS
+function isWithinTradingHours() {
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    // Check if in morning session (7 AM - 12 PM)
+    if (currentHour >= TRADING_HOURS.morning.start && currentHour < TRADING_HOURS.morning.end) {
+        return { allowed: true, session: 'morning' };
+    }
+    
+    // Check if in afternoon session (2 PM - 7 PM)
+    if (currentHour >= TRADING_HOURS.afternoon.start && currentHour < TRADING_HOURS.afternoon.end) {
+        return { allowed: true, session: 'afternoon' };
+    }
+    
+    // Outside trading hours
+    return { allowed: false, session: null };
+}
+
+// 🎯 INITIALIZE SESSION DATA
+function initializeSessionData() {
+    const today = new Date().toDateString();
+    
+    // Check if we need to reset session data (new day)
+    if (!sessionData || sessionData.tradingDate !== today) {
+        sessionData = {
+            tradingDate: today,
+            session1: {
+                completed: false,
+                startBalance: 0,
+                targetBalance: 0,
+                profitTarget: 0
+            },
+            session2: {
+                completed: false,
+                startBalance: 0,
+                targetBalance: 0,
+                profitTarget: 0
+            },
+            breakEndTime: null,
+            currentSession: 1
+        };
+        localStorage.setItem('sessionData', JSON.stringify(sessionData));
+        console.log('📅 ✨ NEW SESSION DATA - Fresh session targets created');
+    } else {
+        console.log('📅 Continuing with existing session data from today');
+    }
+    
+    return sessionData;
+}
+
+// 🎯 START SESSION
+function startSession(sessionNumber, currentBalance) {
+    sessionData = initializeSessionData();
+    
+    if (sessionNumber === 1) {
+        sessionData.session1.startBalance = currentBalance;
+        sessionData.session1.profitTarget = currentBalance * (SESSION_1_PROFIT_PERCENTAGE / 100);
+        sessionData.session1.targetBalance = currentBalance + sessionData.session1.profitTarget;
+        sessionData.currentSession = 1;
+        
+        console.log(`🎯 SESSION 1 STARTED`);
+        console.log(`   Start Balance: $${currentBalance.toFixed(2)}`);
+        console.log(`   Profit Target: $${sessionData.session1.profitTarget.toFixed(2)} (${SESSION_1_PROFIT_PERCENTAGE}%)`);
+        console.log(`   Target Balance: $${sessionData.session1.targetBalance.toFixed(2)}`);
+        
+        setFlashNotification(`🎯 Session 1 Started - Target: ${SESSION_1_PROFIT_PERCENTAGE}% ($${sessionData.session1.profitTarget.toFixed(2)})`, 10);
+        
+    } else if (sessionNumber === 2) {
+        sessionData.session2.startBalance = currentBalance;
+        sessionData.session2.profitTarget = currentBalance * (SESSION_2_PROFIT_PERCENTAGE / 100);
+        sessionData.session2.targetBalance = currentBalance + sessionData.session2.profitTarget;
+        sessionData.currentSession = 2;
+        
+        console.log(`🎯 SESSION 2 STARTED`);
+        console.log(`   Start Balance: $${currentBalance.toFixed(2)}`);
+        console.log(`   Profit Target: $${sessionData.session2.profitTarget.toFixed(2)} (${SESSION_2_PROFIT_PERCENTAGE}%)`);
+        console.log(`   Target Balance: $${sessionData.session2.targetBalance.toFixed(2)}`);
+        
+        setFlashNotification(`🎯 Session 2 Started - Target: ${SESSION_2_PROFIT_PERCENTAGE}% ($${sessionData.session2.profitTarget.toFixed(2)})`, 10);
+    }
+    
+    localStorage.setItem('sessionData', JSON.stringify(sessionData));
+}
+
+// 🎯 CHECK SESSION COMPLETION
+function checkSessionCompletion(currentBalance) {
+    if (!sessionData) return false;
+    
+    const currentSessionNum = sessionData.currentSession;
+    
+    if (currentSessionNum === 1 && !sessionData.session1.completed) {
+        // Check if session 1 target reached
+        if (currentBalance >= sessionData.session1.targetBalance) {
+            sessionData.session1.completed = true;
+            
+            // Schedule break (30-60 minutes)
+            const breakMinutes = Math.floor(Math.random() * (SESSION_BREAK_MAX_MINUTES - SESSION_BREAK_MIN_MINUTES + 1)) + SESSION_BREAK_MIN_MINUTES;
+            const breakEndTime = new Date(Date.now() + breakMinutes * 60 * 1000);
+            sessionData.breakEndTime = breakEndTime.toISOString();
+            
+            localStorage.setItem('sessionData', JSON.stringify(sessionData));
+            
+            console.log(`✅ SESSION 1 COMPLETED!`);
+            console.log(`   Target: $${sessionData.session1.targetBalance.toFixed(2)}`);
+            console.log(`   Achieved: $${currentBalance.toFixed(2)}`);
+            console.log(`   Profit: $${(currentBalance - sessionData.session1.startBalance).toFixed(2)}`);
+            console.log(`⏸️ BREAK TIME: ${breakMinutes} minutes`);
+            console.log(`   Resume at: ${breakEndTime.toLocaleTimeString()}`);
+            
+            setFlashNotification(`✅ Session 1 Complete! Break for ${breakMinutes} min. Resume at ${breakEndTime.toLocaleTimeString()}`, 0);
+            
+            return true;
+        }
+    } else if (currentSessionNum === 2 && !sessionData.session2.completed) {
+        // Check if session 2 target reached (FINAL TARGET)
+        if (currentBalance >= sessionData.session2.targetBalance) {
+            sessionData.session2.completed = true;
+            localStorage.setItem('sessionData', JSON.stringify(sessionData));
+            
+            const totalProfit = currentBalance - sessionData.session1.startBalance;
+            const profitPercentage = (totalProfit / sessionData.session1.startBalance) * 100;
+            
+            console.log(`✅ SESSION 2 COMPLETED!`);
+            console.log(`   Target: $${sessionData.session2.targetBalance.toFixed(2)}`);
+            console.log(`   Achieved: $${currentBalance.toFixed(2)}`);
+            console.log(`🎉 DAILY TARGET ACHIEVED!`);
+            console.log(`   Total Profit: $${totalProfit.toFixed(2)} (${profitPercentage.toFixed(2)}%)`);
+            console.log(`   Session 1 Profit: $${(sessionData.session1.targetBalance - sessionData.session1.startBalance).toFixed(2)}`);
+            console.log(`   Session 2 Profit: $${(currentBalance - sessionData.session2.startBalance).toFixed(2)}`);
+            
+            setFlashNotification(`🎉 DAILY TARGET COMPLETE! Total Profit: $${totalProfit.toFixed(2)} (${profitPercentage.toFixed(1)}%)`, 0);
+            
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+// 🕐 CHECK IF IN BREAK PERIOD
+function isInBreakPeriod() {
+    if (!sessionData || !sessionData.breakEndTime) return false;
+    
+    const now = new Date();
+    const breakEnd = new Date(sessionData.breakEndTime);
+    
+    if (now < breakEnd) {
+        const minutesLeft = Math.ceil((breakEnd - now) / (60 * 1000));
+        return { inBreak: true, minutesLeft, breakEnd };
+    }
+    
+    return { inBreak: false };
+}
+
+// 🎯 LOG SESSION PROGRESS
+function logSessionProgress() {
+    if (!sessionData) return;
+    
+    const currentSessionNum = sessionData.currentSession;
+    
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🎯 SESSION PROGRESS UPDATE');
+    console.log(`📅 Date: ${sessionData.tradingDate}`);
+    
+    if (currentSessionNum === 1) {
+        const progress = updatedAccountBalance - sessionData.session1.startBalance;
+        const progressPercent = (progress / sessionData.session1.profitTarget) * 100;
+        
+        console.log(`📊 SESSION 1 (Target: ${SESSION_1_PROFIT_PERCENTAGE}%)`);
+        console.log(`   Start Balance: $${sessionData.session1.startBalance.toFixed(2)}`);
+        console.log(`   Current Balance: $${updatedAccountBalance.toFixed(2)}`);
+        console.log(`   Target Balance: $${sessionData.session1.targetBalance.toFixed(2)}`);
+        console.log(`   Progress: $${progress.toFixed(2)} / $${sessionData.session1.profitTarget.toFixed(2)} (${progressPercent.toFixed(1)}%)`);
+        console.log(`   Status: ${sessionData.session1.completed ? '✅ COMPLETED' : '⏳ IN PROGRESS'}`);
+    } else if (currentSessionNum === 2) {
+        const session1Profit = sessionData.session1.targetBalance - sessionData.session1.startBalance;
+        const session2Progress = updatedAccountBalance - sessionData.session2.startBalance;
+        const session2ProgressPercent = (session2Progress / sessionData.session2.profitTarget) * 100;
+        
+        console.log(`📊 SESSION 1: ✅ COMPLETED (+$${session1Profit.toFixed(2)})`);
+        console.log(`📊 SESSION 2 (Target: ${SESSION_2_PROFIT_PERCENTAGE}%)`);
+        console.log(`   Start Balance: $${sessionData.session2.startBalance.toFixed(2)}`);
+        console.log(`   Current Balance: $${updatedAccountBalance.toFixed(2)}`);
+        console.log(`   Target Balance: $${sessionData.session2.targetBalance.toFixed(2)}`);
+        console.log(`   Progress: $${session2Progress.toFixed(2)} / $${sessionData.session2.profitTarget.toFixed(2)} (${session2ProgressPercent.toFixed(1)}%)`);
+        console.log(`   Status: ${sessionData.session2.completed ? '✅ COMPLETED' : '⏳ IN PROGRESS'}`);
+        
+        const totalProfit = session1Profit + session2Progress;
+        const totalStartBalance = sessionData.session1.startBalance;
+        const totalProfitPercent = (totalProfit / totalStartBalance) * 100;
+        console.log(`💰 Total Today: +$${totalProfit.toFixed(2)} (${totalProfitPercent.toFixed(1)}%)`);
+    }
+    
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+}
+
 function initializeDailyTarget() {
     const today = new Date().toDateString(); // e.g., "Mon Dec 16 2025"
     
     // Check if we have data and if it's from today
     if (!dailyTargetData || dailyTargetData.tradingDate !== today) {
         // NEW DAY - Calculate fresh targets only when date changes
-        const dailyTargetAmount = initialAccountBalance * 0.50; // 50% of initial capital
-        const dailyTargetCapital = parseFloat(initialAccountBalance) + dailyTargetAmount; // Initial + 50%
+        const dailyTargetAmount = initialAccountBalance * 0.20; // 20% of initial capital
+        const dailyTargetCapital = parseFloat(initialAccountBalance) + dailyTargetAmount; // Initial + 20%
         
         dailyTargetData = {
             tradingDate: today,
@@ -794,6 +1072,65 @@ function initializeDailyTarget() {
 function resetParams() {
     // Check and initialize daily target
     initializeDailyTarget();
+    
+    // 🕐 CHECK TRADING HOURS
+    const tradingHoursCheck = isWithinTradingHours();
+    if (!tradingHoursCheck.allowed) {
+        const now = new Date();
+        const currentHour = now.getHours();
+        let message = '';
+        
+        if (currentHour < TRADING_HOURS.morning.start) {
+            message = `⏰ Too early! Trading starts at ${TRADING_HOURS.morning.start} AM. Current time: ${now.toLocaleTimeString()}`;
+        } else if (currentHour >= TRADING_HOURS.morning.end && currentHour < TRADING_HOURS.afternoon.start) {
+            message = `☕ Lunch Break! Trading resumes at ${TRADING_HOURS.afternoon.start} PM (2 PM). Current time: ${now.toLocaleTimeString()}`;
+        } else {
+            message = `🌙 Trading closed! Trading hours: ${TRADING_HOURS.morning.start} AM - ${TRADING_HOURS.morning.end} PM, ${TRADING_HOURS.afternoon.start} PM - ${TRADING_HOURS.afternoon.end} PM. Current time: ${now.toLocaleTimeString()}`;
+        }
+        
+        console.log(message);
+        setFlashNotification(message, 0);
+        return false; // Prevent trading
+    }
+    
+    console.log(`✅ Trading hours OK - ${tradingHoursCheck.session} session (${new Date().toLocaleTimeString()})`);
+    
+    // 🎯 INITIALIZE SESSION SYSTEM
+    sessionData = initializeSessionData();
+    
+    // Check if in break period
+    const breakCheck = isInBreakPeriod();
+    if (breakCheck.inBreak) {
+        const message = `⏸️ Session Break! Resume trading in ${breakCheck.minutesLeft} minutes at ${breakCheck.breakEnd.toLocaleTimeString()}`;
+        console.log(message);
+        setFlashNotification(message, 0);
+        return false; // Prevent trading during break
+    }
+    
+    // Determine which session to start
+    if (!sessionData.session1.completed) {
+        // Start or continue session 1
+        if (sessionData.session1.startBalance === 0) {
+            startSession(1, updatedAccountBalance);
+        } else {
+            currentSession = 1;
+            console.log(`📊 Continuing Session 1 - Progress: $${updatedAccountBalance.toFixed(2)} / $${sessionData.session1.targetBalance.toFixed(2)}`);
+        }
+    } else if (sessionData.session1.completed && !sessionData.session2.completed) {
+        // Start or continue session 2
+        if (sessionData.session2.startBalance === 0) {
+            startSession(2, updatedAccountBalance);
+        } else {
+            currentSession = 2;
+            console.log(`📊 Continuing Session 2 - Progress: $${updatedAccountBalance.toFixed(2)} / $${sessionData.session2.targetBalance.toFixed(2)}`);
+        }
+    } else if (sessionData.session1.completed && sessionData.session2.completed) {
+        // Both sessions completed
+        const message = `🎉 Daily target already completed! Both sessions finished. Come back tomorrow!`;
+        console.log(message);
+        setFlashNotification(message, 0);
+        return false; // Prevent trading
+    }
     
     // Check if target already completed for today
     if (targetCompleted) {
@@ -1010,6 +1347,8 @@ function setInfo(contract, lastTradeProfit) {
     setAccountInfo("winCount", `${winTradeCount}`);
     setAccountInfo("lossCount", `${lossTradeCount}`);
 
+    // 🎯 LOG SESSION PROGRESS AFTER EACH TRADE
+    logSessionProgress();
 
     let updatedAccountBalanceDisplay = null;
     if (updatedAccountBalance > initialAccountBalance) {
