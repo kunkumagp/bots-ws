@@ -100,6 +100,9 @@ const TRADING_HOURS = {
     afternoon: { start: 14, end: 19 }  // 2 PM - 7 PM
 };
 
+// ☕ LUNCH BREAK TOGGLE (can be enabled/disabled by user)
+let lunchBreakEnabled = localStorage.getItem('lunchBreakEnabled') !== 'false'; // Default: ON
+
 let sessionData = JSON.parse(localStorage.getItem('sessionData') || 'null');
 let currentSession = 1; // 1 or 2
 let sessionBreakEndTime = null; 
@@ -784,6 +787,61 @@ function startWebSocket(){
 // scriptButton.addEventListener("click", runScript);
 // authenticateButton.addEventListener("click", getAuthentication);
 
+// 🗑️ CLEAR STORAGE BUTTON
+const clearStorageButton = document.getElementById("clearStorageButton");
+if (clearStorageButton) {
+    clearStorageButton.addEventListener("click", () => {
+        if (confirm('⚠️ Are you sure you want to clear all storage data?\n\nThis will reset:\n- Session data\n- Daily targets\n- Loss counters\n- Pattern detection\n\nThe page will reload after clearing.')) {
+            // Clear all localStorage items
+            localStorage.removeItem('dailyTargetData');
+            localStorage.removeItem('sessionData');
+            localStorage.removeItem('lostCountInRow');
+            localStorage.removeItem('totalLossInRow');
+            localStorage.removeItem('flipTradeStateFlag');
+            localStorage.removeItem('firstThreeTradesLossCount');
+            localStorage.removeItem('currentSessionTradeCount');
+            localStorage.removeItem('currentSessionLossCount');
+            
+            console.log('✅ All storage data cleared!');
+            alert('✅ Storage cleared successfully!\n\nPage will reload now.');
+            
+            // Reload page to reset everything
+            location.reload();
+        }
+    });
+}
+
+// ☕ LUNCH BREAK TOGGLE BUTTON
+const toggleLunchBreakButton = document.getElementById("toggleLunchBreakButton");
+const lunchBreakStatusSpan = document.getElementById("lunchBreakStatus");
+
+// Update button display on page load
+if (toggleLunchBreakButton && lunchBreakStatusSpan) {
+    lunchBreakStatusSpan.textContent = lunchBreakEnabled ? 'ON' : 'OFF';
+    toggleLunchBreakButton.className = lunchBreakEnabled ? 'btn btn-warning btn-block' : 'btn btn-success btn-block';
+    
+    toggleLunchBreakButton.addEventListener("click", () => {
+        // Toggle the state
+        lunchBreakEnabled = !lunchBreakEnabled;
+        
+        // Save to localStorage
+        localStorage.setItem('lunchBreakEnabled', lunchBreakEnabled.toString());
+        
+        // Update button display
+        lunchBreakStatusSpan.textContent = lunchBreakEnabled ? 'ON' : 'OFF';
+        toggleLunchBreakButton.className = lunchBreakEnabled ? 'btn btn-warning btn-block' : 'btn btn-success btn-block';
+        
+        // Show notification
+        if (lunchBreakEnabled) {
+            console.log('☕ Lunch break ENABLED - Bot will stop trading 12 PM - 2 PM');
+            setFlashNotification('☕ Lunch Break ON - Trading will pause 12 PM - 2 PM', 5);
+        } else {
+            console.log('✅ Lunch break DISABLED - Bot will trade continuously 7 AM - 7 PM');
+            setFlashNotification('✅ Lunch Break OFF - Continuous trading 7 AM - 7 PM', 5);
+        }
+    });
+}
+
 
 
 function reload() {
@@ -837,6 +895,15 @@ function isWithinTradingHours() {
     const now = new Date();
     const currentHour = now.getHours();
     
+    // If lunch break is DISABLED, allow continuous trading from 7 AM - 7 PM
+    if (!lunchBreakEnabled) {
+        if (currentHour >= TRADING_HOURS.morning.start && currentHour < TRADING_HOURS.afternoon.end) {
+            return { allowed: true, session: 'continuous' };
+        }
+        return { allowed: false, session: null };
+    }
+    
+    // If lunch break is ENABLED, enforce 12 PM - 2 PM break
     // Check if in morning session (7 AM - 12 PM)
     if (currentHour >= TRADING_HOURS.morning.start && currentHour < TRADING_HOURS.morning.end) {
         return { allowed: true, session: 'morning' };
@@ -1082,10 +1149,13 @@ function resetParams() {
         
         if (currentHour < TRADING_HOURS.morning.start) {
             message = `⏰ Too early! Trading starts at ${TRADING_HOURS.morning.start} AM. Current time: ${now.toLocaleTimeString()}`;
-        } else if (currentHour >= TRADING_HOURS.morning.end && currentHour < TRADING_HOURS.afternoon.start) {
+        } else if (lunchBreakEnabled && currentHour >= TRADING_HOURS.morning.end && currentHour < TRADING_HOURS.afternoon.start) {
             message = `☕ Lunch Break! Trading resumes at ${TRADING_HOURS.afternoon.start} PM (2 PM). Current time: ${now.toLocaleTimeString()}`;
         } else {
-            message = `🌙 Trading closed! Trading hours: ${TRADING_HOURS.morning.start} AM - ${TRADING_HOURS.morning.end} PM, ${TRADING_HOURS.afternoon.start} PM - ${TRADING_HOURS.afternoon.end} PM. Current time: ${now.toLocaleTimeString()}`;
+            const hoursMsg = lunchBreakEnabled 
+                ? `${TRADING_HOURS.morning.start} AM - ${TRADING_HOURS.morning.end} PM, ${TRADING_HOURS.afternoon.start} PM - ${TRADING_HOURS.afternoon.end} PM`
+                : `${TRADING_HOURS.morning.start} AM - ${TRADING_HOURS.afternoon.end} PM`;
+            message = `🌙 Trading closed! Trading hours: ${hoursMsg}. Current time: ${now.toLocaleTimeString()}`;
         }
         
         console.log(message);
@@ -1093,7 +1163,8 @@ function resetParams() {
         return false; // Prevent trading
     }
     
-    console.log(`✅ Trading hours OK - ${tradingHoursCheck.session} session (${new Date().toLocaleTimeString()})`);
+    const lunchStatus = lunchBreakEnabled ? 'Lunch break ON' : 'Lunch break OFF';
+    console.log(`✅ Trading hours OK - ${tradingHoursCheck.session} session (${new Date().toLocaleTimeString()}) - ${lunchStatus}`);
     
     // 🎯 INITIALIZE SESSION SYSTEM
     sessionData = initializeSessionData();
