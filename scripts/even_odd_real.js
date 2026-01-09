@@ -88,15 +88,15 @@ let targetCapital = 0;
 let targetCompleted = false; 
 
 // 🎯 TWO-SESSION TRADING SYSTEM
-const SESSION_1_PROFIT_PERCENTAGE = 10; // First session: 10% profit
-const SESSION_2_PROFIT_PERCENTAGE = 10; // Second session: 10% profit
-const TOTAL_DAILY_PROFIT_PERCENTAGE = 20; // Total: 20% daily
+const SESSION_1_PROFIT_PERCENTAGE = 5; // First session: 5% profit
+const SESSION_2_PROFIT_PERCENTAGE = 5; // Second session: 5% profit
+const TOTAL_DAILY_PROFIT_PERCENTAGE = 10; // Total: 10% daily
 const SESSION_BREAK_MIN_MINUTES = 30; // Minimum break between sessions
 const SESSION_BREAK_MAX_MINUTES = 60; // Maximum break between sessions
 
 // 🕐 TRADING HOURS (Avoid 12 PM - 2 PM)
 const TRADING_HOURS = {
-    morning: { start: 7, end: 12 },    // 7 AM - 12 PM
+    morning: { start: 6, end: 12 },    // 6 AM - 12 PM
     afternoon: { start: 14, end: 19 }  // 2 PM - 7 PM
 };
 
@@ -459,7 +459,10 @@ function startWebSocket(){
                             if (currentLossAmount < 0) {
                                 if(lostCountInRow >= 4){
                                     // Take a 10-minute rest after 3 consecutive losses
-                                    intervalTime = (getRandomNumber(5, 15) * getRandomNumber(50, 70) * 1000); // 10 minutes
+                                    // intervalTime = (getRandomNumber(30, 60) * getRandomNumber(90, 120) * 1000); // 10 minutes
+
+                                    intervalTime = (getRandomNumber(30, 60) * 1000);
+
                                     console.log('🛑 3 losses in a row detected - Taking 10-minute rest');
                                     setFlashNotification('⏸️ 3 losses in a row - Taking 10-minute rest', 15);
 
@@ -605,7 +608,29 @@ function startWebSocket(){
 
     const stakeChange = (status) => {
         if (status == "Loss") {
-            stake = stake * martingaleMultiplier;
+            // Check if there's accumulated loss to recover
+            const storedLoss = parseFloat(localStorage.getItem('totalLossInRow') || '0');
+            
+            if (storedLoss > 0) {
+                // Calculate stake needed to recover the total accumulated loss
+                // Assuming profit is approximately 95% of stake for even/odd trades
+                const profitPercentage = 0.95; // Adjust based on your payout ratio
+                const requiredStake = storedLoss / profitPercentage;
+                
+                stake = requiredStake;
+                
+                console.log(`💪 Recovery stake calculation:`);
+                console.log(`   Total loss to recover: $${storedLoss.toFixed(2)}`);
+                console.log(`   Required stake: $${requiredStake.toFixed(2)}`);
+            } else {
+                // No accumulated loss - use Martingale multiplier
+                stake = stake * martingaleMultiplier;
+            }
+            
+            // Ensure stake is at least the minimum
+            if (stake < 0.35) {
+                stake = 0.35;
+            }
             
             // Add small random variation to stake after loss (±1-5%) to avoid exact patterns
             if (humanizeStakes) {
@@ -614,7 +639,29 @@ function startWebSocket(){
                 console.log('Stake varied by:', ((variation - 1) * 100).toFixed(2) + '%');
             }
         } else if (status == "Win") {
-            stake = amountPutForTrading;
+            // Check if there's still loss to recover
+            const storedLoss = parseFloat(localStorage.getItem('totalLossInRow') || '0');
+            
+            if (storedLoss > 0) {
+                // Still have loss to recover - calculate next recovery stake
+                const profitPercentage = 0.95;
+                const requiredStake = storedLoss / profitPercentage;
+                
+                stake = requiredStake;
+                
+                console.log(`💪 Continuing recovery mode:`);
+                console.log(`   Remaining loss: $${storedLoss.toFixed(2)}`);
+                console.log(`   Next stake: $${requiredStake.toFixed(2)}`);
+                
+                // Ensure stake is at least the minimum
+                if (stake < 0.35) {
+                    stake = 0.35;
+                }
+            } else {
+                // Fully recovered - reset to normal stake
+                stake = amountPutForTrading;
+                console.log('✅ Recovery complete - Reset to normal stake');
+            }
             
             // Add tiny variation to base stake on wins too (±1-3%)
             if (humanizeStakes) {
@@ -1102,8 +1149,8 @@ function initializeDailyTarget() {
     // Check if we have data and if it's from today
     if (!dailyTargetData || dailyTargetData.tradingDate !== today) {
         // NEW DAY - Calculate fresh targets only when date changes
-        const dailyTargetAmount = initialAccountBalance * 0.20; // 20% of initial capital
-        const dailyTargetCapital = parseFloat(initialAccountBalance) + dailyTargetAmount; // Initial + 20%
+        const dailyTargetAmount = initialAccountBalance * 0.10; // 10% of initial capital
+        const dailyTargetCapital = parseFloat(initialAccountBalance) + dailyTargetAmount; // Initial + 10%
         
         dailyTargetData = {
             tradingDate: today,
@@ -1118,7 +1165,7 @@ function initializeDailyTarget() {
         console.log('📅 ✨ NEW TRADING DAY - Fresh targets calculated:');
         console.log(`   Date: ${today}`);
         console.log(`   Initial Capital: $${initialAccountBalance}`);
-        console.log(`   Target Amount: $${dailyTargetAmount.toFixed(2)} (50%)`);
+        console.log(`   Target Amount: $${dailyTargetAmount.toFixed(2)} (10%)`);
         console.log(`   Target Capital: $${dailyTargetCapital.toFixed(2)}`);
         console.log(`   Status: New day initialized`);
         
@@ -1196,11 +1243,30 @@ function resetParams() {
             console.log(`📊 Continuing Session 2 - Progress: $${updatedAccountBalance.toFixed(2)} / $${sessionData.session2.targetBalance.toFixed(2)}`);
         }
     } else if (sessionData.session1.completed && sessionData.session2.completed) {
-        // Both sessions completed
-        const message = `🎉 Daily target already completed! Both sessions finished. Come back tomorrow!`;
-        console.log(message);
-        setFlashNotification(message, 0);
-        return false; // Prevent trading
+        // 🔍 SAFETY CHECK: Verify if sessions are actually completed
+        // Check if current balance actually reached the session 2 target
+        if (sessionData.session2.targetBalance > 0 && updatedAccountBalance >= sessionData.session2.targetBalance) {
+            // Both sessions completed AND verified
+            const message = `🎉 Daily target already completed! Both sessions finished. Come back tomorrow!`;
+            console.log(message);
+            setFlashNotification(message, 0);
+            return false; // Prevent trading
+        } else {
+            // Sessions marked complete but balance doesn't match - RESET SESSION 2
+            console.log('⚠️ WARNING: Session 2 marked complete but balance not reached!');
+            console.log(`   Current Balance: $${updatedAccountBalance.toFixed(2)}`);
+            console.log(`   Session 2 Target: $${sessionData.session2.targetBalance.toFixed(2)}`);
+            console.log('   🔄 Resetting Session 2 to continue trading...');
+            
+            sessionData.session2.completed = false;
+            sessionData.currentSession = 2;
+            currentSession = 2;
+            
+            localStorage.setItem('sessionData', JSON.stringify(sessionData));
+            
+            setFlashNotification('⚠️ Session data corrected - Continuing Session 2', 5);
+            console.log(`📊 Continuing Session 2 - Progress: $${updatedAccountBalance.toFixed(2)} / $${sessionData.session2.targetBalance.toFixed(2)}`);
+        }
     }
     
     // Check if target already completed for today
