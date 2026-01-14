@@ -50,6 +50,7 @@ let isRunning = false, intervalId;
 let pingIntervalId;
 let targetPercentage = 0.3;
 let amountPercentage = 0.35;
+// let amountPercentage = 1;
 let historyTickCount = 1000;
 // let leavingAmount = 400;
 let leavingAmount = 0;
@@ -97,7 +98,7 @@ const SESSION_BREAK_MAX_MINUTES = 60; // Maximum break between sessions
 // 🕐 TRADING HOURS (Avoid 12 PM - 2 PM)
 const TRADING_HOURS = {
     morning: { start: 6, end: 12 },    // 6 AM - 12 PM
-    afternoon: { start: 14, end: 19 }  // 2 PM - 7 PM
+    afternoon: { start: 14, end: 20 }  // 2 PM - 8 PM
 };
 
 // ☕ LUNCH BREAK TOGGLE (can be enabled/disabled by user)
@@ -448,23 +449,25 @@ function startWebSocket(){
                             let intervalTime;
                             let newMarket;
                             
-                            // Stop trading after 5 losses in a row
-                            if (lostCountInRow >= 5) {
-                                setFlashNotification("Trading stopped: 5 losses in a row reached", 0);
-                                console.log('Trading stopped: 5 losses in a row');
+                            // Stop trading after 6 losses in a row
+                            if (lostCountInRow >= 6) {
+                                setFlashNotification("Trading stopped: 6 losses in a row reached", 0);
+                                console.log('Trading stopped: 6 losses in a row');
                                 isRunning = false;
                                 return;
                             }
                             
                             if (currentLossAmount < 0) {
-                                if(lostCountInRow >= 4){
+                                if(lostCountInRow >= 5){
                                     // Take a 10-minute rest after 3 consecutive losses
+                                    // intervalTime = (getRandomNumber(30, 60) * getRandomNumber(90, 120) * 1000); // 10 minutes
+                                    intervalTime = (getRandomNumber(120, 300) * 1000);
+
+
+                                } else if(lostCountInRow >= 4){
                                     // intervalTime = (getRandomNumber(30, 60) * getRandomNumber(90, 120) * 1000); // 10 minutes
 
                                     intervalTime = (getRandomNumber(30, 60) * 1000);
-
-                                    console.log('🛑 3 losses in a row detected - Taking 10-minute rest');
-                                    setFlashNotification('⏸️ 3 losses in a row - Taking 10-minute rest', 15);
 
                                 } else if(lostCountInRow >= 3){
                                     // More variation: 5-45 seconds
@@ -518,11 +521,37 @@ function startWebSocket(){
                                 
                                 if (sessionCompleted) {
                                     if (sessionData.currentSession === 1 && sessionData.session1.completed) {
-                                        // Session 1 completed - take break
+                                        // Session 1 completed - take break then auto-reload
                                         console.log('🎯 Session 1 target reached! Taking break...');
                                         setFlashNotification('✅ Session 1 Complete! Bot will stop for break.', 0);
                                         isRunning = false;
                                         weClose();
+                                        
+                                        // Show countdown timer and auto-reload after break
+                                        const breakEndTime = new Date(sessionData.breakEndTime);
+                                        const breakDuration = Math.ceil((breakEndTime - new Date()) / 1000);
+                                        
+                                        let breakTimer = setInterval(() => {
+                                            const now = new Date();
+                                            const secondsLeft = Math.ceil((breakEndTime - now) / 1000);
+                                            
+                                            if (secondsLeft <= 0) {
+                                                clearInterval(breakTimer);
+                                                setFlashNotification('⏰ Break ended - Reloading...', 2);
+                                            } else {
+                                                const minutes = Math.floor(secondsLeft / 60);
+                                                const seconds = secondsLeft % 60;
+                                                setFlashNotification(`⏸️ Break: ${minutes}:${seconds.toString().padStart(2, '0')} remaining. Session 2 starts soon...`, 0);
+                                            }
+                                        }, 1000);
+                                        
+                                        // Schedule automatic reload after break
+                                        setTimeout(() => {
+                                            clearInterval(breakTimer);
+                                            console.log('⏰ Break ended - Reloading page to start Session 2...');
+                                            reload();
+                                        }, breakDuration * 1000 + 2000); // Break time + 2 seconds buffer
+                                        
                                         return;
                                     } else if (sessionData.currentSession === 2 && sessionData.session2.completed) {
                                         // Session 2 completed - daily target achieved
@@ -533,8 +562,7 @@ function startWebSocket(){
                                         return;
                                     }
                                 }
-                                
-                                // Legacy daily target check (backup)
+
                                 if (dailyTargetData && updatedAccountBalance >= dailyTargetData.targetCapital) {
                                     dailyTargetData.targetCompleted = true;
                                     targetCompleted = true;
@@ -1088,7 +1116,7 @@ function checkSessionCompletion(currentBalance) {
 
 // 🕐 CHECK IF IN BREAK PERIOD
 function isInBreakPeriod() {
-    if (!sessionData || !sessionData.breakEndTime) return false;
+    if (!sessionData || !sessionData.breakEndTime) return { inBreak: false };
     
     const now = new Date();
     const breakEnd = new Date(sessionData.breakEndTime);
@@ -1106,37 +1134,41 @@ function logSessionProgress() {
     if (!sessionData) return;
     
     const currentSessionNum = sessionData.currentSession;
+    const currentSession = currentSessionNum === 1 ? sessionData.session1 : sessionData.session2;
     
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('🎯 SESSION PROGRESS UPDATE');
     console.log(`📅 Date: ${sessionData.tradingDate}`);
+    console.log(`📊 SESSION ${currentSessionNum}/2 (Target: ${currentSessionNum === 1 ? SESSION_1_PROFIT_PERCENTAGE : SESSION_2_PROFIT_PERCENTAGE}%)`);
     
-    if (currentSessionNum === 1) {
-        const progress = updatedAccountBalance - sessionData.session1.startBalance;
-        const progressPercent = (progress / sessionData.session1.profitTarget) * 100;
+    if (currentSession) {
+        const progress = updatedAccountBalance - currentSession.startBalance;
+        const progressPercent = (progress / currentSession.profitTarget) * 100;
         
-        console.log(`📊 SESSION 1 (Target: ${SESSION_1_PROFIT_PERCENTAGE}%)`);
-        console.log(`   Start Balance: $${sessionData.session1.startBalance.toFixed(2)}`);
+        console.log(`   Start Balance: $${currentSession.startBalance.toFixed(2)}`);
         console.log(`   Current Balance: $${updatedAccountBalance.toFixed(2)}`);
-        console.log(`   Target Balance: $${sessionData.session1.targetBalance.toFixed(2)}`);
-        console.log(`   Progress: $${progress.toFixed(2)} / $${sessionData.session1.profitTarget.toFixed(2)} (${progressPercent.toFixed(1)}%)`);
-        console.log(`   Status: ${sessionData.session1.completed ? '✅ COMPLETED' : '⏳ IN PROGRESS'}`);
-    } else if (currentSessionNum === 2) {
-        const session1Profit = sessionData.session1.targetBalance - sessionData.session1.startBalance;
-        const session2Progress = updatedAccountBalance - sessionData.session2.startBalance;
-        const session2ProgressPercent = (session2Progress / sessionData.session2.profitTarget) * 100;
-        
-        console.log(`📊 SESSION 1: ✅ COMPLETED (+$${session1Profit.toFixed(2)})`);
-        console.log(`📊 SESSION 2 (Target: ${SESSION_2_PROFIT_PERCENTAGE}%)`);
-        console.log(`   Start Balance: $${sessionData.session2.startBalance.toFixed(2)}`);
-        console.log(`   Current Balance: $${updatedAccountBalance.toFixed(2)}`);
-        console.log(`   Target Balance: $${sessionData.session2.targetBalance.toFixed(2)}`);
-        console.log(`   Progress: $${session2Progress.toFixed(2)} / $${sessionData.session2.profitTarget.toFixed(2)} (${session2ProgressPercent.toFixed(1)}%)`);
-        console.log(`   Status: ${sessionData.session2.completed ? '✅ COMPLETED' : '⏳ IN PROGRESS'}`);
-        
-        const totalProfit = session1Profit + session2Progress;
-        const totalStartBalance = sessionData.session1.startBalance;
-        const totalProfitPercent = (totalProfit / totalStartBalance) * 100;
+        console.log(`   Target Balance: $${currentSession.targetBalance.toFixed(2)}`);
+        console.log(`   Progress: $${progress.toFixed(2)} / $${currentSession.profitTarget.toFixed(2)} (${progressPercent.toFixed(1)}%)`);
+        console.log(`   Status: ${currentSession.completed ? '✅ COMPLETED' : '⏳ IN PROGRESS'}`);
+    }
+    
+    // Show completed sessions
+    let completedCount = 0;
+    if (sessionData.session1.completed) {
+        completedCount++;
+        const profit = sessionData.session1.targetBalance - sessionData.session1.startBalance;
+        console.log(`✅ Session 1 Completed: +$${profit.toFixed(2)}`);
+    }
+    if (sessionData.session2.completed) {
+        completedCount++;
+        const profit = sessionData.session2.targetBalance - sessionData.session2.startBalance;
+        console.log(`✅ Session 2 Completed: +$${profit.toFixed(2)}`);
+    }
+    
+    // Calculate total progress
+    if (sessionData.session1.startBalance > 0) {
+        const totalProfit = updatedAccountBalance - sessionData.session1.startBalance;
+        const totalProfitPercent = (totalProfit / sessionData.session1.startBalance) * 100;
         console.log(`💰 Total Today: +$${totalProfit.toFixed(2)} (${totalProfitPercent.toFixed(1)}%)`);
     }
     
