@@ -49,8 +49,8 @@ let probabilisticBehavior = true; // Add probabilistic decisions
 let isRunning = false, intervalId;
 let pingIntervalId;
 let targetPercentage = 0.3;
-let amountPercentage = 0.35;
-// let amountPercentage = 1;
+// let amountPercentage = 0.35;
+let amountPercentage = 0.1;
 let historyTickCount = 1000;
 // let leavingAmount = 400;
 let leavingAmount = 0;
@@ -83,17 +83,21 @@ let currentSessionTradeCount = parseInt(localStorage.getItem('currentSessionTrad
 let currentSessionLossCount = parseInt(localStorage.getItem('currentSessionLossCount') || '0'); 
 let flipTradeStateFlag = (localStorage.getItem('flipTradeStateFlag') === 'true');
 
+// 🎯 ADVANCED ANALYSIS MODE for consecutive losses
+let advancedAnalysisMode = false; // Activated after 2 losses
+let superAdvancedAnalysisMode = false; // Activated after 3 losses
+let waitingForPattern = false; // Flag to indicate we're monitoring for pattern
+
 // Daily target tracking
 let dailyTargetData = JSON.parse(localStorage.getItem('dailyTargetData') || 'null');
 let targetCapital = 0;
 let targetCompleted = false; 
 
-// 🎯 TWO-SESSION TRADING SYSTEM
-const SESSION_1_PROFIT_PERCENTAGE = 5; // First session: 5% profit
-const SESSION_2_PROFIT_PERCENTAGE = 5; // Second session: 5% profit
-const TOTAL_DAILY_PROFIT_PERCENTAGE = 10; // Total: 10% daily
-const SESSION_BREAK_MIN_MINUTES = 30; // Minimum break between sessions
-const SESSION_BREAK_MAX_MINUTES = 60; // Maximum break between sessions
+// 🎯 FIVE-SESSION TRADING SYSTEM (2% each = 10% daily)
+const SESSION_PROFIT_PERCENTAGE = 2; // Each session: 2% profit
+const TOTAL_SESSIONS = 5; // 5 sessions per day
+const TOTAL_DAILY_PROFIT_PERCENTAGE = 10; // Total: 10% daily (2% × 5)
+const SESSION_BREAK_MINUTES = 10; // 10 minutes break between sessions
 
 // 🕐 TRADING HOURS (Avoid 12 PM - 2 PM)
 const TRADING_HOURS = {
@@ -233,9 +237,65 @@ function startWebSocket(){
                 const priceList = wsResponse.history.prices;
                 const lastDigits = priceList.map(p => Number(String(p).slice(-1)));
 
-                // console.log('Price List: ', priceList);
-                // console.log('Last 500 ticks last digits: ', lastDigits);
+                // 🎯 ADVANCED ANALYSIS MODE (2 losses) - Wait for 4 consecutive even/odd
+                if (advancedAnalysisMode && !waitingForPattern) {
+                    console.log('🔍 ADVANCED ANALYSIS: Checking last 4 digits...');
+                    const pattern = checkConsecutivePattern(lastDigits, 4);
+                    
+                    if (pattern) {
+                        // Found 4 consecutive! Trade opposite immediately with 1 tick
+                        const tradeAction = pattern === 'even' ? 'odd' : 'even';
+                        tradeType = tradeAction;
+                        console.log(`✅ 4 consecutive ${pattern} found! Trading ${tradeAction.toUpperCase()} with 1 tick`);
+                        setFlashNotification(`4 ${pattern} detected! Trading ${tradeAction} NOW`, 5);
+                        runScript();
+                        return;
+                    } else {
+                        // Not found in history, subscribe to live ticks
+                        console.log('🔍 Pattern not in history, subscribing to live ticks...');
+                        waitingForPattern = true;
+                        setFlashNotification('Monitoring live ticks for 4 consecutive pattern...', 0);
+                        
+                        subscribeToLiveTicks(market, 4, (tradeAction) => {
+                            tradeType = tradeAction;
+                            waitingForPattern = false;
+                            advancedAnalysisMode = false; // Used once
+                            runScript();
+                        });
+                        return;
+                    }
+                }
+                
+                // 🎯🎯 SUPER ADVANCED ANALYSIS MODE (3 losses) - Wait for 5 consecutive even/odd
+                if (superAdvancedAnalysisMode && !waitingForPattern) {
+                    console.log('🔍🔍 SUPER ADVANCED ANALYSIS: Checking last 5 digits...');
+                    const pattern = checkConsecutivePattern(lastDigits, 5);
+                    
+                    if (pattern) {
+                        // Found 5 consecutive! Trade opposite immediately with 1 tick
+                        const tradeAction = pattern === 'even' ? 'odd' : 'even';
+                        tradeType = tradeAction;
+                        console.log(`✅✅ 5 consecutive ${pattern} found! Trading ${tradeAction.toUpperCase()} with 1 tick`);
+                        setFlashNotification(`5 ${pattern} detected! Trading ${tradeAction} NOW`, 5);
+                        runScript();
+                        return;
+                    } else {
+                        // Not found in history, subscribe to live ticks
+                        console.log('🔍🔍 Pattern not in history, subscribing to live ticks...');
+                        waitingForPattern = true;
+                        setFlashNotification('Monitoring live ticks for 5 consecutive pattern...', 0);
+                        
+                        subscribeToLiveTicks(market, 5, (tradeAction) => {
+                            tradeType = tradeAction;
+                            waitingForPattern = false;
+                            superAdvancedAnalysisMode = false; // Used once
+                            runScript();
+                        });
+                        return;
+                    }
+                }
 
+                // 📊 NORMAL MODE - Use prediction algorithm
                 const newProbabilities = predictNextParity(lastDigits);
                 const number = parseFloat(newProbabilities.confidence.replace('%', '')) / 100;
                 console.log('Predicted Probabilities: ', newProbabilities);
@@ -352,6 +412,22 @@ function startWebSocket(){
                                 currentSessionLossCount++;
                                 localStorage.setItem('currentSessionLossCount', currentSessionLossCount.toString());
                                 
+                                // 🎯 ACTIVATE ADVANCED ANALYSIS MODES
+                                if (lostCountInRow === 2) {
+                                    advancedAnalysisMode = true;
+                                    superAdvancedAnalysisMode = false;
+                                    console.log('🔍 ADVANCED ANALYSIS MODE ACTIVATED (2 losses) - Waiting for 4 consecutive even/odd');
+                                    setFlashNotification('⚠️ Advanced Analysis Mode: Waiting for 4 consecutive pattern', 8);
+                                } else if (lostCountInRow === 3) {
+                                    advancedAnalysisMode = false;
+                                    superAdvancedAnalysisMode = true;
+                                    console.log('🔍🔍 SUPER ADVANCED ANALYSIS MODE ACTIVATED (3 losses) - Waiting for 5 consecutive even/odd');
+                                    setFlashNotification('⚠️⚠️ Super Advanced Mode: Waiting for 5 consecutive pattern', 8);
+                                } else if (lostCountInRow === 4) {
+                                    console.log('⚠️⚠️⚠️ 4 CONSECUTIVE LOSSES - One more loss will stop the bot!');
+                                    setFlashNotification('⚠️ WARNING: 4 losses! Bot will stop after 5th loss', 10);
+                                }
+                                
                                 // Store total loss amount in localStorage
                                 let storedLoss = parseFloat(localStorage.getItem('totalLossInRow') || '0');
                                 storedLoss += Math.abs(profit);
@@ -397,6 +473,12 @@ function startWebSocket(){
                                 lostCountInRow = 0;
                                 localStorage.removeItem('lostCountInRow');
                                 console.log('Win! Loss counter reset');
+                                
+                                // 🎯 RESET ADVANCED ANALYSIS MODES
+                                advancedAnalysisMode = false;
+                                superAdvancedAnalysisMode = false;
+                                waitingForPattern = false;
+                                console.log('✅ Advanced analysis modes reset');
                                 
                                 // Reset pattern detection on any win
                                 if (flipTradeStateFlag) {
@@ -449,11 +531,16 @@ function startWebSocket(){
                             let intervalTime;
                             let newMarket;
                             
-                            // Stop trading after 6 losses in a row
-                            if (lostCountInRow >= 6) {
-                                setFlashNotification("Trading stopped: 6 losses in a row reached", 0);
-                                console.log('Trading stopped: 6 losses in a row');
+                            // 🛑 STOP TRADING AFTER 5 LOSSES IN A ROW
+                            if (lostCountInRow >= 5) {
+                                setFlashNotification("🛑 TRADING STOPPED: 5 consecutive losses reached", 0);
+                                console.log('🛑 Trading stopped: 5 losses in a row - Safety limit reached');
                                 isRunning = false;
+                                
+                                // Reset advanced analysis modes
+                                advancedAnalysisMode = false;
+                                superAdvancedAnalysisMode = false;
+                                waitingForPattern = false;
                                 return;
                             }
                             
@@ -520,17 +607,25 @@ function startWebSocket(){
                                 const sessionCompleted = checkSessionCompletion(updatedAccountBalance);
                                 
                                 if (sessionCompleted) {
-                                    if (sessionData.currentSession === 1 && sessionData.session1.completed) {
-                                        // Session 1 completed - take break then auto-reload
-                                        console.log('🎯 Session 1 target reached! Taking break...');
-                                        setFlashNotification('✅ Session 1 Complete! Bot will stop for break.', 0);
+                                    const currentSessionNum = sessionData.currentSession;
+                                    const currentSession = sessionData.sessions[currentSessionNum - 1];
+                                    
+                                    if (currentSessionNum === TOTAL_SESSIONS && currentSession.completed) {
+                                        // Final session completed - daily target achieved
+                                        console.log('� Final session target reached! Daily target achieved!');
+                                        setFlashNotification('🎉 Daily Target Complete! Trading stopped.', 0);
+                                        isRunning = false;
+                                        weClose();
+                                        return;
+                                    } else if (currentSession.completed) {
+                                        // Session completed - take break before next session
+                                        console.log(`🎯 Session ${currentSessionNum} target reached! Taking ${SESSION_BREAK_MINUTES}-minute break...`);
+                                        setFlashNotification(`✅ Session ${currentSessionNum}/${TOTAL_SESSIONS} Complete! Bot will stop for ${SESSION_BREAK_MINUTES}-min break.`, 0);
                                         isRunning = false;
                                         weClose();
                                         
-                                        // Show countdown timer and auto-reload after break
+                                        // Show countdown timer for break
                                         const breakEndTime = new Date(sessionData.breakEndTime);
-                                        const breakDuration = Math.ceil((breakEndTime - new Date()) / 1000);
-                                        
                                         let breakTimer = setInterval(() => {
                                             const now = new Date();
                                             const secondsLeft = Math.ceil((breakEndTime - now) / 1000);
@@ -541,24 +636,17 @@ function startWebSocket(){
                                             } else {
                                                 const minutes = Math.floor(secondsLeft / 60);
                                                 const seconds = secondsLeft % 60;
-                                                setFlashNotification(`⏸️ Break: ${minutes}:${seconds.toString().padStart(2, '0')} remaining. Session 2 starts soon...`, 0);
+                                                setFlashNotification(`⏸️ Break: ${minutes}:${seconds.toString().padStart(2, '0')} remaining. Session ${currentSessionNum + 1} starts soon...`, 0);
                                             }
                                         }, 1000);
                                         
-                                        // Schedule automatic reload after break
+                                        // Schedule automatic resume after break
                                         setTimeout(() => {
                                             clearInterval(breakTimer);
-                                            console.log('⏰ Break ended - Reloading page to start Session 2...');
+                                            console.log('⏰ Break ended - Reloading page to start next session...');
                                             reload();
-                                        }, breakDuration * 1000 + 2000); // Break time + 2 seconds buffer
+                                        }, (SESSION_BREAK_MINUTES * 60 * 1000) + 2000); // Break time + 2 seconds buffer
                                         
-                                        return;
-                                    } else if (sessionData.currentSession === 2 && sessionData.session2.completed) {
-                                        // Session 2 completed - daily target achieved
-                                        console.log('🎉 Session 2 target reached! Daily target achieved!');
-                                        setFlashNotification('🎉 Daily Target Complete! Trading stopped.', 0);
-                                        isRunning = false;
-                                        weClose();
                                         return;
                                     }
                                 }
@@ -858,6 +946,91 @@ function startWebSocket(){
     };
 }
 
+// 🎯 ADVANCED ANALYSIS HELPERS
+// Check if last N digits are all even or all odd
+function checkConsecutivePattern(digits, count) {
+    if (!digits || digits.length < count) return null;
+    
+    const lastNDigits = digits.slice(-count);
+    const allEven = lastNDigits.every(d => d % 2 === 0);
+    const allOdd = lastNDigits.every(d => d % 2 !== 0);
+    
+    if (allEven) {
+        console.log(`🎯 PATTERN DETECTED: Last ${count} digits are ALL EVEN:`, lastNDigits);
+        return 'even';
+    } else if (allOdd) {
+        console.log(`🎯 PATTERN DETECTED: Last ${count} digits are ALL ODD:`, lastNDigits);
+        return 'odd';
+    }
+    
+    return null;
+}
+
+// Subscribe to live ticks to monitor for patterns
+function subscribeToLiveTicks(symbol, requiredCount, onPatternDetected) {
+    console.log(`📊 Subscribing to live ticks, waiting for ${requiredCount} consecutive even/odd...`);
+    
+    const recentDigits = [];
+    let tickSubscriptionId = null;
+    
+    const tickSubscription = {
+        ticks: symbol,
+        subscribe: 1
+    };
+    
+    ws.send(JSON.stringify(tickSubscription));
+    
+    // Store the subscription handler
+    const originalOnMessage = ws.onmessage;
+    
+    ws.onmessage = function(event) {
+        const wsResponse = JSON.parse(event.data);
+        
+        // Handle tick updates
+        if (wsResponse.msg_type === 'tick' && wsResponse.tick) {
+            const price = wsResponse.tick.quote;
+            const lastDigit = Number(String(price).slice(-1));
+            recentDigits.push(lastDigit);
+            
+            // Keep only the last N digits we need
+            if (recentDigits.length > requiredCount) {
+                recentDigits.shift();
+            }
+            
+            console.log(`📊 Monitoring tick: ${price} (digit: ${lastDigit}), Recent: [${recentDigits.join(', ')}]`);
+            
+            // Check if we have enough digits
+            if (recentDigits.length >= requiredCount) {
+                const pattern = checkConsecutivePattern(recentDigits, requiredCount);
+                
+                if (pattern) {
+                    // Pattern found! Unsubscribe and execute trade
+                    tickSubscriptionId = wsResponse.tick.id;
+                    
+                    const unsubscribe = {
+                        forget: tickSubscriptionId
+                    };
+                    ws.send(JSON.stringify(unsubscribe));
+                    
+                    // Restore original message handler
+                    ws.onmessage = originalOnMessage;
+                    
+                    // Execute callback with opposite trade
+                    const tradeAction = pattern === 'even' ? 'odd' : 'even';
+                    console.log(`✅ Pattern complete! Trading ${tradeAction.toUpperCase()}`);
+                    setFlashNotification(`Pattern detected: ${requiredCount} ${pattern} digits. Trading ${tradeAction}!`, 5);
+                    
+                    onPatternDetected(tradeAction);
+                    return;
+                }
+            }
+        }
+        
+        // Pass through all other messages to original handler
+        originalOnMessage.call(ws, event);
+    };
+}
+
 
 // scriptButton.addEventListener("click", runScript);
 // authenticateButton.addEventListener("click", getAuthentication);
@@ -934,6 +1107,11 @@ function reserParams() {
     currentSessionLossCount = 0;
     flipTradeStateFlag = false;
     
+    // 🎯 Reset advanced analysis modes
+    advancedAnalysisMode = false;
+    superAdvancedAnalysisMode = false;
+    waitingForPattern = false;
+    
     // Clear all localStorage including pattern detection
     localStorage.removeItem('totalLossInRow');
     localStorage.removeItem('lostCountInRow');
@@ -1001,23 +1179,24 @@ function initializeSessionData() {
     if (!sessionData || sessionData.tradingDate !== today) {
         sessionData = {
             tradingDate: today,
-            session1: {
-                completed: false,
-                startBalance: 0,
-                targetBalance: 0,
-                profitTarget: 0
-            },
-            session2: {
-                completed: false,
-                startBalance: 0,
-                targetBalance: 0,
-                profitTarget: 0
-            },
+            sessions: [],
             breakEndTime: null,
             currentSession: 1
         };
+        
+        // Create 5 sessions with 2% target each
+        for (let i = 1; i <= TOTAL_SESSIONS; i++) {
+            sessionData.sessions.push({
+                sessionNumber: i,
+                completed: false,
+                startBalance: 0,
+                targetBalance: 0,
+                profitTarget: 0
+            });
+        }
+        
         localStorage.setItem('sessionData', JSON.stringify(sessionData));
-        console.log('📅 ✨ NEW SESSION DATA - Fresh session targets created');
+        console.log('📅 ✨ NEW SESSION DATA - 5 sessions created (2% each)');
     } else {
         console.log('📅 Continuing with existing session data from today');
     }
@@ -1029,31 +1208,20 @@ function initializeSessionData() {
 function startSession(sessionNumber, currentBalance) {
     sessionData = initializeSessionData();
     
-    if (sessionNumber === 1) {
-        sessionData.session1.startBalance = currentBalance;
-        sessionData.session1.profitTarget = currentBalance * (SESSION_1_PROFIT_PERCENTAGE / 100);
-        sessionData.session1.targetBalance = currentBalance + sessionData.session1.profitTarget;
-        sessionData.currentSession = 1;
+    if (sessionNumber >= 1 && sessionNumber <= TOTAL_SESSIONS) {
+        const session = sessionData.sessions[sessionNumber - 1];
         
-        console.log(`🎯 SESSION 1 STARTED`);
+        session.startBalance = currentBalance;
+        session.profitTarget = currentBalance * (SESSION_PROFIT_PERCENTAGE / 100);
+        session.targetBalance = currentBalance + session.profitTarget;
+        sessionData.currentSession = sessionNumber;
+        
+        console.log(`🎯 SESSION ${sessionNumber}/${TOTAL_SESSIONS} STARTED`);
         console.log(`   Start Balance: $${currentBalance.toFixed(2)}`);
-        console.log(`   Profit Target: $${sessionData.session1.profitTarget.toFixed(2)} (${SESSION_1_PROFIT_PERCENTAGE}%)`);
-        console.log(`   Target Balance: $${sessionData.session1.targetBalance.toFixed(2)}`);
+        console.log(`   Profit Target: $${session.profitTarget.toFixed(2)} (${SESSION_PROFIT_PERCENTAGE}%)`);
+        console.log(`   Target Balance: $${session.targetBalance.toFixed(2)}`);
         
-        setFlashNotification(`🎯 Session 1 Started - Target: ${SESSION_1_PROFIT_PERCENTAGE}% ($${sessionData.session1.profitTarget.toFixed(2)})`, 10);
-        
-    } else if (sessionNumber === 2) {
-        sessionData.session2.startBalance = currentBalance;
-        sessionData.session2.profitTarget = currentBalance * (SESSION_2_PROFIT_PERCENTAGE / 100);
-        sessionData.session2.targetBalance = currentBalance + sessionData.session2.profitTarget;
-        sessionData.currentSession = 2;
-        
-        console.log(`🎯 SESSION 2 STARTED`);
-        console.log(`   Start Balance: $${currentBalance.toFixed(2)}`);
-        console.log(`   Profit Target: $${sessionData.session2.profitTarget.toFixed(2)} (${SESSION_2_PROFIT_PERCENTAGE}%)`);
-        console.log(`   Target Balance: $${sessionData.session2.targetBalance.toFixed(2)}`);
-        
-        setFlashNotification(`🎯 Session 2 Started - Target: ${SESSION_2_PROFIT_PERCENTAGE}% ($${sessionData.session2.profitTarget.toFixed(2)})`, 10);
+        setFlashNotification(`🎯 Session ${sessionNumber}/${TOTAL_SESSIONS} Started - Target: ${SESSION_PROFIT_PERCENTAGE}% ($${session.profitTarget.toFixed(2)})`, 10);
     }
     
     localStorage.setItem('sessionData', JSON.stringify(sessionData));
@@ -1061,53 +1229,50 @@ function startSession(sessionNumber, currentBalance) {
 
 // 🎯 CHECK SESSION COMPLETION
 function checkSessionCompletion(currentBalance) {
-    if (!sessionData) return false;
+    if (!sessionData || !sessionData.sessions) return false;
     
     const currentSessionNum = sessionData.currentSession;
+    const currentSession = sessionData.sessions[currentSessionNum - 1];
     
-    if (currentSessionNum === 1 && !sessionData.session1.completed) {
-        // Check if session 1 target reached
-        if (currentBalance >= sessionData.session1.targetBalance) {
-            sessionData.session1.completed = true;
+    if (currentSession && !currentSession.completed) {
+        // Check if current session target reached
+        if (currentBalance >= currentSession.targetBalance) {
+            currentSession.completed = true;
             
-            // Schedule break (30-60 minutes)
-            const breakMinutes = Math.floor(Math.random() * (SESSION_BREAK_MAX_MINUTES - SESSION_BREAK_MIN_MINUTES + 1)) + SESSION_BREAK_MIN_MINUTES;
-            const breakEndTime = new Date(Date.now() + breakMinutes * 60 * 1000);
-            sessionData.breakEndTime = breakEndTime.toISOString();
-            
-            localStorage.setItem('sessionData', JSON.stringify(sessionData));
-            
-            console.log(`✅ SESSION 1 COMPLETED!`);
-            console.log(`   Target: $${sessionData.session1.targetBalance.toFixed(2)}`);
-            console.log(`   Achieved: $${currentBalance.toFixed(2)}`);
-            console.log(`   Profit: $${(currentBalance - sessionData.session1.startBalance).toFixed(2)}`);
-            console.log(`⏸️ BREAK TIME: ${breakMinutes} minutes`);
-            console.log(`   Resume at: ${breakEndTime.toLocaleTimeString()}`);
-            
-            setFlashNotification(`✅ Session 1 Complete! Break for ${breakMinutes} min. Resume at ${breakEndTime.toLocaleTimeString()}`, 0);
-            
-            return true;
-        }
-    } else if (currentSessionNum === 2 && !sessionData.session2.completed) {
-        // Check if session 2 target reached (FINAL TARGET)
-        if (currentBalance >= sessionData.session2.targetBalance) {
-            sessionData.session2.completed = true;
-            localStorage.setItem('sessionData', JSON.stringify(sessionData));
-            
-            const totalProfit = currentBalance - sessionData.session1.startBalance;
-            const profitPercentage = (totalProfit / sessionData.session1.startBalance) * 100;
-            
-            console.log(`✅ SESSION 2 COMPLETED!`);
-            console.log(`   Target: $${sessionData.session2.targetBalance.toFixed(2)}`);
-            console.log(`   Achieved: $${currentBalance.toFixed(2)}`);
-            console.log(`🎉 DAILY TARGET ACHIEVED!`);
-            console.log(`   Total Profit: $${totalProfit.toFixed(2)} (${profitPercentage.toFixed(2)}%)`);
-            console.log(`   Session 1 Profit: $${(sessionData.session1.targetBalance - sessionData.session1.startBalance).toFixed(2)}`);
-            console.log(`   Session 2 Profit: $${(currentBalance - sessionData.session2.startBalance).toFixed(2)}`);
-            
-            setFlashNotification(`🎉 DAILY TARGET COMPLETE! Total Profit: $${totalProfit.toFixed(2)} (${profitPercentage.toFixed(1)}%)`, 0);
-            
-            return true;
+            if (currentSessionNum === TOTAL_SESSIONS) {
+                // Final session completed - daily target achieved!
+                localStorage.setItem('sessionData', JSON.stringify(sessionData));
+                
+                const totalProfit = currentBalance - sessionData.sessions[0].startBalance;
+                const profitPercentage = (totalProfit / sessionData.sessions[0].startBalance) * 100;
+                
+                console.log(`✅ SESSION ${currentSessionNum}/${TOTAL_SESSIONS} COMPLETED!`);
+                console.log(`   Target: $${currentSession.targetBalance.toFixed(2)}`);
+                console.log(`   Achieved: $${currentBalance.toFixed(2)}`);
+                console.log(`🎉 DAILY TARGET ACHIEVED!`);
+                console.log(`   Total Profit: $${totalProfit.toFixed(2)} (${profitPercentage.toFixed(2)}%)`);
+                
+                setFlashNotification(`🎉 All 5 Sessions Complete! Daily Target Achieved: +$${totalProfit.toFixed(2)} (${profitPercentage.toFixed(1)}%)`, 0);
+                
+                return true;
+            } else {
+                // Session completed, schedule 10-minute break
+                const breakEndTime = new Date(Date.now() + SESSION_BREAK_MINUTES * 60 * 1000);
+                sessionData.breakEndTime = breakEndTime.toISOString();
+                
+                localStorage.setItem('sessionData', JSON.stringify(sessionData));
+                
+                console.log(`✅ SESSION ${currentSessionNum}/${TOTAL_SESSIONS} COMPLETED!`);
+                console.log(`   Target: $${currentSession.targetBalance.toFixed(2)}`);
+                console.log(`   Achieved: $${currentBalance.toFixed(2)}`);
+                console.log(`   Profit: $${(currentBalance - currentSession.startBalance).toFixed(2)}`);
+                console.log(`⏸️ BREAK TIME: ${SESSION_BREAK_MINUTES} minutes`);
+                console.log(`   Resume at: ${breakEndTime.toLocaleTimeString()}`);
+                
+                setFlashNotification(`✅ Session ${currentSessionNum}/${TOTAL_SESSIONS} Complete! Break for ${SESSION_BREAK_MINUTES} min. Resume at ${breakEndTime.toLocaleTimeString()}`, 0);
+                
+                return true;
+            }
         }
     }
     
@@ -1131,15 +1296,15 @@ function isInBreakPeriod() {
 
 // 🎯 LOG SESSION PROGRESS
 function logSessionProgress() {
-    if (!sessionData) return;
+    if (!sessionData || !sessionData.sessions) return;
     
     const currentSessionNum = sessionData.currentSession;
-    const currentSession = currentSessionNum === 1 ? sessionData.session1 : sessionData.session2;
+    const currentSession = sessionData.sessions[currentSessionNum - 1];
     
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('🎯 SESSION PROGRESS UPDATE');
     console.log(`📅 Date: ${sessionData.tradingDate}`);
-    console.log(`📊 SESSION ${currentSessionNum}/2 (Target: ${currentSessionNum === 1 ? SESSION_1_PROFIT_PERCENTAGE : SESSION_2_PROFIT_PERCENTAGE}%)`);
+    console.log(`📊 SESSION ${currentSessionNum}/${TOTAL_SESSIONS} (Target: ${SESSION_PROFIT_PERCENTAGE}%)`);
     
     if (currentSession) {
         const progress = updatedAccountBalance - currentSession.startBalance;
@@ -1153,22 +1318,19 @@ function logSessionProgress() {
     }
     
     // Show completed sessions
-    let completedCount = 0;
-    if (sessionData.session1.completed) {
-        completedCount++;
-        const profit = sessionData.session1.targetBalance - sessionData.session1.startBalance;
-        console.log(`✅ Session 1 Completed: +$${profit.toFixed(2)}`);
-    }
-    if (sessionData.session2.completed) {
-        completedCount++;
-        const profit = sessionData.session2.targetBalance - sessionData.session2.startBalance;
-        console.log(`✅ Session 2 Completed: +$${profit.toFixed(2)}`);
+    const completedSessions = sessionData.sessions.filter(s => s.completed);
+    if (completedSessions.length > 0) {
+        console.log(`✅ Completed Sessions: ${completedSessions.length}/${TOTAL_SESSIONS}`);
+        completedSessions.forEach(session => {
+            const profit = session.targetBalance - session.startBalance;
+            console.log(`   Session ${session.sessionNumber}: +$${profit.toFixed(2)}`);
+        });
     }
     
     // Calculate total progress
-    if (sessionData.session1.startBalance > 0) {
-        const totalProfit = updatedAccountBalance - sessionData.session1.startBalance;
-        const totalProfitPercent = (totalProfit / sessionData.session1.startBalance) * 100;
+    if (sessionData.sessions[0].startBalance > 0) {
+        const totalProfit = updatedAccountBalance - sessionData.sessions[0].startBalance;
+        const totalProfitPercent = (totalProfit / sessionData.sessions[0].startBalance) * 100;
         console.log(`💰 Total Today: +$${totalProfit.toFixed(2)} (${totalProfitPercent.toFixed(1)}%)`);
     }
     
@@ -1258,46 +1420,32 @@ function resetParams() {
     }
     
     // Determine which session to start
-    if (!sessionData.session1.completed) {
-        // Start or continue session 1
-        if (sessionData.session1.startBalance === 0) {
-            startSession(1, updatedAccountBalance);
-        } else {
-            currentSession = 1;
-            console.log(`📊 Continuing Session 1 - Progress: $${updatedAccountBalance.toFixed(2)} / $${sessionData.session1.targetBalance.toFixed(2)}`);
-        }
-    } else if (sessionData.session1.completed && !sessionData.session2.completed) {
-        // Start or continue session 2
-        if (sessionData.session2.startBalance === 0) {
-            startSession(2, updatedAccountBalance);
-        } else {
-            currentSession = 2;
-            console.log(`📊 Continuing Session 2 - Progress: $${updatedAccountBalance.toFixed(2)} / $${sessionData.session2.targetBalance.toFixed(2)}`);
-        }
-    } else if (sessionData.session1.completed && sessionData.session2.completed) {
-        // 🔍 SAFETY CHECK: Verify if sessions are actually completed
-        // Check if current balance actually reached the session 2 target
-        if (sessionData.session2.targetBalance > 0 && updatedAccountBalance >= sessionData.session2.targetBalance) {
-            // Both sessions completed AND verified
-            const message = `🎉 Daily target already completed! Both sessions finished. Come back tomorrow!`;
-            console.log(message);
-            setFlashNotification(message, 0);
-            return false; // Prevent trading
-        } else {
-            // Sessions marked complete but balance doesn't match - RESET SESSION 2
-            console.log('⚠️ WARNING: Session 2 marked complete but balance not reached!');
-            console.log(`   Current Balance: $${updatedAccountBalance.toFixed(2)}`);
-            console.log(`   Session 2 Target: $${sessionData.session2.targetBalance.toFixed(2)}`);
-            console.log('   🔄 Resetting Session 2 to continue trading...');
+    const currentSessionNum = sessionData.currentSession;
+    const allSessionsCompleted = sessionData.sessions.every(s => s.completed);
+    
+    if (allSessionsCompleted) {
+        // All 5 sessions completed - daily target achieved
+        const message = `🎉 All 5 sessions completed! Daily 10% target achieved. Come back tomorrow!`;
+        console.log(message);
+        setFlashNotification(message, 0);
+        return false; // Prevent trading
+    }
+    
+    // Find the current active session
+    let activeSession = null;
+    for (let i = 0; i < TOTAL_SESSIONS; i++) {
+        if (!sessionData.sessions[i].completed) {
+            activeSession = sessionData.sessions[i];
+            sessionData.currentSession = i + 1;
             
-            sessionData.session2.completed = false;
-            sessionData.currentSession = 2;
-            currentSession = 2;
-            
-            localStorage.setItem('sessionData', JSON.stringify(sessionData));
-            
-            setFlashNotification('⚠️ Session data corrected - Continuing Session 2', 5);
-            console.log(`📊 Continuing Session 2 - Progress: $${updatedAccountBalance.toFixed(2)} / $${sessionData.session2.targetBalance.toFixed(2)}`);
+            if (activeSession.startBalance === 0) {
+                // Start new session
+                startSession(i + 1, updatedAccountBalance);
+            } else {
+                // Continue existing session
+                console.log(`📊 Continuing Session ${i + 1}/${TOTAL_SESSIONS} - Progress: $${updatedAccountBalance.toFixed(2)} / $${activeSession.targetBalance.toFixed(2)}`);
+            }
+            break;
         }
     }
     
