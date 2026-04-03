@@ -31,6 +31,7 @@ let consecutiveLossCount = 0;
 const NO_TRADE_TICK_LIMIT = 60;
 
 const martingaleMultiplier = 2.07112;
+// const martingaleMultiplier = 1.8;
 let dayTarget = 0;
 
 if (params.get("target")) {
@@ -39,8 +40,8 @@ if (params.get("target")) {
     dayTarget = Number(targetProfitInputElement.value);
 }
 
-let targetPercentage = 5/100,
-    amountPercentage = 1/100,
+let targetPercentage = 1/100,
+    amountPercentage = 0.35/100,
     isTradeOpen = false,
     netProfit = 0,
     targetAmount = 0,
@@ -51,6 +52,8 @@ let targetPercentage = 5/100,
     initialAccountBalance = 0,
     updatedAccountBalance = 0,
     tradeProposal = null,
+    tradeProposalEven = null,
+    tradeProposalOdd = null,
     lastTradeId = null,
     tradeTypeDisplay = "",
     totalLossAmount = 0,
@@ -148,6 +151,7 @@ ws.onmessage = function (event) {
 
     // if(isWithinTimeRange()){
     wsResponse = JSON.parse(event.data);
+        // console.log('wsResponse: ', wsResponse);
 
     if (wsResponse != null) {
 
@@ -169,7 +173,9 @@ ws.onmessage = function (event) {
                 setFlashNotification("Day target is done", 0);
                 console.log("Day target is done");
             } else {
-                runScript();
+                getPoposlReady("even");
+                getPoposlReady("odd");
+                // runScript();
                 // placeTheTrade("even");
             }
         }
@@ -194,13 +200,34 @@ ws.onmessage = function (event) {
             ) {
                 webSocketConnectionStop();
             } else {
-                tradeProposal = wsResponse;
 
-                console.log('tradeProposal: ', tradeProposal);
+                // Determine contract type from proposal if available, otherwise fall back to echo_req
+                const respContractType = (wsResponse.proposal && wsResponse.proposal.contract_type)
+                    ? wsResponse.proposal.contract_type
+                    : (wsResponse.echo_req && wsResponse.echo_req.contract_type)
+                        ? wsResponse.echo_req.contract_type
+                        : null;
 
-                if (pendingContractType && isTradeOpen === false) {
-                    makeTheTrade(tradeProposal, pendingContractType);
+                if (respContractType === "DIGITEVEN") {
+                    tradeProposalEven = wsResponse;
+                } else if (respContractType === "DIGITODD") {
+                    tradeProposalOdd = wsResponse;
+                } else {
+                    // fallback: log unknown type and assign to tradeProposalOdd to avoid blocking
+                    console.warn('Unknown proposal contract type, storing in tradeProposalOdd', wsResponse);
+                    tradeProposalOdd = wsResponse;
                 }
+
+                // tradeProposal = wsResponse;
+
+                if(tradeProposalEven != null){
+                    console.log('Received proposal for Even contract:', tradeProposalEven);
+                }
+                if(tradeProposalOdd != null){
+                    console.log('Received proposal for Odd contract:', tradeProposalOdd);
+                }
+
+                runScript();
             }
         }
 
@@ -208,7 +235,7 @@ ws.onmessage = function (event) {
             console.error("API error:", wsResponse.error);
         }
 
-
+        
 
         if (wsResponse.msg_type === "buy") {
             if (
@@ -265,21 +292,23 @@ ws.onmessage = function (event) {
                         consecutiveLossCount = 0;
                     }
 
-                    if (consecutiveLossCount >= 3) {
+                    if (consecutiveLossCount >= 2) {
                         const setTimeInterval = 30000;
                         console.log(`[LOSS STREAK] ${consecutiveLossCount} losses in a row. Waiting 30 seconds.`);
                         setTimer(setTimeInterval);
                         setTimeout(() => {
-                            runScript();
+                            // runScript();
+                            getPoposlReady("even");
+                            getPoposlReady("odd");
                         }, setTimeInterval);
                     } else {
-                        console.log('netProfit: ',netProfit);
-                        console.log('dayTarget: ',dayTarget);
-                        console.log('targetAmount: ',targetAmount);
                         if(netProfit >= targetAmount){
                             reload();
                         }else {
-                            runScript();
+                            // runScript();
+                            getPoposlReady("even");
+                            getPoposlReady("odd");
+
                         }
                     }
                 } else {
@@ -348,9 +377,9 @@ function logEvenOddPercentages(prices) {
     const lastThreeDigits = lastDigits.slice(-3);
 
     contractType = null;
-    if (evenPercentage >= 52) {
+    if (evenPercentage > 52) {
         contractType = "even";
-    } else if (oddPercentage >= 52) {
+    } else if (oddPercentage > 52) {
         contractType = "odd";
     }
 
@@ -426,7 +455,7 @@ function tryEvenEntry(evenPercentage, lastDigits) {
 
     let shouldPlaceTrade = false;
 
-    if (evenPercentage >= 52 && evenPercentage <= 62 && trailingOddCount >= 3) {
+    if (evenPercentage > 52 && evenPercentage < 62 && trailingOddCount >= 3) {
         shouldPlaceTrade = true;
     } else if (evenPercentage >= 62 && trailingOddCount >= 2) {
         shouldPlaceTrade = true;
@@ -434,7 +463,7 @@ function tryEvenEntry(evenPercentage, lastDigits) {
 
     if (shouldPlaceTrade) {
         if (typeof placeTheTrade === "function") {
-            placeTheTrade(contractType);
+            placeTheTrade(tradeProposal, contractType);
             return true;
         } else {
             console.warn("placeTheTrade function is not available.");
@@ -465,7 +494,7 @@ function tryOddEntry(oddPercentage, lastDigits) {
 
     let shouldPlaceTrade = false;
 
-    if (oddPercentage >= 52 && oddPercentage <= 62 && trailingEvenCount >= 3) {
+    if (oddPercentage > 52 && oddPercentage < 62 && trailingEvenCount >= 3) {
         shouldPlaceTrade = true;
     } else if (oddPercentage >= 62 && trailingEvenCount >= 2) {
         shouldPlaceTrade = true;
@@ -473,7 +502,7 @@ function tryOddEntry(oddPercentage, lastDigits) {
 
     if (shouldPlaceTrade) {
         if (typeof placeTheTrade === "function") {
-            placeTheTrade(contractType);
+            placeTheTrade(tradeProposal, contractType);
             return true;
         } else {
             console.warn("placeTheTrade function is not available.");
@@ -482,3 +511,27 @@ function tryOddEntry(oddPercentage, lastDigits) {
 
     return false;
 }
+
+
+function getPoposlReady(type){
+
+    stake = Number(stake);
+    stake < 0.35 ? (stake = 0.35) : (stake = stake);
+    tickCount = 1;
+
+    const tradeRequest = {
+        proposal: 1,
+        amount: stake.toFixed(2),
+        basis: "stake",
+        contract_type: type === "even" ? "DIGITEVEN" : "DIGITODD",
+        currency: "USD",
+        duration: tickCount,
+        duration_unit: "t",
+        symbol: market,
+    };
+
+    console.log("Sending Rise/Fall trade request:", tradeRequest);
+    ws.send(JSON.stringify(tradeRequest));
+    
+}
+

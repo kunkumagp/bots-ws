@@ -41,50 +41,70 @@ function resetParams() {
 
 
 
-const placeEvenOddTrade = (selectedContractType = "even") => {
-    if (isTradeOpen == false) {
-        const tradeState = selectedContractType === "odd" ? "DIGITODD" : "DIGITEVEN";
+// const placeEvenOddTrade = (selectedContractType = "even") => {
+//     if (isTradeOpen == false) {
+//         const tradeState = selectedContractType === "odd" ? "DIGITODD" : "DIGITEVEN";
 
-        stake = Number(stake);
-        stake < 0.35 ? (stake = 0.35) : (stake = stake);
-        tickCount = 1;
+//         stake = Number(stake);
+//         stake < 0.35 ? (stake = 0.35) : (stake = stake);
+//         tickCount = 1;
 
-        const tradeRequest = {
-            proposal: 1,
-            amount: stake.toFixed(2),
-            basis: "stake",
-            contract_type: tradeState,
-            currency: "USD",
-            duration: tickCount,
-            duration_unit: "t",
-            symbol: market,
-        };
+//         const tradeRequest = {
+//             proposal: 1,
+//             amount: stake.toFixed(2),
+//             basis: "stake",
+//             contract_type: tradeState,
+//             currency: "USD",
+//             duration: tickCount,
+//             duration_unit: "t",
+//             symbol: market,
+//         };
 
-        console.log("Sending Rise/Fall trade request:", tradeRequest);
-        ws.send(JSON.stringify(tradeRequest));
-    }
+//         console.log("Sending Rise/Fall trade request:", tradeRequest);
+//         ws.send(JSON.stringify(tradeRequest));
+//     }
 
-};
+// };
 
-function placeTheTrade(contractType) {
+function placeTheTrade(tradeProposal, contractType) {
     if (isTradeOpen) return;
     pendingContractType = contractType;
     console.log('Preparing proposal for contract type :', contractType);
-    placeEvenOddTrade(contractType);
+    // placeEvenOddTrade(contractType);
+    makeTheTrade(tradeProposal, contractType);
 }
 
-const makeTheTrade = (tradeProposal, contractType) => {
+const makeTheTrade = (tradeProposal, contractTypeParam) => {
     if (
-        tradeProposal.proposal == undefined ||
-        tradeProposal.proposal.id == undefined
+        tradeProposalEven && tradeProposalEven.proposal == undefined ||
+        tradeProposalOdd && tradeProposalOdd.proposal == undefined
     ) {
         isRunning = false;
         webSocketConnectionStart();
     } else {
-        buyRequest = {
-            buy: tradeProposal.proposal.id,
-            price: tradeProposal.proposal.ask_price,
-        };
+        let buyRequest;
+
+        console.log('Making trade for contract type:', contractTypeParam);
+        console.log('tradeProposalEven: ', tradeProposalEven);
+        console.log('tradeProposalOdd: ', tradeProposalOdd);
+
+        // Map the simple contract type to the API shortcode before buying
+        const mappedContractType = contractTypeParam === "even" ? "DIGITEVEN" : "DIGITODD";
+        // store mapped value in the global `contractType` for later reference
+        contractType = mappedContractType;
+
+        if (contractTypeParam === "even" && tradeProposalEven && tradeProposalEven.proposal) {
+            buyRequest = {
+                buy: tradeProposalEven.proposal.id,
+                price: tradeProposalEven.proposal.ask_price,
+            };
+        } else if (contractTypeParam === "odd" && tradeProposalOdd && tradeProposalOdd.proposal) {
+            buyRequest = {
+                buy: tradeProposalOdd.proposal.id,
+                price: tradeProposalOdd.proposal.ask_price,
+            };
+        }
+
         console.log('buyRequest: ', buyRequest);
 
         ws.send(JSON.stringify(buyRequest));
