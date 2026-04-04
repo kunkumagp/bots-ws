@@ -39,8 +39,8 @@ if (params.get("target")) {
     dayTarget = Number(targetProfitInputElement.value);
 }
 
-let targetPercentage = 5/100,
-    amountPercentage = 1/100,
+let targetPercentage = 1/100,
+    amountPercentage = 0.35/100,
     isTradeOpen = false,
     netProfit = 0,
     targetAmount = 0,
@@ -265,17 +265,37 @@ ws.onmessage = function (event) {
                         consecutiveLossCount = 0;
                     }
 
-                    if (consecutiveLossCount >= 3) {
-                        const setTimeInterval = 30000;
+                    let setTimeInterval = 0;
+
+                   if (consecutiveLossCount >= 5) {
+                        setTimeInterval = 150000;
+                        console.log(`[LOSS STREAK] ${consecutiveLossCount} losses in a row. Waiting 30 seconds.`);
+                        setTimer(setTimeInterval);
+                        setTimeout(() => {
+                            runScript();
+                        }, setTimeInterval);
+                    } else if (consecutiveLossCount >= 4) {
+                        setTimeInterval = 120000;
+                        console.log(`[LOSS STREAK] ${consecutiveLossCount} losses in a row. Waiting 30 seconds.`);
+                        setTimer(setTimeInterval);
+                        setTimeout(() => {
+                            runScript();
+                        }, setTimeInterval);
+                    } else if (consecutiveLossCount >= 3) {
+                        setTimeInterval = 90000;
+                        console.log(`[LOSS STREAK] ${consecutiveLossCount} losses in a row. Waiting 30 seconds.`);
+                        setTimer(setTimeInterval);
+                        setTimeout(() => {
+                            runScript();
+                        }, setTimeInterval);
+                    } else if (consecutiveLossCount >= 2) {
+                        setTimeInterval = 60000;
                         console.log(`[LOSS STREAK] ${consecutiveLossCount} losses in a row. Waiting 30 seconds.`);
                         setTimer(setTimeInterval);
                         setTimeout(() => {
                             runScript();
                         }, setTimeInterval);
                     } else {
-                        console.log('netProfit: ',netProfit);
-                        console.log('dayTarget: ',dayTarget);
-                        console.log('targetAmount: ',targetAmount);
                         if(netProfit >= targetAmount){
                             reload();
                         }else {
@@ -348,9 +368,9 @@ function logEvenOddPercentages(prices) {
     const lastThreeDigits = lastDigits.slice(-3);
 
     contractType = null;
-    if (evenPercentage >= 52) {
+    if (evenPercentage > 52) {
         contractType = "even";
-    } else if (oddPercentage >= 52) {
+    } else if (oddPercentage > 52) {
         contractType = "odd";
     }
 
@@ -426,9 +446,9 @@ function tryEvenEntry(evenPercentage, lastDigits) {
 
     let shouldPlaceTrade = false;
 
-    if (evenPercentage >= 52 && evenPercentage <= 62 && trailingOddCount >= 3) {
+    if (evenPercentage > 52 && evenPercentage <= 62 && trailingOddCount >= 3) {
         shouldPlaceTrade = true;
-    } else if (evenPercentage >= 62 && trailingOddCount >= 2) {
+    } else if (evenPercentage > 62 && trailingOddCount >= 2) {
         shouldPlaceTrade = true;
     }
 
@@ -465,9 +485,9 @@ function tryOddEntry(oddPercentage, lastDigits) {
 
     let shouldPlaceTrade = false;
 
-    if (oddPercentage >= 52 && oddPercentage <= 62 && trailingEvenCount >= 3) {
+    if (oddPercentage > 52 && oddPercentage <= 62 && trailingEvenCount >= 3) {
         shouldPlaceTrade = true;
-    } else if (oddPercentage >= 62 && trailingEvenCount >= 2) {
+    } else if (oddPercentage > 62 && trailingEvenCount >= 2) {
         shouldPlaceTrade = true;
     }
 
