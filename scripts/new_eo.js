@@ -30,6 +30,7 @@ let ticksWithoutTrade = 0;
 let consecutiveLossCount = 0;
 const NO_TRADE_TICK_LIMIT = 60;
 
+// const martingaleMultiplier = 1.5;
 const martingaleMultiplier = 2.07112;
 let dayTarget = 0;
 
@@ -39,7 +40,34 @@ if (params.get("target")) {
     dayTarget = Number(targetProfitInputElement.value);
 }
 
-let targetPercentage = 1/100,
+// Ensure localStorage is reset when the date changes.
+// If any known stored date key does not match today's date, clear localStorage
+// and reload the page once per browser session to avoid reload loops.
+try {
+    const _today = new Date().toISOString().slice(0, 10);
+    // Keys that may contain the last-run date in localStorage
+    const keysToCheck = ['sessionTargetDate', 'dayStartDate', 'dayStartDate'];
+    const hasMismatch = keysToCheck.some((k) => {
+        try {
+            const v = localStorage.getItem(k);
+            return v && v !== _today;
+        } catch (e) {
+            return false;
+        }
+    });
+    const _clearedMarker = sessionStorage.getItem('localStorageClearedForDate');
+    if (hasMismatch && _clearedMarker !== _today) {
+        console.info('Stored date mismatch — clearing localStorage and reloading.');
+        sessionStorage.setItem('localStorageClearedForDate', _today);
+        localStorage.clear();
+        window.location.reload();
+    }
+} catch (e) {
+    console.error('Error while checking/clearing localStorage for new day:', e);
+}
+
+let sessionTargetPercentage = 1/100,
+    targetPercentage = 1/100,
     amountPercentage = 0.35/100,
     isTradeOpen = false,
     netProfit = 0,
@@ -155,23 +183,43 @@ ws.onmessage = function (event) {
         if (wsResponse.msg_type === "authorize") {
             console.log("Authorization successful.\n-----------------------------\n\n");
             setFlashNotification("Authorization successful", 0);
-            initialAccountBalance = wsResponse.authorize.balance;
-            updatedAccountBalance = initialAccountBalance;
-            setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance}`);
-            authSuccess = true;
-            authenticateButton.innerHTML = "Authenticated. Ready to trade.";
-            authenticateButton.disabled = true;
-            resetParams();
-            // scriptButton.innerHTML = "Bot started....";
-            // placeTrade();
 
-            if (dayTarget > 0 && updatedAccountBalance >= dayTarget) {
-                setFlashNotification("Day target is done", 0);
-                console.log("Day target is done");
+            if (wsResponse.authorize && typeof wsResponse.authorize.balance !== "undefined") {
+                initialAccountBalance = wsResponse.authorize?.balance;
+                updatedAccountBalance = initialAccountBalance;
+                setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance}`);
+                authSuccess = true;
+                authenticateButton.innerHTML = "Authenticated. Ready to trade.";
+                authenticateButton.disabled = true;
+                resetParams();
+                // reset or initialize today's session target counter
+                try {
+                    const today = new Date().toISOString().slice(0,10);
+                    const storedDate = localStorage.getItem('sessionTargetDate');
+                    if (storedDate !== today) {
+                        localStorage.setItem('sessionTargetCount', '0');
+                        localStorage.setItem('sessionTargetDate', today);
+                    }
+                } catch (e) {}
+                // scriptButton.innerHTML = "Bot started....";
+                // placeTrade();
+
+                const stoppedForDay = (localStorage.getItem('tradingStoppedForDay') === '1');
+                if (dayTarget > 0 && updatedAccountBalance >= dayTarget) {
+                    setFlashNotification("Day target is done", 0);
+                    console.log("Day target is done");
+                } else if (stoppedForDay) {
+                    setFlashNotification('Trading already stopped for today.', 0);
+                    if (scriptButton) { scriptButton.disabled = true; scriptButton.innerText = 'Stopped for day'; }
+                } else {
+                    runScript();
+                    // placeTheTrade("even");
+                }
             } else {
-                runScript();
-                // placeTheTrade("even");
+                reload();
             }
+
+            
         }
 
         if (wsResponse.msg_type === "history" && wsResponse.history && Array.isArray(wsResponse.history.prices)) {
@@ -268,41 +316,39 @@ ws.onmessage = function (event) {
                     let setTimeInterval = 0;
 
                    if (consecutiveLossCount >= 5) {
-                        setTimeInterval = 150000;
-                        console.log(`[LOSS STREAK] ${consecutiveLossCount} losses in a row. Waiting 30 seconds.`);
+                        setTimeInterval = 210000;
                         setTimer(setTimeInterval);
                         setTimeout(() => {
                             runScript();
                         }, setTimeInterval);
                     } else if (consecutiveLossCount >= 4) {
-                        setTimeInterval = 120000;
-                        console.log(`[LOSS STREAK] ${consecutiveLossCount} losses in a row. Waiting 30 seconds.`);
+                        setTimeInterval = 180000;
                         setTimer(setTimeInterval);
                         setTimeout(() => {
                             runScript();
                         }, setTimeInterval);
                     } else if (consecutiveLossCount >= 3) {
-                        setTimeInterval = 90000;
-                        console.log(`[LOSS STREAK] ${consecutiveLossCount} losses in a row. Waiting 30 seconds.`);
-                        setTimer(setTimeInterval);
-                        setTimeout(() => {
-                            runScript();
-                        }, setTimeInterval);
-                    } else if (consecutiveLossCount >= 2) {
-                        setTimeInterval = 60000;
-                        console.log(`[LOSS STREAK] ${consecutiveLossCount} losses in a row. Waiting 30 seconds.`);
+                        setTimeInterval = 150000;
+                        console.log(`[LOSS STREAK] ${consecutiveLossCount} losses in a row. Waiting 150 seconds.`);
                         setTimer(setTimeInterval);
                         setTimeout(() => {
                             runScript();
                         }, setTimeInterval);
                     } else {
-                        if(netProfit >= targetAmount){
-                            reload();
-                        }else {
-                            runScript();
-                        }
+                        setTimeInterval = 0;
+                        setTimer(setTimeInterval);
+                        setTimeout(() => {
+                            if(netProfit >= targetAmount){
+                                reload();
+                            }else {
+                                runScript();
+                            }
+                        }, setTimeInterval);
+                        
                     }
                 } else {
+                    // mark that a trade is currently open so no other trade is placed
+                    isTradeOpen = true;
                     setTimeout(() => {
                         setTickCountDown(
                             contract.tick_count,

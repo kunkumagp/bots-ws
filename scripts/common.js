@@ -67,7 +67,16 @@ const placeEvenOddTrade = (selectedContractType = "even") => {
 };
 
 function placeTheTrade(contractType) {
-    if (isTradeOpen) return;
+    // Do not place a trade if another trade is open or a trade is pending
+    if (isTradeOpen) {
+        console.log('Trade blocked: another trade is still open.');
+        return;
+    }
+    if (pendingContractType) {
+        console.log('Trade blocked: a trade proposal is already pending.');
+        return;
+    }
+
     pendingContractType = contractType;
     console.log('Preparing proposal for contract type :', contractType);
     placeEvenOddTrade(contractType);
@@ -187,6 +196,35 @@ function setInfo(contract, lastTradeProfit) {
 
     netProfit = updatedAccountBalance - initialAccountBalance;
 
+    // session target: reload and count hits; stop for day after 10 hits
+    try {
+        const pct = (typeof sessionTargetPercentage !== 'undefined') ? Number(sessionTargetPercentage) : 0;
+        if (pct > 0) {
+            const sessionTargetAmount = Number((initialAccountBalance * pct).toFixed(2));
+            if (netProfit >= sessionTargetAmount) {
+                const today = new Date().toISOString().slice(0,10);
+                const storedDate = localStorage.getItem('sessionTargetDate');
+                let count = Number(localStorage.getItem('sessionTargetCount') || 0);
+                if (storedDate !== today) count = 0;
+                count += 1;
+                try { localStorage.setItem('sessionTargetCount', String(count)); localStorage.setItem('sessionTargetDate', today); } catch (e) {}
+                setFlashNotification(`Session target hit ${count} time(s)`, 2);
+                if (count >= 10) {
+                    setFlashNotification('Session target reached 10 times. Stopping for today.', 0);
+                    try { localStorage.setItem('tradingStoppedForDay', '1'); } catch (e) {}
+                    isRunning = false;
+                    stopPing();
+                    try { if (ws) ws.close(); } catch (e) {}
+                    if (typeof scriptButton !== 'undefined' && scriptButton) { scriptButton.disabled = true; scriptButton.innerText = 'Stopped for day'; }
+                    return;
+                }
+                setFlashNotification('Session target reached. Reloading...', 0);
+                setTimeout(() => reload(), 1000);
+                return;
+            }
+        }
+    } catch (e) { console.error('Error checking session target', e); }
+
     if (dayTarget > 0 && netProfit >= dayTarget) {
         console.log(`Day target reached. Net profit: ${netProfit.toFixed(2)} / Target: ${dayTarget}`);
         setFlashNotification("Day target reached. Reloading page...", 0);
@@ -293,22 +331,44 @@ function getRandomNumber(min, max) {
 }
 
 function setTimer(time) {
-    let timeleft = time / 1000; // Convert milliseconds to seconds
+    // ensure only one recovery timer runs at a time
+    if (window.recoveryTimer) {
+        clearInterval(window.recoveryTimer);
+        window.recoveryTimer = null;
+    }
+
+    stopTimer = false;
+    let timeleft = Math.max(0, Math.floor(time / 1000)); // Convert milliseconds to seconds
 
     if (!isRunning) {
         timeleft = 0;
         stopTimer = true;
     }
 
-    let timer = setInterval(function () {
-        if (timeleft <= 0) {
-            clearInterval(timer);
+    if (timeleft <= 0) {
+        setFlashNotification(``, 0);
+        return;
+    }
+
+    // show initial message immediately
+    setFlashNotification(`Bot will run again in <span class="number">${formatTime(timeleft)}</span>.`, 0);
+
+    window.recoveryTimer = setInterval(function () {
+        if (stopTimer) {
+            clearInterval(window.recoveryTimer);
+            window.recoveryTimer = null;
             setFlashNotification(``, 0);
-        } else if (timeleft > 0 && !stopTimer) {
-            let formattedTime = formatTime(timeleft);
-            setFlashNotification(`Bot will run again in <span class="number">${formattedTime}</span>.`, 0);
+            return;
         }
+
         timeleft -= 1;
+        if (timeleft <= 0) {
+            clearInterval(window.recoveryTimer);
+            window.recoveryTimer = null;
+            setFlashNotification(``, 0);
+        } else {
+            setFlashNotification(`Bot will run again in <span class="number">${formatTime(timeleft)}</span>.`, 0);
+        }
     }, 1000);
 }
 
