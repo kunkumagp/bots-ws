@@ -72,6 +72,10 @@ function placeTheTrade(contractType) {
         console.log('Trade blocked: another trade is still open.');
         return;
     }
+    if (typeof window !== 'undefined' && window.pendingCooldown) {
+        console.log('Trade blocked: pending cooldown in effect.');
+        return;
+    }
     if (pendingContractType) {
         console.log('Trade blocked: a trade proposal is already pending.');
         return;
@@ -103,9 +107,18 @@ const makeTheTrade = (tradeProposal, contractType) => {
 
 const stakeChange = (status) => {
     if (status == "Loss") {
-        stake = stake * martingaleMultiplier;
+        const newStake = Number(stake) * Number(martingaleMultiplier || 1);
+        // cap martingale to a percentage of initial balance to limit blowups (2%)
+        let maxStake = Number(amountPutForTrading) * 10; // fallback max (10x base)
+        try {
+            if (typeof initialAccountBalance !== 'undefined' && initialAccountBalance > 0) {
+                maxStake = Math.max( Number(amountPutForTrading), Number((initialAccountBalance * 0.02).toFixed(2)) );
+            }
+        } catch (e) {}
+        stake = Math.min(newStake, maxStake);
+        if (stake < 0.35) stake = 0.35;
     } else if (status == "Win") {
-        stake = amountPutForTrading;
+        stake = Number(amountPutForTrading);
     }
 };
 

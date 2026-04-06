@@ -26,6 +26,7 @@ let isRunning = false, intervalId;
 let last50Prices = [];
 let hasRequestedTickHistory = false;
 let pendingContractType = null;
+window.pendingCooldown = false;
 let ticksWithoutTrade = 0;
 let consecutiveLossCount = 0;
 const NO_TRADE_TICK_LIMIT = 60;
@@ -93,6 +94,7 @@ let market,
     tickCount,
     contractType
     ;
+
 
 
 let ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=1089");
@@ -303,7 +305,6 @@ ws.onmessage = function (event) {
                     const result = profit > 0 ? "Win" : "Loss";
 
                     setInfo(contract, profit);
-                    isTradeOpen = false;
                     stakeChange(result);
                     pendingContractType = null;
 
@@ -315,23 +316,37 @@ ws.onmessage = function (event) {
 
                     let setTimeInterval = 0;
 
-                   if (consecutiveLossCount >= 5) {
-                        setTimeInterval = 210000;
-                        setTimer(setTimeInterval);
-                        setTimeout(() => {
-                            runScript();
-                        }, setTimeInterval);
-                    } else if (consecutiveLossCount >= 4) {
-                        setTimeInterval = 180000;
-                        setTimer(setTimeInterval);
-                        setTimeout(() => {
-                            runScript();
-                        }, setTimeInterval);
+                    if (consecutiveLossCount >= 5) {
+                        // stop the bot after 5 consecutive losses
+                        console.log(`[LOSS STREAK] ${consecutiveLossCount} losses in a row. Stopping bot.`);
+                        setFlashNotification(`Stopped after ${consecutiveLossCount} consecutive losses.`, 0);
+                        isRunning = false;
+                        stopPing();
+                        try { ws.close(); } catch (e) { }
+                        if (scriptButton) { scriptButton.disabled = true; scriptButton.innerText = 'Stopped'; }
+                        return;
                     } else if (consecutiveLossCount >= 3) {
+                        // larger cooldown and market switch
                         setTimeInterval = 150000;
-                        console.log(`[LOSS STREAK] ${consecutiveLossCount} losses in a row. Waiting 150 seconds.`);
+                        console.log(`[LOSS STREAK] ${consecutiveLossCount} losses in a row. Waiting ${setTimeInterval/1000} seconds.`);
+                        window.pendingCooldown = true;
+                        changeMarketAfterNoTrade();
                         setTimer(setTimeInterval);
                         setTimeout(() => {
+                            window.pendingCooldown = false;
+                            isTradeOpen = false;
+                            runScript();
+                        }, setTimeInterval);
+                    } else if (consecutiveLossCount >= 2) {
+                        // short cooldown and market switch to avoid continuing losing streak
+                        setTimeInterval = 90000;
+                        console.log(`[LOSS STREAK] ${consecutiveLossCount} losses in a row. Waiting ${setTimeInterval/1000} seconds.`);
+                        window.pendingCooldown = true;
+                        changeMarketAfterNoTrade();
+                        setTimer(setTimeInterval);
+                        setTimeout(() => {
+                            window.pendingCooldown = false;
+                            isTradeOpen = false;
                             runScript();
                         }, setTimeInterval);
                     } else {
@@ -341,10 +356,10 @@ ws.onmessage = function (event) {
                             if(netProfit >= targetAmount){
                                 reload();
                             }else {
+                                isTradeOpen = false;
                                 runScript();
                             }
                         }, setTimeInterval);
-                        
                     }
                 } else {
                     // mark that a trade is currently open so no other trade is placed
@@ -484,18 +499,28 @@ function getTrailingOddCount(lastDigits) {
 }
 
 function tryEvenEntry(evenPercentage, lastDigits) {
-    if (pendingContractType) return false;
-    if (contractType !== "even") return;
+    if (pendingContractType || (typeof window !== 'undefined' && window.pendingCooldown)) return false;
+    if (contractType !== "even") return false;
     if (!Array.isArray(lastDigits) || lastDigits.length === 0) return;
 
     const trailingOddCount = getTrailingOddCount(lastDigits);
 
     let shouldPlaceTrade = false;
 
-    if (evenPercentage > 52 && evenPercentage <= 62 && trailingOddCount >= 3) {
-        shouldPlaceTrade = true;
-    } else if (evenPercentage > 62 && trailingOddCount >= 2) {
-        shouldPlaceTrade = true;
+    // If we've lost 3 or more in a row, only act on strong signals (>65%)
+    if (typeof consecutiveLossCount !== 'undefined' && consecutiveLossCount >= 3) {
+        if (evenPercentage > 65) {
+            shouldPlaceTrade = true;
+        } else {
+            return false;
+        }
+    } else {
+        // stronger entry rules to reduce losing streaks
+        if (evenPercentage > 65 && trailingOddCount >= 3) {
+            shouldPlaceTrade = true;
+        } else if (evenPercentage > 55 && evenPercentage <= 65 && trailingOddCount >= 4) {
+            shouldPlaceTrade = true;
+        }
     }
 
     if (shouldPlaceTrade) {
@@ -523,18 +548,28 @@ function getTrailingEvenCount(lastDigits) {
 }
 
 function tryOddEntry(oddPercentage, lastDigits) {
-    if (pendingContractType) return false;
-    if (contractType !== "odd") return;
+    if (pendingContractType || (typeof window !== 'undefined' && window.pendingCooldown)) return false;
+    if (contractType !== "odd") return false;
     if (!Array.isArray(lastDigits) || lastDigits.length === 0) return;
 
     const trailingEvenCount = getTrailingEvenCount(lastDigits);
 
     let shouldPlaceTrade = false;
 
-    if (oddPercentage > 52 && oddPercentage <= 62 && trailingEvenCount >= 3) {
-        shouldPlaceTrade = true;
-    } else if (oddPercentage > 62 && trailingEvenCount >= 2) {
-        shouldPlaceTrade = true;
+    // If we've lost 3 or more in a row, only act on strong signals (>65%)
+    if (typeof consecutiveLossCount !== 'undefined' && consecutiveLossCount >= 3) {
+        if (oddPercentage > 65) {
+            shouldPlaceTrade = true;
+        } else {
+            return false;
+        }
+    } else {
+        // stronger entry rules to reduce losing streaks
+        if (oddPercentage > 65 && trailingEvenCount >= 3) {
+            shouldPlaceTrade = true;
+        } else if (oddPercentage > 55 && oddPercentage <= 65 && trailingEvenCount >= 4) {
+            shouldPlaceTrade = true;
+        }
     }
 
     if (shouldPlaceTrade) {
