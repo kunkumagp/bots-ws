@@ -48,6 +48,8 @@ const placeEvenOddTrade = (selectedContractType = "even") => {
         stake = Number(stake);
         stake < 0.35 ? (stake = 0.35) : (stake = stake);
         tickCount = 1;
+        // tickCount = getRandomNumber(1, 3);
+        
 
         const tradeRequest = {
             proposal: 1,
@@ -95,6 +97,19 @@ const makeTheTrade = (tradeProposal, contractType) => {
 const stakeChange = (status) => {
     if (status == "Loss") {
         stake = stake * martingaleMultiplier;
+    } else if (status == "Win") {
+        stake = amountPutForTrading;
+    }
+};
+
+
+const stakeChangeForTotal = (status) => {
+    if (status == "Loss") {
+        const storedLost = parseFloat(localStorage.getItem('totalLostAmount')) || 0;
+        if (storedLost !== 0) {
+            const calcStake = Number(((Math.abs(storedLost) / 80) * 100).toFixed(2));
+            stake = calcStake;
+        }
     } else if (status == "Win") {
         stake = amountPutForTrading;
     }
@@ -201,7 +216,32 @@ function setInfo(contract, lastTradeProfit) {
     } else if (lastTradeProfit < 0) {
         lossTradeCount = lossTradeCount + 1;
         totalLossAmount = totalLossAmount + lastTradeProfit;
-        totalLossAmount = totalLossAmount + lastTradeProfit;
+
+        // persist running total of losses (stored as negative value) in localStorage under key 'totalLostAmount'
+        try {
+            const stored = parseFloat(localStorage.getItem('totalLostAmount')) || 0;
+            const updated = stored + lastTradeProfit; // lastTradeProfit is negative
+            localStorage.setItem('totalLostAmount', updated.toFixed(2));
+        } catch (e) {}
+    }
+
+    // If we won, reduce persisted totalLostAmount (move towards zero)
+    if (lastTradeProfit > 0) {
+        try {
+            let stored = parseFloat(localStorage.getItem('totalLostAmount')) || 0;
+            if (stored !== 0) {
+                stored = stored + lastTradeProfit; // add positive profit to negative stored value
+                if (stored >= 0) {
+                    stored = 0;
+                }
+                localStorage.setItem('totalLostAmount', stored.toFixed(2));
+                // if recovered fully, restore stake to normal trading amount
+                if (stored === 0) {
+                    try { stake = amountPutForTrading; } catch (e) {}
+                    try { if (initialStakeInputElement) initialStakeInputElement.value = stake; } catch (e) {}
+                }
+            }
+        } catch (e) {}
     }
 
     setResultNotification(

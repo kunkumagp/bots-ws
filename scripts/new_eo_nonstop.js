@@ -30,12 +30,7 @@ let ticksWithoutTrade = 0;
 let consecutiveLossCount = 0;
 const NO_TRADE_TICK_LIMIT = 120;
 
-// pause state after a loss: when true do NOT place any trades until `pausedUntil`
-let isPaused = false;
-let pausedUntil = 0;
-
-// const martingaleMultiplier = 1.4;
-const martingaleMultiplier = 2.07112;
+const martingaleMultiplier = 1.0;
 let dayTarget = 0;
 
 if (params.get("target")) {
@@ -48,8 +43,8 @@ let startingAmount = 250;
 
 let sessionTargetPercentage = 1/startingAmount,
     targetPercentage = 1/startingAmount,
-    // amountPercentage = 0.35/startingAmount,
-    amountPercentage = 0.5/100,
+    amountPercentage = 0.35/startingAmount,
+    // finishTargetPercentagePerDay = 5/100,
     finishTargetPercentagePerDay = 3/100,
     isTradeOpen = false,
     netProfit = 0,
@@ -78,7 +73,6 @@ let market,
 
 
 let ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=1089");
-
 
 
 accounts.forEach((item) => {
@@ -187,8 +181,7 @@ ws.onmessage = function (event) {
                     const storedLost = parseFloat(localStorage.getItem('totalLostAmount')) || 0;
                     if (storedLost !== 0) {
                         // storedLost is negative (e.g. -1.45). Compute stake as positive value: (abs(totalLostAmount) / 90) * 100
-                        // Updated formula per request: use 80 instead of 90
-                        const calcStake = Number(((Math.abs(storedLost) / 80) * 100).toFixed(2));
+                        const calcStake = Number(((Math.abs(storedLost) / 90) * 100).toFixed(2));
                         stake = calcStake;
                         // reflect in UI if available
                         try { if (initialStakeInputElement) initialStakeInputElement.value = stake; } catch (e) {}
@@ -283,13 +276,8 @@ ws.onmessage = function (event) {
 
                 console.log('tradeProposal: ', tradeProposal);
 
-                // If paused due to recent loss, skip executing trades until pause ends
-                if (isPaused && Date.now() < pausedUntil) {
-                    console.log('Trading paused until', new Date(pausedUntil).toLocaleTimeString(), '- skipping proposal execution.');
-                } else {
-                    if (pendingContractType && isTradeOpen === false) {
-                        makeTheTrade(tradeProposal, pendingContractType);
-                    }
+                if (pendingContractType && isTradeOpen === false) {
+                    makeTheTrade(tradeProposal, pendingContractType);
                 }
             }
         }
@@ -357,78 +345,44 @@ ws.onmessage = function (event) {
                     } catch (e) {}
 
                     isTradeOpen = false;
-                    stakeChangeForTotal(result);
+                    stakeChange(result);
                     pendingContractType = null;
-                    let setTimeInterval = 0;
-
-
-                    // if(profit < 0){
-                    //     setTimeInterval = getRandomNumber(30, 180) * 1000;
-                    //     setTimer(setTimeInterval);
-                    //     setTimeout(() => {
-                    //         reload();
-                    //     }, setTimeInterval);
-
-                    // } else {
-                    //     if(netProfit >= targetAmount){
-                    //         setTimeInterval = 10 * 1000;
-                    //         setTimer(setTimeInterval);
-                    //         setTimeout(() => {
-                    //             reload();
-                    //         }, setTimeInterval);
-                    //     }else {
-                    //         setTimer(setTimeInterval);
-                    //         setTimeout(() => {
-                    //             runScript();
-                    //         }, setTimeInterval);
-                    //     }
-                    // }
 
                     if (profit < 0) {
-                        // On any loss, increment consecutive count and pause trading for 3-5 minutes
                         consecutiveLossCount += 1;
-
-                        // If reached 4 consecutive losses, stop the bot and preserve totalLostAmount
-                        if (consecutiveLossCount >= 4) {
-                            setFlashNotification('Stopped: 4 consecutive losses reached. Manual restart required.', 0);
+                        // If reached 3 consecutive losses, stop the bot and preserve totalLostAmount
+                        if (consecutiveLossCount >= 3) {
+                            setFlashNotification('Stopped: 3 consecutive losses reached. Manual restart required.', 0);
                             try { localStorage.setItem('tradingStoppedForDay', '1'); } catch (e) {}
                             isRunning = false;
                             stopPing();
                             try { if (ws) ws.close(); } catch (e) {}
-                            try { if (scriptButton) { scriptButton.disabled = true; scriptButton.innerText = 'Stopped (4 losses)'; } } catch (e) {}
+                            try { if (scriptButton) { scriptButton.disabled = true; scriptButton.innerText = 'Stopped (3 losses)'; } } catch (e) {}
                             return;
                         }
+                    } else {
+                        consecutiveLossCount = 0;
+                    }
 
-                        // Enforce a strict 3 to 5 minute pause (no trades allowed during this interval)
-                        setTimeInterval = getRandomNumber(180, 300) * 1000; // seconds -> ms (180s = 3min, 300s = 5min)
-                        // mark paused state
-                        isPaused = true;
-                        pausedUntil = Date.now() + setTimeInterval;
-                        pendingContractType = null;
+                    let setTimeInterval = 0;
 
-                        console.log(`[LOSS PAUSE] Loss detected. Pausing trading for ${Math.round(setTimeInterval/1000)} seconds until ${new Date(pausedUntil).toLocaleTimeString()}`);
+
+                    if (consecutiveLossCount >= 3) {
+                        setTimeInterval = getRandomNumber(30, 180) * 1000;;
+                        console.log(`[LOSS STREAK] ${consecutiveLossCount} losses in a row. Waiting 30 seconds.`);
                         setTimer(setTimeInterval);
-
-                        // After pause ends, resume scanning/trading
                         setTimeout(() => {
-                            isPaused = false;
-                            hasRequestedTickHistory = false; // allow fresh history request
                             runScript();
                         }, setTimeInterval);
                     } else {
-                        // Reset consecutive losses on win
-                        consecutiveLossCount = 0;
-
-                        // If session target reached or other conditions, continue normal flow
-                        if (netProfit >= targetAmount) {
+                        if(netProfit >= targetAmount){
                             reload();
-                            return;
+                        }else {
+                            setTimer(setTimeInterval);
+                            setTimeout(() => {
+                                runScript();
+                            }, setTimeInterval);
                         }
-                        // otherwise continue immediately
-                        setTimer(setTimeInterval);
-                        setTimeout(() => {
-                            runScript();
-                        }, setTimeInterval);
                     }
                 } else {
                     setTimeout(() => {
@@ -496,9 +450,9 @@ function logEvenOddPercentages(prices) {
     const lastThreeDigits = lastDigits.slice(-3);
 
     contractType = null;
-    if (evenPercentage >= 54) {
+    if (evenPercentage >= 56) {
         contractType = "even";
-    } else if (oddPercentage >= 54) {
+    } else if (oddPercentage >= 56) {
         contractType = "odd";
     }
 
@@ -566,31 +520,14 @@ function getTrailingOddCount(lastDigits) {
 }
 
 function tryEvenEntry(evenPercentage, lastDigits) {
-    if (isPaused && Date.now() < pausedUntil) return false;
     if (pendingContractType) return false;
     if (contractType !== "even") return;
     if (!Array.isArray(lastDigits) || lastDigits.length === 0) return;
-
-    const trailingOddCount = getTrailingOddCount(lastDigits);
-
-    let shouldPlaceTrade = false;
-
-    // After 4 consecutive losses, only enter when the majority percentage is strictly greater than 60
-    if (consecutiveLossCount >= 4) {
+    if (consecutiveLossCount >= 3) {
         if (evenPercentage <= 60) return false;
     }
 
-    if (evenPercentage >= 54 && evenPercentage <= 60 && trailingOddCount >= 3) {
-        shouldPlaceTrade = true;
-    } else if (evenPercentage >= 60 && trailingOddCount >= 2) {
-        shouldPlaceTrade = true;
-    }
-
-    if (shouldPlaceTrade) {
-        if (isPaused && Date.now() < pausedUntil) {
-            console.log('Paused — skipping even entry until', new Date(pausedUntil).toLocaleTimeString());
-            return false;
-        }
+    if (evenPercentage >= 56) {
         if (typeof placeTheTrade === "function") {
             placeTheTrade(contractType);
             return true;
@@ -615,31 +552,14 @@ function getTrailingEvenCount(lastDigits) {
 }
 
 function tryOddEntry(oddPercentage, lastDigits) {
-    if (isPaused && Date.now() < pausedUntil) return false;
     if (pendingContractType) return false;
     if (contractType !== "odd") return;
     if (!Array.isArray(lastDigits) || lastDigits.length === 0) return;
-
-    const trailingEvenCount = getTrailingEvenCount(lastDigits);
-
-    let shouldPlaceTrade = false;
-
-    // After 4 consecutive losses, only enter when the majority percentage is strictly greater than 60
-    if (consecutiveLossCount >= 4) {
+    if (consecutiveLossCount >= 3) {
         if (oddPercentage <= 60) return false;
     }
 
-    if (oddPercentage >= 54 && oddPercentage <= 60 && trailingEvenCount >= 3) {
-        shouldPlaceTrade = true;
-    } else if (oddPercentage >= 60 && trailingEvenCount >= 2) {
-        shouldPlaceTrade = true;
-    }
-
-    if (shouldPlaceTrade) {
-        if (isPaused && Date.now() < pausedUntil) {
-            console.log('Paused — skipping odd entry until', new Date(pausedUntil).toLocaleTimeString());
-            return false;
-        }
+    if (oddPercentage >= 56) {
         if (typeof placeTheTrade === "function") {
             placeTheTrade(contractType);
             return true;

@@ -1,0 +1,356 @@
+// @version=5
+indicator("All-In-One MarketSense", overlay=true, shorttitle="AIO MarketSense")
+
+// === Inputs ===
+showEMA = input.bool(true, "Show EMAs")
+emaFastLen = input.int(20, "EMA Fast Length")
+emaSlowLen = input.int(50, "EMA Slow Length")
+
+showSMA = input.bool(true, "Show SMA")
+smaLen = input.int(200, "SMA Length")
+
+showRSI = input.bool(true, "Show RSI")
+rsiLen = input.int(14, "RSI Length")
+
+showMACD = input.bool(true, "Show MACD")
+
+showBB = input.bool(true, "Show Bollinger Bands")
+bbLen = input.int(20, "BB Length")
+bbMult = input.float(2.0, "BB Mult")
+
+showADX = input.bool(true, "Show ADX")
+adxLen = input.int(14, "ADX Length")
+
+showPivots = input.bool(true, "Show Pivot Zones")
+phLeft = input.int(5, "Pivot Left Bars")
+phRight = input.int(5, "Pivot Right Bars")
+
+rr = input.float(2.0, "Default RR (TP/SL)")
+signalThreshold = input.int(3, "Signal Score Threshold")
+
+// Pattern tolerance
+priceTolerance = input.float(0.005, "Pattern Price Tolerance (fraction)")
+
+// === Indicators ===
+emaFast = ta.ema(close, emaFastLen)
+emaSlow = ta.ema(close, emaSlowLen)
+sma200 = ta.sma(close, smaLen)
+
+rsi = ta.rsi(close, rsiLen)
+
+macd_line = ta.ema(close, 12) - ta.ema(close, 26)
+macd_signal = ta.ema(macd_line, 9)
+
+bbBasis = ta.sma(close, bbLen)
+bbDev = ta.stdev(close, bbLen)
+bbUpper = bbBasis + bbMult * bbDev
+bbLower = bbBasis - bbMult * bbDev
+
+// Scalping / ATR settings
+scalpingMode = input.bool(true, "Scalping Mode (ATR-based SL/TP)")
+atrPeriod = input.int(14, "ATR Period")
+slAtrMult = input.float(0.5, "SL = ATR ×", step=0.1)
+tpAtrMult = input.float(1.0, "TP = ATR ×", step=0.1)
+// Minimal display: hide auxiliary plots and only show signals + SL/TP
+minimalDisplay = input.bool(true, "Minimal Display (only signals)")
+
+// ADX: manual computation using True Range and Directional Movement (Wilder's smoothing)
+upMove = high - high[1]
+downMove = low[1] - low
+plusDM = (upMove > downMove and upMove > 0) ? upMove : 0.0
+minusDM = (downMove > upMove and downMove > 0) ? downMove : 0.0
+tr = math.max(high - low, math.max(math.abs(high - close[1]), math.abs(low - close[1])))
+smTR = ta.rma(tr, adxLen)
+smPlusDM = ta.rma(plusDM, adxLen)
+smMinusDM = ta.rma(minusDM, adxLen)
+plusDI = smTR != 0 ? 100 * smPlusDM / smTR : 0.0
+minusDI = smTR != 0 ? 100 * smMinusDM / smTR : 0.0
+dx = (plusDI + minusDI) != 0 ? 100 * math.abs(plusDI - minusDI) / (plusDI + minusDI) : 0.0
+adx = ta.rma(dx, adxLen)
+
+// ATR used for scalping SL/TP
+atr = ta.atr(atrPeriod)
+
+volSma = ta.sma(volume, 20)
+
+// === Pivot detection ===
+ph = ta.pivothigh(high, phLeft, phRight)
+pl = ta.pivotlow(low, phLeft, phRight)
+
+// store last few pivots into vars
+var float lastPH = na
+var int lastPHBar = na
+var float prevPH = na
+var int prevPHBar = na
+var float lastPL = na
+var int lastPLBar = na
+var float prevPL = na
+var int prevPLBar = na
+
+if not na(ph)
+    prevPH := lastPH
+    prevPHBar := lastPHBar
+    lastPH := ph
+    lastPHBar := bar_index - phRight
+
+if not na(pl)
+    prevPL := lastPL
+    prevPLBar := lastPLBar
+    lastPL := pl
+    lastPLBar := bar_index - phRight
+
+// Helper: roughly equal price
+isClose(a, b, tol) => math.abs(a - b) <= math.max(0.0001, tol * math.abs(b))
+
+// format price to symbol tick precision
+fmt_price(x) => str.tostring(math.round(x / syminfo.mintick) * syminfo.mintick)
+
+// === Simple pattern detectors ===
+doubleTop = false
+doubleBottom = false
+headAndShoulders = false
+invHeadAndShoulders = false
+
+// Double top: two recent pivot highs close in price and the valley between them lower
+if not na(lastPH) and not na(prevPH)
+    barsBetween = math.max(1, math.abs(lastPHBar - prevPHBar))
+    valley = ta.lowest(low, barsBetween)
+    if isClose(lastPH, prevPH, priceTolerance) and lastPH > valley
+        doubleTop := true
+
+// Double bottom
+if not na(lastPL) and not na(prevPL)
+    barsBetweenPL = math.max(1, math.abs(lastPLBar - prevPLBar))
+    peakBetween = ta.highest(high, barsBetweenPL)
+    if isClose(lastPL, prevPL, priceTolerance) and lastPL < peakBetween
+        doubleBottom := true
+
+// Head & Shoulders (approx) - naive heuristic
+// we require three pivot highs where middle is highest and shoulders approx equal
+hsDetected = false
+if not na(prevPH) and not na(lastPH)
+    // find an older pivot high by scanning a few bars back
+    var float olderPH = na
+    var int olderPHBar = na
+    for i = 1 to 40
+        phx = ta.pivothigh(high, phLeft, phRight)[i]
+        if not na(phx)
+            olderPH := phx
+            olderPHBar := bar_index - phRight - i
+            break
+    if not na(olderPH)
+        // olderPH (left shoulder), prevPH (head), lastPH (right shoulder)
+        if prevPH > olderPH and prevPH > lastPH and isClose(olderPH, lastPH, priceTolerance)
+            headAndShoulders := true
+
+// Inverse H&S using pivot lows
+if not na(prevPL) and not na(lastPL)
+    var float olderPL = na
+    var int olderPLBar = na
+    for i = 1 to 40
+        plx = ta.pivotlow(low, phLeft, phRight)[i]
+        if not na(plx)
+            olderPL := plx
+            olderPLBar := bar_index - phRight - i
+            break
+    if not na(olderPL)
+        if prevPL < olderPL and prevPL < lastPL and isClose(olderPL, lastPL, priceTolerance)
+            invHeadAndShoulders := true
+
+// === Scoring / signal aggregation ===
+bullScore = 0
+bearScore = 0
+
+// Trend (EMA)
+if close > emaFast and emaFast > emaSlow
+    bullScore += 1
+if close < emaFast and emaFast < emaSlow
+    bearScore += 1
+
+// SMA200 as filter
+if close > sma200
+    bullScore += 1
+else
+    bearScore += 1
+
+// RSI extremes
+if rsi < 30
+    bullScore += 1
+if rsi > 70
+    bearScore += 1
+
+// MACD
+if macd_line > macd_signal
+    bullScore += 1
+else
+    bearScore += 1
+
+// ADX
+if adx > 25
+    if emaFast > emaSlow
+        bullScore += 1
+    else
+        bearScore += 1
+
+// Bollinger
+if close > bbUpper
+    bullScore += 1
+if close < bbLower
+    bearScore += 1
+
+// Volume
+if volume > volSma * 1.5
+    if close > open
+        bullScore += 1
+    else
+        bearScore += 1
+
+// Patterns
+if doubleTop
+    bearScore += 2
+if doubleBottom
+    bullScore += 2
+if headAndShoulders
+    bearScore += 2
+if invHeadAndShoulders
+    bullScore += 2
+
+// === Determine signal ===
+signal = 0 // 1 = long, -1 = short
+if bullScore - bearScore >= signalThreshold
+    signal := 1
+if bearScore - bullScore >= signalThreshold
+    signal := -1
+
+// === Entry / SL / TP logic ===
+var float entryPrice = na
+var float stopLoss = na
+var float takeProfit = na
+var int entryBar = na
+
+recentPH = lastPH
+recentPL = lastPL
+
+if signal == 1
+    if not na(recentPH)
+        if close > recentPH
+            entryPrice := close
+            if scalpingMode
+                stopLoss := entryPrice - slAtrMult * atr
+                takeProfit := entryPrice + tpAtrMult * atr
+            else
+                stopLoss := not na(prevPL) ? prevPL : ta.lowest(low, 10)
+                takeProfit := entryPrice + (entryPrice - stopLoss) * rr
+            entryBar := bar_index
+    else
+        if emaFast > emaSlow and ta.crossover(close, emaFast)
+            entryPrice := close
+            if scalpingMode
+                stopLoss := entryPrice - slAtrMult * atr
+                takeProfit := entryPrice + tpAtrMult * atr
+            else
+                stopLoss := ta.lowest(low, 10)
+                takeProfit := entryPrice + (entryPrice - stopLoss) * rr
+            entryBar := bar_index
+
+if signal == -1
+    if not na(recentPL)
+        if close < recentPL
+            entryPrice := close
+            if scalpingMode
+                stopLoss := entryPrice + slAtrMult * atr
+                takeProfit := entryPrice - tpAtrMult * atr
+            else
+                stopLoss := not na(prevPH) ? prevPH : ta.highest(high, 10)
+                takeProfit := entryPrice - (stopLoss - entryPrice) * rr
+            entryBar := bar_index
+    else
+        if emaFast < emaSlow and ta.crossunder(close, emaFast)
+            entryPrice := close
+            if scalpingMode
+                stopLoss := entryPrice + slAtrMult * atr
+                takeProfit := entryPrice - tpAtrMult * atr
+            else
+                stopLoss := ta.highest(high, 10)
+                takeProfit := entryPrice - (stopLoss - entryPrice) * rr
+            entryBar := bar_index
+
+// Reset stale entry if SL hit historically (visual)
+if not na(entryPrice)
+    if low <= stopLoss and signal == 1
+        entryPrice := na
+        stopLoss := na
+        takeProfit := na
+    if high >= stopLoss and signal == -1
+        entryPrice := na
+        stopLoss := na
+        takeProfit := na
+
+// === Drawing ===
+// `plot()` must be called at global scope — use ternary to show/hide
+
+// plots must be at global scope; hide when minimalDisplay is enabled
+pEMA1 = plot((showEMA and not minimalDisplay) ? emaFast : na, color=color.orange, title="EMA Fast")
+pEMA2 = plot((showEMA and not minimalDisplay) ? emaSlow : na, color=color.blue, title="EMA Slow")
+
+pSMA = plot((showSMA and not minimalDisplay) ? sma200 : na, color=color.gray, title="SMA200")
+
+// Bollinger bands plots (global) and fill
+pBB1 = plot((showBB and not minimalDisplay) ? bbUpper : na, color=color.new(color.purple, 60))
+pBB2 = plot((showBB and not minimalDisplay) ? bbLower : na, color=color.new(color.purple, 60))
+fill(pBB1, pBB2, color=color.new(color.purple, 90))
+
+if (showPivots and not minimalDisplay)
+    if not na(lastPH)
+        line.new(lastPHBar, lastPH, bar_index, lastPH, xloc=xloc.bar_index, color=color.red, width=1, extend=extend.right)
+    if not na(lastPL)
+        line.new(lastPLBar, lastPL, bar_index, lastPL, xloc=xloc.bar_index, color=color.green, width=1, extend=extend.right)
+
+// (pattern labels removed to reduce on-chart clutter)
+
+// Plot signal arrow - must be at global scope (use ternary to hide when minimal)
+plotshape((not minimalDisplay and signal == 1) ? low : na, title="Bull Signal", location=location.belowbar, color=color.green, style=shape.arrowup, size=size.small)
+plotshape((not minimalDisplay and signal == -1) ? high : na, title="Bear Signal", location=location.abovebar, color=color.red, style=shape.arrowdown, size=size.small)
+
+// Draw entry, SL, TP
+var line entryLine = na
+var line slLine = na
+var line tpLine = na
+var label entryMain = na
+var label slLbl = na
+var label tpLbl = na
+
+if not na(entryPrice) and entryBar == bar_index
+    if not na(entryLine)
+        line.delete(entryLine)
+    if not na(slLine)
+        line.delete(slLine)
+    if not na(tpLine)
+        line.delete(tpLine)
+    if not na(entryMain)
+        label.delete(entryMain)
+    if not na(slLbl)
+        label.delete(slLbl)
+    if not na(tpLbl)
+        label.delete(tpLbl)
+    entryLine := line.new(bar_index, entryPrice, bar_index + 50, entryPrice, xloc=xloc.bar_index, color=color.green, style=line.style_solid)
+    slLine := line.new(bar_index, stopLoss, bar_index + 50, stopLoss, xloc=xloc.bar_index, color=color.red, style=line.style_dashed)
+    tpLine := line.new(bar_index, takeProfit, bar_index + 50, takeProfit, xloc=xloc.bar_index, color=color.blue, style=line.style_dashed)
+    entryMain := label.new(bar_index, entryPrice, signal == 1 ? "Buy" : "Sell", yloc=yloc.price, style= signal == 1 ? label.style_label_up : label.style_label_down, color= signal == 1 ? color.new(color.green, 0) : color.new(color.red, 0), textcolor=color.white)
+    slLbl := label.new(bar_index, stopLoss, "SL: " + fmt_price(stopLoss), yloc=yloc.price, style=label.style_label_left, color=color.new(color.red, 0), textcolor=color.white)
+    tpLbl := label.new(bar_index, takeProfit, "TP: " + fmt_price(takeProfit), yloc=yloc.price, style=label.style_label_left, color=color.new(color.blue, 0), textcolor=color.white)
+
+// extend to current bar
+if not na(entryLine)
+    line.set_xy2(entryLine, bar_index + 50, entryPrice)
+if not na(slLine)
+    line.set_xy2(slLine, bar_index + 50, stopLoss)
+if not na(tpLine)
+    line.set_xy2(tpLine, bar_index + 50, takeProfit)
+// Live summary table (table created at global scope; only filled when not minimal)
+var table sigTable = table.new(position.top_right, 1, 4)
+if not minimalDisplay and barstate.islast
+    table.cell(sigTable, 0, 0, "BullScore: " + str.tostring(bullScore), text_color=color.green)
+    table.cell(sigTable, 0, 1, "BearScore: " + str.tostring(bearScore), text_color=color.red)
+    table.cell(sigTable, 0, 2, "Signal: " + (signal == 1 ? "LONG" : signal == -1 ? "SHORT" : "NEUTRAL"))
+    table.cell(sigTable, 0, 3, "Entry: " + (not na(entryPrice) ? str.tostring(entryPrice) : "—"))
