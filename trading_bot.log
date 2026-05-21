@@ -1,0 +1,8 @@
+2026-05-13 13:58:01,837 - TradingBot - INFO - Trading bot started
+2026-05-13 13:58:01,837 - TradingBot - INFO - ============================================================
+2026-05-13 13:58:01,837 - TradingBot - INFO - Starting trading bot run at 2026-05-13 13:58:01.837113
+2026-05-13 13:58:01,838 - TradingBot - INFO - ============================================================
+2026-05-13 13:58:01,950 - TradingBot - ERROR - Error getting account balance: APIError(code=-2015): Invalid API-key, IP, or permissions for action.
+2026-05-13 13:58:01,950 - TradingBot - INFO - Available USDT balance: 0.00
+2026-05-13 13:58:01,953 - TradingBot - WARNING - Insufficient balance. Need at least 10 USDT
+2026-05-13 13:58:01,954 - TradingBot - INFO - Waiting 300 seconds for next check...

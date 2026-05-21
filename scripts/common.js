@@ -59,7 +59,7 @@ const placeEvenOddTrade = (selectedContractType = "even") => {
             currency: "USD",
             duration: tickCount,
             duration_unit: "t",
-            symbol: market,
+            underlying_symbol: market,
         };
 
         console.log("Sending Rise/Fall trade request:", tradeRequest);
