@@ -13,7 +13,10 @@ const marketArray = [
     { value: "R_100", name: "Volatility 100 Index" },
 ];
 
-const APP_ID = "33jLZ26mnkXNN8GI4mJBI";
+// const ACCOUNT_TYPE = "demo";
+const ACCOUNT_TYPE = "real";
+
+const APP_ID = "33oWYOQxAL3YJYtTvBRep";
 const accountSelectElement = document.getElementById("account_select");
 const marketSelectElement = document.getElementById("market");
 const targetProfitInputElement = document.getElementById("target_profit");
@@ -66,6 +69,7 @@ let sessionTargetPercentage = 1 / startingAmount,
 
 let market, apiToken, stake, tickCount, contractType;
 let authSuccess = false, automation = false;
+let currentPayoutRate = 0.75;
 
 accounts.forEach((item) => {
     const option = document.createElement("option");
@@ -126,14 +130,58 @@ async function fetchAuthenticatedConnectionUrl(token) {
         }
 
         const accountData = await accountDetailsResponse.json();
-        if (!accountData.data || accountData.data.length === 0) {
-            throw new Error("No active options trading accounts found for this token.");
+
+        let activeAccount = null;
+        console.log(accountData);
+
+        if (accountData.data && accountData.data.length > 0) {
+            activeAccount = accountData.data.find(acc => acc.account_type === ACCOUNT_TYPE);
         }
 
-        const activeAccountId = accountData.data[0].account_id;
-        console.log(`Targeting Account ID: ${activeAccountId}`);
+        
 
-        const otpEndpointUrl = `https://api.derivws.com/trading/v1/options/accounts/${activeAccountId}/otp`;
+        if (!activeAccount) {
+            console.log(`No demo account found. Creating one...`);
+            const createResponse = await fetch(
+                "https://api.derivws.com/trading/v1/options/accounts",
+                {
+                    method: "POST",
+                    headers: {
+                        "Deriv-App-ID": APP_ID,
+                        "Authorization": `Bearer ${token}`,
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        currency: "USD",
+                        group: "row",
+                        account_type: "demo",
+                    }),
+                }
+            );
+
+            if (!createResponse.ok) {
+                throw new Error(`Failed to create demo account: ${createResponse.statusText}`);
+            }
+
+            const createData = await createResponse.json();
+            if (Array.isArray(createData.data)) {
+                activeAccount = createData.data[0];
+            } else {
+                activeAccount = createData.data;
+            }
+            if (typeof setFlashNotification === "function") {
+                setFlashNotification(`Demo account created: ${activeAccount.account_id}`, 3);
+            }
+            console.log("Demo account created:", activeAccount);
+        }
+
+        if (!activeAccount) {
+            throw new Error("No demo account available.");
+        }
+
+        console.log(`Using Demo Account ID: ${activeAccount.account_id}`);
+
+        const otpEndpointUrl = `https://api.derivws.com/trading/v1/options/accounts/${activeAccount.account_id}/otp`;
 
         const response = await fetch(otpEndpointUrl, {
             method: "POST",
@@ -249,12 +297,12 @@ function handleServerMessage(event) {
                 authenticateButton.disabled = true;
             }
             if (typeof resetParams === "function") resetParams();
+            try { if (initialStakeInputElement) initialStakeInputElement.value = Number(stake).toFixed(2); } catch (e) { }
 
             try {
                 const storedLost = parseFloat(localStorage.getItem('totalLostAmount')) || 0;
                 if (storedLost !== 0) {
-                    const PAYOUT_RATE = 0.80;
-                    const calcStake = Number((Math.abs(storedLost) / PAYOUT_RATE).toFixed(2));
+                    const calcStake = Number((Math.abs(storedLost) / currentPayoutRate).toFixed(2));
                     stake = calcStake;
                     try { if (initialStakeInputElement) initialStakeInputElement.value = stake; } catch (e) { }
                     if (typeof setFlashNotification === "function") setFlashNotification(`Recovered pending loss ${storedLost.toFixed(2)} — adjusting stake to ${stake}`, 5);
@@ -335,6 +383,13 @@ function handleServerMessage(event) {
         } else {
             tradeProposal = wsResponse;
             console.log('tradeProposal: ', tradeProposal);
+            // Extract actual payout rate from the proposal
+            try {
+                if (tradeProposal.proposal && tradeProposal.proposal.payout && tradeProposal.proposal.ask_price && tradeProposal.proposal.ask_price > 0) {
+                    currentPayoutRate = (tradeProposal.proposal.payout - tradeProposal.proposal.ask_price) / tradeProposal.proposal.ask_price;
+                    currentPayoutRate = Number(currentPayoutRate.toFixed(4));
+                }
+            } catch (e) { }
             if (pendingContractType && isTradeOpen === false) {
                 if (typeof makeTheTrade === "function") makeTheTrade(tradeProposal, pendingContractType);
             }
@@ -389,7 +444,15 @@ function handleServerMessage(event) {
                 } catch (e) { }
 
                 isTradeOpen = false;
-                if (typeof stakeChangeForTotal === "function") stakeChangeForTotal(result);
+                if (result === "Loss") {
+                    const storedLost = parseFloat(localStorage.getItem('totalLostAmount')) || 0;
+                    if (storedLost !== 0) {
+                        stake = Number((Math.abs(storedLost) / currentPayoutRate).toFixed(2));
+                    }
+                } else if (result === "Win") {
+                    stake = amountPutForTrading;
+                }
+                try { if (initialStakeInputElement) initialStakeInputElement.value = Number(stake).toFixed(2); } catch (e) { }
                 pendingContractType = null;
 
                 if (profit < 0) {

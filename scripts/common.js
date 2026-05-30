@@ -107,7 +107,7 @@ const stakeChangeForTotal = (status) => {
     if (status == "Loss") {
         const storedLost = parseFloat(localStorage.getItem('totalLostAmount')) || 0;
         if (storedLost !== 0) {
-            const calcStake = Number(((Math.abs(storedLost) / 80) * 100).toFixed(2));
+            const calcStake = Number(((Math.abs(storedLost) / 75) * 100).toFixed(2));
             stake = calcStake;
         }
     } else if (status == "Win") {
