@@ -32,25 +32,11 @@ let last50Prices = [];
 let hasRequestedTickHistory = false;
 let pendingContractType = null;
 let ticksWithoutTrade = 0;
-let consecutiveLossCount = 0;
 const NO_TRADE_TICK_LIMIT = 120;
-
-const martingaleMultiplier = 2.07112;
 let dayTarget = 0;
+const amountPercentage = 1 / 100;
 
-if (params.get("target")) {
-    dayTarget = Number(params.get("target"));
-} else if (targetProfitInputElement && targetProfitInputElement.value) {
-    dayTarget = Number(targetProfitInputElement.value);
-}
-
-let startingAmount = 250;
-
-let sessionTargetPercentage = 1 / startingAmount,
-    targetPercentage = 1 / startingAmount,
-    amountPercentage = 0.5 / 100,
-    finishTargetPercentagePerDay = 3 / 100,
-    isTradeOpen = false,
+let isTradeOpen = false,
     netProfit = 0,
     targetAmount = 0,
     winTradeCount = 0,
@@ -92,17 +78,6 @@ apiToken = accountSelectElement.value;
 accountSelectElement.addEventListener("change", () => {
     apiToken = accountSelectElement.value;
 });
-
-if (targetProfitInputElement) {
-    targetProfitInputElement.addEventListener("change", () => {
-        const val = Number(targetProfitInputElement.value);
-        if (initialAccountBalance > 0 && val > 0) {
-            sessionTargetPercentage = val / initialAccountBalance;
-            targetAmount = val;
-        }
-        console.log(`Session target percentage updated: ${sessionTargetPercentage}`);
-    });
-}
 
 market = (typeof getRandomMarket === "function") ? getRandomMarket(marketArray, "") : marketSelectElement.value;
 
@@ -299,93 +274,19 @@ function handleServerMessage(event) {
             if (typeof resetParams === "function") resetParams();
             try { if (initialStakeInputElement) initialStakeInputElement.value = Number(stake).toFixed(2); } catch (e) { }
 
-            try {
-                const storedLost = parseFloat(localStorage.getItem('totalLostAmount')) || 0;
-                if (storedLost !== 0) {
-                    const calcStake = Number((Math.abs(storedLost) / currentPayoutRate).toFixed(2));
-                    stake = calcStake;
-                    try { if (initialStakeInputElement) initialStakeInputElement.value = stake; } catch (e) { }
-                    if (typeof setFlashNotification === "function") setFlashNotification(`Recovered pending loss ${storedLost.toFixed(2)} — adjusting stake to ${stake}`, 5);
-                }
-            } catch (e) { }
-
-            try {
-                if (typeof stake === 'number' && initialAccountBalance > 0 && stake > initialAccountBalance) {
-                    stake = Number(initialAccountBalance.toFixed(2));
-                    try { if (initialStakeInputElement) initialStakeInputElement.value = stake; } catch (e) { }
-                    if (typeof setFlashNotification === "function") setFlashNotification(`Stake adjusted to initial account balance: ${stake}`, 5);
-                }
-            } catch (e) { }
-
-            try {
-                const today = new Date().toISOString().slice(0, 10);
-                const storedDate = localStorage.getItem('date');
-                let storedDayTarget = localStorage.getItem('dayTarget');
-
-                if (!storedDate || !storedDayTarget || storedDate !== today) {
-                    const computedTarget = Number((initialAccountBalance + (finishTargetPercentagePerDay * initialAccountBalance)).toFixed(2));
-                    localStorage.setItem('date', today);
-                    localStorage.setItem('dayTarget', String(computedTarget));
-                    dayTarget = computedTarget;
-                } else {
-                    dayTarget = Number(storedDayTarget);
-                }
-
-                if (typeof setAccountInfo === "function") setAccountInfo("targetAmount", `$ ${dayTarget}`);
-
-                try {
-                    targetAmount = Number((initialAccountBalance * sessionTargetPercentage).toFixed(2));
-                    if (targetProfitInputElement) {
-                        targetProfitInputElement.value = targetAmount;
-                    }
-                } catch (e) { }
-
-                if (initialAccountBalance >= dayTarget) {
-                    if (typeof setFlashNotification === "function") setFlashNotification('Day target already reached. Stopping for today.', 0);
-                    try { localStorage.setItem('tradingStoppedForDay', '1'); } catch (e) { }
-                    isRunning = false;
-                    stopPing();
-                    try { if (ws) ws.close(); } catch (e) { }
-                    if (scriptButton) { scriptButton.disabled = true; scriptButton.innerText = 'Stopped for day'; }
-                    return;
-                }
-            } catch (e) {
-                console.error('Error initializing day target:', e);
-            }
-
-            // Check persistent consecutive loss streak
-            try {
-                const savedStreak = parseInt(localStorage.getItem('consecutiveLossStreak')) || 0;
-                const streakDate = localStorage.getItem('consecutiveLossDate');
-                const today = new Date().toISOString().slice(0, 10);
-
-                if (savedStreak >= 3 && streakDate === today) {
-                    if (typeof setFlashNotification === "function") setFlashNotification('Stopped: consecutive loss limit reached today. Manual restart required.', 0);
-                    try { localStorage.setItem('tradingStoppedForDay', '1'); } catch (e) { }
-                    isRunning = false;
-                    stopPing();
-                    try { if (ws) ws.close(); } catch (e) { }
-                    if (scriptButton) { scriptButton.disabled = true; scriptButton.innerText = 'Stopped (3 losses)'; }
-                    return;
-                } else if (streakDate !== today) {
-                    // New day, clear streak
-                    localStorage.removeItem('consecutiveLossStreak');
-                    localStorage.removeItem('consecutiveLossDate');
-                }
-            } catch (e) { }
-
-            if (dayTarget > 0 && updatedAccountBalance >= dayTarget) {
-                if (typeof setFlashNotification === "function") setFlashNotification("Day target is done", 0);
-                console.log("Day target is done");
-            } else {
-                runScript();
-            }
+            runScript();
         } else {
             if (typeof reload === "function") reload();
         }
     }
 
     if (wsResponse.msg_type === "history" && wsResponse.history && Array.isArray(wsResponse.history.prices)) {
+        console.log("history prices: ",wsResponse.history.prices);
+
+        
+        const nextValues = predictNextFiveValues(wsResponse.history.prices);
+        console.log("Next 5 values: ",nextValues); // Output: [ 4996.816, 4996.722, 4996.628, 4996.534, 4996.44 ]
+        
         last50Prices = wsResponse.history.prices.slice(-50);
         logEvenOddPercentages(last50Prices);
     }
@@ -455,71 +356,42 @@ function handleServerMessage(event) {
 
                 if (typeof setInfo === "function") setInfo(contract, profit);
 
-                try {
-                    const sessionTargetAmount = initialAccountBalance * sessionTargetPercentage;
-                    if (sessionTargetAmount > 0 && netProfit >= sessionTargetAmount) {
-                        if (typeof setFlashNotification === "function") setFlashNotification('Session target reached. Reloading.', 0);
-                        if (typeof reload === "function") reload();
-                        return;
-                    }
-                } catch (e) { }
-
                 isTradeOpen = false;
-                if (result === "Loss") {
-                    const storedLost = parseFloat(localStorage.getItem('totalLostAmount')) || 0;
-                    if (storedLost !== 0) {
-                        stake = Number((Math.abs(storedLost) / currentPayoutRate).toFixed(2));
-                    }
-                } else if (result === "Win") {
-                    stake = amountPutForTrading;
-                }
-                try { if (initialStakeInputElement) initialStakeInputElement.value = Number(stake).toFixed(2); } catch (e) { }
                 pendingContractType = null;
 
-                if (profit < 0) {
-                    consecutiveLossCount += 1;
-                    // Persist loss streak across page reloads
-                    try {
-                        localStorage.setItem('consecutiveLossStreak', consecutiveLossCount);
-                        localStorage.setItem('consecutiveLossDate', new Date().toISOString().slice(0, 10));
-                    } catch (e) { }
+                // Martingale: if recovering losses, stake = totalLostAmount * 1.3; else 1% of capital
+                const storedLost = parseFloat(localStorage.getItem('totalLostAmount')) || 0;
+                if (storedLost !== 0) {
+                    stake = Number((Math.abs(storedLost) * 1.3).toFixed(2));
+                } else {
+                    stake = Number((updatedAccountBalance * amountPercentage).toFixed(2));
+                }
+                try { if (initialStakeInputElement) initialStakeInputElement.value = Number(stake).toFixed(2); } catch (e) { }
 
-                    if (consecutiveLossCount >= 3) {
-                        if (typeof setFlashNotification === "function") setFlashNotification('Stopped: 3 consecutive losses reached. Manual restart required.', 0);
-                        try { localStorage.setItem('tradingStoppedForDay', '1'); } catch (e) { }
-                        isRunning = false;
-                        stopPing();
-                        try { if (ws) ws.close(); } catch (e) { }
-                        try { if (scriptButton) { scriptButton.disabled = true; scriptButton.innerText = 'Stopped (3 losses)'; } } catch (e) { }
-                        return;
+                // Switch market randomly after every win
+                if (profit > 0) {
+                    const prevMarket = market;
+                    const nextMarket = (typeof getRandomMarket === "function") ? getRandomMarket(marketArray, prevMarket) : marketArray[0].value;
+                    if (nextMarket && nextMarket !== prevMarket) {
+                        market = nextMarket;
+                        marketSelectElement.value = nextMarket;
+                        last50Prices = [];
+                        hasRequestedTickHistory = false;
+                        pendingContractType = null;
+                        contractType = null;
+                        console.log(`[MARKET SWITCH] Win trade. ${prevMarket} -> ${nextMarket}`);
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify({ forget_all: "ticks" }));
+                        }
                     }
-                } else {
-                    consecutiveLossCount = 0;
-                    try {
-                        localStorage.removeItem('consecutiveLossStreak');
-                        localStorage.removeItem('consecutiveLossDate');
-                    } catch (e) { }
                 }
 
-                let setTimeInterval = 0;
-
-                // Progressive cooldown based on consecutive loss count
-                if (consecutiveLossCount === 0) {
-                    setTimeInterval = (typeof getRandomNumber === "function" ? getRandomNumber(0, 5) : 2) * 1000;
-                } else if (consecutiveLossCount === 1) {
-                    setTimeInterval = (typeof getRandomNumber === "function" ? getRandomNumber(10, 30) : 15) * 1000;
-                } else if (consecutiveLossCount === 2) {
-                    setTimeInterval = (typeof getRandomNumber === "function" ? getRandomNumber(30, 60) : 45) * 1000;
-                }
-
-                if (netProfit >= targetAmount) {
-                    if (typeof reload === "function") reload();
-                } else {
-                    if (setTimeInterval > 0 && typeof setTimer === "function") setTimer(setTimeInterval);
-                    setTimeout(() => {
-                        runScript();
-                    }, setTimeInterval);
-                }
+                // Random 2-5 minute interval between trades
+                const intervalMs = (typeof getRandomNumber === "function" ? getRandomNumber(120, 300) : 180) * 1000;
+                if (typeof setTimer === "function") setTimer(intervalMs);
+                setTimeout(() => {
+                    runScript();
+                }, intervalMs);
             } else {
                 setTimeout(() => {
                     if (typeof setTickCountDown === "function") setTickCountDown(contract.tick_count, contract.tick_stream.length);
@@ -544,7 +416,7 @@ function analizeForEvenOdd() {
         JSON.stringify({
             ticks_history: market,
             style: "ticks",
-            count: 50,
+            count: 100,
             end: "latest",
             subscribe: 1,
         })
@@ -585,9 +457,9 @@ function logEvenOddPercentages(prices) {
 
     contractType = null;
     // Dual-window confirmation: both 50-tick and 10-tick must show same bias
-    if (evenPercentage >= 54 && even10Percentage >= 52) {
+    if (evenPercentage >= 52 && even10Percentage >= 60) {
         contractType = "even";
-    } else if (oddPercentage >= 54 && odd10Percentage >= 52) {
+    } else if (oddPercentage >= 52 && odd10Percentage >= 60) {
         contractType = "odd";
     }
 
@@ -660,24 +532,9 @@ function tryEvenEntry(evenPercentage, lastDigits) {
     const trailingOddCount = getTrailingOddCount(lastDigits);
     let shouldPlaceTrade = false;
 
-    // Progressive thresholds based on consecutive loss count
-    let minPercentage, minTrailing;
-    if (consecutiveLossCount === 0) {
-        minPercentage = 54;
-        minTrailing = 3;
-    } else if (consecutiveLossCount === 1) {
-        minPercentage = 56;
-        minTrailing = 3;
-    } else if (consecutiveLossCount === 2) {
-        minPercentage = 60;
-        minTrailing = 4;
-    } else {
-        return false; // 3+ losses - hard stop
-    }
+    if (evenPercentage < 52) return false;
 
-    if (evenPercentage < minPercentage) return false;
-
-    if (evenPercentage >= minPercentage && evenPercentage <= 60 && trailingOddCount >= minTrailing) {
+    if (evenPercentage >= 52 && evenPercentage <= 60 && trailingOddCount >= 3) {
         shouldPlaceTrade = true;
     } else if (evenPercentage > 60 && trailingOddCount >= 2) {
         shouldPlaceTrade = true;
@@ -716,26 +573,11 @@ function tryOddEntry(oddPercentage, lastDigits) {
     const trailingEvenCount = getTrailingEvenCount(lastDigits);
     let shouldPlaceTrade = false;
 
-    // Progressive thresholds based on consecutive loss count
-    let minPercentage, minTrailing;
-    if (consecutiveLossCount === 0) {
-        minPercentage = 54;
-        minTrailing = 3;
-    } else if (consecutiveLossCount === 1) {
-        minPercentage = 56;
-        minTrailing = 3;
-    } else if (consecutiveLossCount === 2) {
-        minPercentage = 60;
-        minTrailing = 4;
-    } else {
-        return false; // 3+ losses - hard stop
-    }
+    if (oddPercentage < 52) return false;
 
-    if (oddPercentage < minPercentage) return false;
-
-    if (oddPercentage >= minPercentage && oddPercentage <= 60 && trailingEvenCount >= minTrailing) {
+    if (oddPercentage >= 52 && oddPercentage <= 60 && trailingEvenCount >= 2) {
         shouldPlaceTrade = true;
-    } else if (oddPercentage > 60 && trailingEvenCount >= 2) {
+    } else if (oddPercentage > 60 && trailingEvenCount >= 1) {
         shouldPlaceTrade = true;
     }
 
@@ -757,7 +599,6 @@ function webSocketConnectionStop() {
     isRunning = false;
     isTradeOpen = false;
     pendingContractType = null;
-    try { localStorage.setItem("tradingStoppedForDay", "1"); } catch (e) { }
     stopPing();
     if (ws) {
         try { ws.onclose = null; ws.close(); } catch (e) { }
@@ -781,3 +622,51 @@ function webSocketConnectionStart() {
     console.log("[BRIDGE] Socket closed. Re-connecting...");
     initializeTradingSession();
 }
+
+
+function predictNextFiveValues(data) {
+    const lookback = 5; // Number of recent points to analyze
+    const forecastSteps = 5; // Number of future points to predict
+    
+    if (data.length < lookback) {
+        throw new Error(`Array must have at least ${lookback} elements.`);
+    }
+
+    // 1. Extract the last 'lookback' data points
+    const recentData = data.slice(-lookback);
+    
+    // 2. Setup X (indices/time) and Y (values) arrays
+    // For simplicity, we align the X indices to start from 0 to lookback-1
+    const xValues = Array.from({ length: lookback }, (_, i) => i);
+    const yValues = recentData;
+
+    // 3. Calculate Means of X and Y
+    const xMean = xValues.reduce((a, b) => a + b, 0) / lookback;
+    const yMean = yValues.reduce((a, b) => a + b, 0) / lookback;
+
+    // 4. Calculate the Slope (m) and Intercept (c) -> y = mx + c
+    let num = 0;
+    let den = 0;
+    for (let i = 0; i < lookback; i++) {
+        num += (xValues[i] - xMean) * (yValues[i] - yMean);
+        den += Math.pow(xValues[i] - xMean, 2);
+    }
+    
+    const slope = num / den;
+    const intercept = yMean - (slope * xMean);
+
+    // 5. Predict the next 5 values
+    const predictions = [];
+    for (let i = 0; i < forecastSteps; i++) {
+        // The next points continue from the lookback index onwards
+        const nextX = lookback + i;
+        const nextY = (slope * nextX) + intercept;
+        
+        // Round to 3 decimal places to match your data formatting
+        predictions.push(Number(nextY.toFixed(3)));
+    }
+
+    return predictions;
+}
+
+// Output: [ 4996.816, 4996.722, 4996.628, 4996.534, 4996.44 ]

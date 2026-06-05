@@ -30,11 +30,8 @@ function setAccountInfo(elementId, message) {
 }
 
 function resetParams() {
-    targetAmount = (initialAccountBalance * (targetPercentage)).toFixed(2);
-    setAccountInfo("targetAmount", `$ ${targetAmount}`);
-    amountPutForTrading = (initialAccountBalance * (amountPercentage)).toFixed(2);
-    setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
-    stake = amountPutForTrading;
+    stake = Number((initialAccountBalance * amountPercentage).toFixed(2));
+    setAccountInfo("amountPutForTrading", `$ ${stake}`);
 }
 
 
@@ -237,7 +234,7 @@ function setInfo(contract, lastTradeProfit) {
                 localStorage.setItem('totalLostAmount', stored.toFixed(2));
                 // if recovered fully, restore stake to normal trading amount
                 if (stored === 0) {
-                    try { stake = amountPutForTrading; } catch (e) {}
+                    try { stake = Number((updatedAccountBalance * amountPercentage).toFixed(2)); } catch (e) {}
                     try { if (initialStakeInputElement) initialStakeInputElement.value = stake; } catch (e) {}
                 }
             }

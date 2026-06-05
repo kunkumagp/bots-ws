@@ -1,8 +1,5 @@
 const accounts = [
     { name: "KunkumaGP", value: "pat_75687aeb556fbcef179dfe7fa307bd403a28ec334dcbe0a45323c3d92a7c7aae" },
-    { name: "KUNKUMAGP Real", value: "Y71P0GIOxz3YYvr" },
-    { name: "Kunkuma Trading", value: "hJfU1x5xpoSTwHe" },
-    { name: "W H K G Prasanna 85", value: "iVOpdm24hBhw3JI" },
 ];
 
 const marketArray = [
@@ -13,10 +10,6 @@ const marketArray = [
     { value: "R_100", name: "Volatility 100 Index" },
 ];
 
-const ACCOUNT_TYPE = "demo";
-// const ACCOUNT_TYPE = "real";
-
-// ─── Configuration & Global Constant Declarations ────────────────────────────
 const APP_ID = "33jLZ26mnkXNN8GI4mJBI";
 const accountSelectElement   = document.getElementById("account_select");
 const marketSelectElement    = document.getElementById("market");
@@ -36,20 +29,16 @@ let ticksWithoutTrade = 0;
 let consecutiveLossCount = 0;
 const NO_TRADE_TICK_LIMIT = 120;
 
-const martingaleMultiplier = 2.07112;
-let dayTarget = 0;
+let entryThreshold = 52;
+let lastTradeResult = null;
 
-if (params.get("target")) {
-    dayTarget = Number(params.get("target"));
-} else if (targetProfitInputElement && targetProfitInputElement.value) {
-    dayTarget = Number(targetProfitInputElement.value);
-}
+let dayTarget = 0;
 
 let startingAmount = 100;
 
 let sessionTargetPercentage  = 1 / startingAmount,
     targetPercentage         = 0.4 / startingAmount,
-    amountPercentage         = 0.5 / 100,
+    amountPercentage         = 0.35 / 100,
     finishTargetPercentagePerDay = 3 / 100,
     isTradeOpen              = false,
     netProfit                = 0,
@@ -69,13 +58,9 @@ let sessionTargetPercentage  = 1 / startingAmount,
     stopTimer                = false;
 
 let market, apiToken, stake, tickCount, contractType;
-let currentPayoutRate = 0.75;
-
-// Flags expected by external helper scripts
 let authSuccess = false;
 let automation  = false;
 
-// ─── DOM Population ───────────────────────────────────────────────────────────
 accounts.forEach((item) => {
     const option = document.createElement("option");
     option.value = item.value;
@@ -111,14 +96,11 @@ if (targetProfitInputElement) {
 
 market = (typeof getRandomMarket === "function") ? getRandomMarket(marketArray, "") : marketSelectElement.value;
 
-// Keep updatedAccountBalance as a numeric property (guards against string assignments)
 Object.defineProperty(window, "updatedAccountBalance", {
     get: function ()  { return window._underlyingBalance || 0; },
     set: function (v) { window._underlyingBalance = typeof v === "string" ? parseFloat(v) : v; },
     configurable: true,
 });
-
-// ─── NEW DERIV AUTH: REST → WebSocket ────────────────────────────────────────
 
 async function fetchAuthenticatedConnectionUrl(token) {
     try {
@@ -138,59 +120,14 @@ async function fetchAuthenticatedConnectionUrl(token) {
         }
 
         const accountData = await accountDetailsResponse.json();
-
-        let activeAccount = null;
-        console.log(accountData);
-
-        if (accountData.data && accountData.data.length > 0) {
-            activeAccount = accountData.data.find(acc => acc.account_type === ACCOUNT_TYPE);
+        if (!accountData.data || accountData.data.length === 0) {
+            throw new Error("No active options trading accounts found for this token.");
         }
 
-        if (!activeAccount) {
-            if (ACCOUNT_TYPE !== "demo") {
-                throw new Error(`No ${ACCOUNT_TYPE} account found.`);
-            }
-            console.log(`No demo account found. Creating one...`);
-            const createResponse = await fetch(
-                "https://api.derivws.com/trading/v1/options/accounts",
-                {
-                    method: "POST",
-                    headers: {
-                        "Deriv-App-ID": APP_ID,
-                        "Authorization": `Bearer ${token}`,
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        currency: "USD",
-                        group: "row",
-                        account_type: "demo",
-                    }),
-                }
-            );
+        const activeAccountId = accountData.data[0].account_id;
+        console.log(`Targeting Account ID: ${activeAccountId}`);
 
-            if (!createResponse.ok) {
-                throw new Error(`Failed to create demo account: ${createResponse.statusText}`);
-            }
-
-            const createData = await createResponse.json();
-            if (Array.isArray(createData.data)) {
-                activeAccount = createData.data[0];
-            } else {
-                activeAccount = createData.data;
-            }
-            if (typeof setFlashNotification === "function") {
-                setFlashNotification(`Demo account created: ${activeAccount.account_id}`, 3);
-            }
-            console.log("Demo account created:", activeAccount);
-        }
-
-        if (!activeAccount) {
-            throw new Error("No demo account available.");
-        }
-
-        console.log(`Using ${ACCOUNT_TYPE} Account ID: ${activeAccount.account_id}`);
-
-        const otpEndpointUrl = `https://api.derivws.com/trading/v1/options/accounts/${activeAccount.account_id}/otp`;
+        const otpEndpointUrl = `https://api.derivws.com/trading/v1/options/accounts/${activeAccountId}/otp`;
 
         const response = await fetch(otpEndpointUrl, {
             method: "POST",
@@ -232,7 +169,6 @@ async function initializeTradingSession() {
     console.log("Connecting to validated stream pipeline...");
     ws = new WebSocket(authorizedUrl);
 
-    // Intercept send() to remap 'symbol' → 'underlying_symbol' for proposal requests
     const originalSend = ws.send.bind(ws);
     ws.send = function (data) {
         try {
@@ -249,7 +185,6 @@ async function initializeTradingSession() {
     ws.onopen = function () {
         console.log("WebSocket connected successfully.");
         startPing();
-        // Request balance subscription — replaces the old 'authorize' handshake
         ws.send(JSON.stringify({ balance: 1, subscribe: 1 }));
     };
 
@@ -272,10 +207,7 @@ if (authenticateButton) {
     authenticateButton.addEventListener("click", initializeTradingSession);
 }
 
-// Auto-connect on page load
 initializeTradingSession();
-
-// ─── Keep-Alive Ping ──────────────────────────────────────────────────────────
 
 function startPing() {
     if (intervalId) return;
@@ -293,14 +225,10 @@ function stopPing() {
     }
 }
 
-// ─── Message Handler ──────────────────────────────────────────────────────────
-
 function handleServerMessage(event) {
     const wsResponse = JSON.parse(event.data);
     if (!wsResponse) return;
 
-    // ── BALANCE (replaces old 'authorize' callback) ──────────────────────────
-    // Only initialise once (initialAccountBalance === 0 guard)
     if (wsResponse.msg_type === "balance" && initialAccountBalance === 0) {
         console.log("Authorization verified via balance callback.\n-----------------------------\n\n");
         if (typeof setFlashNotification === "function") setFlashNotification("Authorization successful", 0);
@@ -311,7 +239,6 @@ function handleServerMessage(event) {
 
             if (typeof setAccountInfo === "function") setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance}`);
 
-            // Set flags expected by external helper scripts
             authSuccess = true;
             if (authenticateButton) {
                 authenticateButton.innerHTML = "Authenticated. Ready to trade.";
@@ -319,29 +246,23 @@ function handleServerMessage(event) {
             }
             if (typeof resetParams === "function") resetParams();
 
-            // ── Recover persisted loss into stake ────────────────────────────
-            try {
-                const storedLost = parseFloat(localStorage.getItem("totalLostAmount")) || 0;
-                if (storedLost !== 0) {
-                    const PAYOUT_RATE  = 0.80; // Deriv digit even/odd ~80%
-                    stake = Number((Math.abs(storedLost) / PAYOUT_RATE).toFixed(2));
+            const storedLost = parseFloat(localStorage.getItem("totalLostAmount")) || 0;
+            if (storedLost !== 0) {
+                stake = Number((Math.abs(storedLost) * 1.3).toFixed(2));
+                try { if (initialStakeInputElement) initialStakeInputElement.value = stake; } catch (e) {}
+                if (stake > initialAccountBalance) {
+                    stake = Number(initialAccountBalance.toFixed(2));
                     try { if (initialStakeInputElement) initialStakeInputElement.value = stake; } catch (e) {}
-                    // Safety cap: stake must not exceed available balance
-                    if (stake > initialAccountBalance) {
-                        stake = Number(initialAccountBalance.toFixed(2));
-                        try { if (initialStakeInputElement) initialStakeInputElement.value = stake; } catch (e) {}
-                        if (typeof setFlashNotification === "function") {
-                            setFlashNotification(`Stake capped to balance: ${stake}`, 5);
-                        }
-                    } else {
-                        if (typeof setFlashNotification === "function") {
-                            setFlashNotification(`Recovered pending loss ${storedLost.toFixed(2)} — stake adjusted to ${stake}`, 5);
-                        }
+                    if (typeof setFlashNotification === "function") {
+                        setFlashNotification(`Stake capped to balance: ${stake}`, 5);
+                    }
+                } else {
+                    if (typeof setFlashNotification === "function") {
+                        setFlashNotification(`Recovering pending loss ${storedLost.toFixed(2)} — stake adjusted to ${stake}`, 5);
                     }
                 }
-            } catch (e) {}
+            }
 
-            // ── Day-target initialisation / persistence ──────────────────────
             try {
                 const today           = new Date().toISOString().slice(0, 10);
                 const storedDate      = localStorage.getItem("date");
@@ -360,13 +281,11 @@ function handleServerMessage(event) {
 
                 if (typeof setAccountInfo === "function") setAccountInfo("targetAmount", `$ ${dayTarget}`);
 
-                // Show session target in the input field
                 try {
                     targetAmount = Number((initialAccountBalance * sessionTargetPercentage).toFixed(2));
                     if (targetProfitInputElement) targetProfitInputElement.value = targetAmount;
                 } catch (e) {}
 
-                // If today's target is already met, halt immediately
                 if (initialAccountBalance >= dayTarget) {
                     if (typeof setFlashNotification === "function") {
                         setFlashNotification("Day target already reached. Stopping for today.", 0);
@@ -382,7 +301,6 @@ function handleServerMessage(event) {
                 console.error("Error initialising day target:", e);
             }
 
-            // ── Start the bot ────────────────────────────────────────────────
             if (dayTarget > 0 && updatedAccountBalance >= dayTarget) {
                 if (typeof setFlashNotification === "function") setFlashNotification("Day target is done", 0);
                 console.log("Day target is done");
@@ -390,25 +308,21 @@ function handleServerMessage(event) {
                 runScript();
             }
         } else {
-            // Balance payload missing — reload and retry
             if (typeof reload === "function") reload();
         }
     }
 
-    // ── TICK HISTORY ─────────────────────────────────────────────────────────
     if (wsResponse.msg_type === "history" && wsResponse.history && Array.isArray(wsResponse.history.prices)) {
         last50Prices = wsResponse.history.prices.slice(-50);
         logEvenOddPercentages(last50Prices);
     }
 
-    // ── LIVE TICK ─────────────────────────────────────────────────────────────
     if (wsResponse.msg_type === "tick" && wsResponse.tick && typeof wsResponse.tick.quote !== "undefined") {
         last50Prices.push(wsResponse.tick.quote);
         if (last50Prices.length > 50) last50Prices = last50Prices.slice(-50);
         logEvenOddPercentages(last50Prices);
     }
 
-    // ── PROPOSAL ─────────────────────────────────────────────────────────────
     if (wsResponse.msg_type === "proposal") {
         if (updatedAccountBalance > 0 && wsResponse.echo_req.amount > updatedAccountBalance) {
             webSocketConnectionStop();
@@ -421,20 +335,17 @@ function handleServerMessage(event) {
         }
     }
 
-    // ── API ERROR ─────────────────────────────────────────────────────────────
     if (wsResponse.msg_type === "error") {
         console.error("API error:", wsResponse.error);
     }
 
-    // ── BUY CONFIRMATION ──────────────────────────────────────────────────────
     if (wsResponse.msg_type === "buy") {
         if (wsResponse.buy == undefined || wsResponse.buy.contract_id == undefined) {
-            // buy failed — no action; external scripts may handle retries
         } else {
             lastTradeId     = wsResponse.buy.contract_id;
             totalTradeCount = totalTradeCount + 1;
             isTradeOpen     = true;
-            automation      = true; // flag for external helper scripts
+            automation      = true;
 
             if (wsResponse.buy.shortcode.includes("DIGITEVEN")) {
                 tradeTypeDisplay = "Even";
@@ -453,7 +364,6 @@ function handleServerMessage(event) {
         }
     }
 
-    // ── CONTRACT RESULT ───────────────────────────────────────────────────────
     if (wsResponse.msg_type === "proposal_open_contract") {
         if (wsResponse.proposal_open_contract.contract_id === lastTradeId) {
             const contract = wsResponse.proposal_open_contract;
@@ -464,7 +374,6 @@ function handleServerMessage(event) {
 
                 if (typeof setInfo === "function") setInfo(contract, profit);
 
-                // ── Session target check (from old code) ─────────────────────
                 try {
                     const sessionTargetAmount = initialAccountBalance * sessionTargetPercentage;
                     if (sessionTargetAmount > 0 && netProfit >= sessionTargetAmount) {
@@ -477,52 +386,52 @@ function handleServerMessage(event) {
                 } catch (e) {}
 
                 isTradeOpen = false;
-                if (typeof stakeChange === "function") stakeChangeForTotal(result);
                 pendingContractType = null;
 
-                if (profit < 0) {
-                    consecutiveLossCount += 1;
-
-                    // ── 3 consecutive losses: hard stop (old behaviour) ───────
-                    if (consecutiveLossCount >= 3) {
-                        if (typeof setFlashNotification === "function") {
-                            setFlashNotification("Stopped: 3 consecutive losses. Manual restart required.", 0);
-                        }
-                        try { localStorage.setItem("tradingStoppedForDay", "1"); } catch (e) {}
-                        isRunning   = false;
-                        stopPing();
-                        try { if (ws) ws.close(); } catch (e) {}
-                        try {
-                            if (scriptButton) {
-                                scriptButton.disabled  = true;
-                                scriptButton.innerText = "Stopped (3 losses)";
-                            }
-                        } catch (e) {}
-                        return;
-                    }
-                } else {
+                if (profit > 0) {
+                    entryThreshold = 52;
                     consecutiveLossCount = 0;
+                    lastTradeResult = "win";
+
+                    const storedLost = parseFloat(localStorage.getItem("totalLostAmount")) || 0;
+                    if (storedLost === 0) {
+                        stake = Number((initialAccountBalance * amountPercentage).toFixed(2));
+                        try { if (initialStakeInputElement) initialStakeInputElement.value = stake; } catch (e) {}
+                    }
+
+                    console.log(`[WIN] Resuming immediately.`);
+                    runScript();
+                } else {
+                    consecutiveLossCount += 1;
+                    entryThreshold = 58;
+                    lastTradeResult = "loss";
+
+                    const storedLost = parseFloat(localStorage.getItem("totalLostAmount")) || 0;
+                    if (storedLost !== 0) {
+                        stake = Number((Math.abs(storedLost) * 1.3).toFixed(2));
+                        try { if (initialStakeInputElement) initialStakeInputElement.value = stake; } catch (e) {}
+                        if (stake > updatedAccountBalance) {
+                            stake = Number(updatedAccountBalance.toFixed(2));
+                            try { if (initialStakeInputElement) initialStakeInputElement.value = stake; } catch (e) {}
+                        }
+                    }
+
+                    console.log(`[LOSS] Threshold raised to ${entryThreshold}%. Monitoring for recovery.`);
+                    runScript();
                 }
 
-                // ── After-trade delay / next action ──────────────────────────
-                let setTimeInterval = 0;
-
-                if (consecutiveLossCount >= 3) {
-                    // Should never reach here (handled above), but kept as safety net
-                    setTimeInterval = getRandomNumber(30, 180) * 1000;
-                    console.log(`[LOSS STREAK] ${consecutiveLossCount} losses. Waiting ${setTimeInterval / 1000}s.`);
-                    if (typeof setTimer === "function") setTimer(setTimeInterval);
-                    setTimeout(() => { runScript(); }, setTimeInterval);
-                } else {
-                    if (netProfit >= targetAmount) {
-                        if (typeof reload === "function") reload();
-                    } else {
-                        if (typeof setTimer === "function") setTimer(setTimeInterval);
-                        setTimeout(() => { runScript(); }, setTimeInterval);
+                if (dayTarget > 0 && updatedAccountBalance >= dayTarget) {
+                    if (typeof setFlashNotification === "function") {
+                        setFlashNotification("Day target reached. Stopping for today.", 0);
                     }
+                    try { localStorage.setItem("tradingStoppedForDay", "1"); } catch (e) {}
+                    isRunning = false;
+                    stopPing();
+                    try { if (ws) ws.close(); } catch (e) {}
+                    if (scriptButton) { scriptButton.disabled = true; scriptButton.innerText = "Stopped for day"; }
+                    return;
                 }
             } else {
-                // Contract still open — poll again in 1 s
                 setTimeout(() => {
                     if (typeof setTickCountDown === "function") {
                         setTickCountDown(contract.tick_count, contract.tick_stream.length);
@@ -533,8 +442,6 @@ function handleServerMessage(event) {
         }
     }
 }
-
-// ─── Bot Core ─────────────────────────────────────────────────────────────────
 
 function runScript() {
     isRunning = true;
@@ -556,8 +463,6 @@ function analizeForEvenOdd() {
         })
     );
 }
-
-// ─── Market Switch on Inactivity ──────────────────────────────────────────────
 
 function changeMarketAfterNoTrade() {
     if (lossTradeCount !== 0) return;
@@ -587,8 +492,6 @@ function changeMarketAfterNoTrade() {
         analizeForEvenOdd();
     }
 }
-
-// ─── Even/Odd Analysis ────────────────────────────────────────────────────────
 
 function getDecimalPlaces(value) {
     const parts = String(value).split(".");
@@ -622,13 +525,14 @@ function logEvenOddPercentages(prices) {
     const odd10Percentage  = Number(((oddCount10  / last10Digits.length) * 100).toFixed(2));
 
     contractType = null;
-    if      (evenPercentage >= 54) contractType = "even";
-    else if (oddPercentage  >= 54) contractType = "odd";
+    if      (evenPercentage > oddPercentage)  contractType = "even";
+    else if (oddPercentage  > evenPercentage) contractType = "odd";
 
     console.log(
         `[${market}] Even: ${evenPercentage}% (last10: ${even10Percentage}%) | ` +
         `Odd: ${oddPercentage}% (last10: ${odd10Percentage}%) | ` +
-        `ContractType: ${contractType} | Last3: [${lastThreeDigits.join(",")}]`
+        `Threshold: ${entryThreshold}% | ContractType: ${contractType} | ` +
+        `ConsecutiveLosses: ${consecutiveLossCount} | Last3: [${lastThreeDigits.join(",")}]`
     );
 
     const evenTriggered  = tryEvenEntry(evenPercentage, lastDigits);
@@ -648,49 +552,17 @@ function logEvenOddPercentages(prices) {
     }
 }
 
-// ─── Trade Entry Logic ────────────────────────────────────────────────────────
-
-function getTrailingOddCount(lastDigits) {
-    let count = 0;
-    for (let i = lastDigits.length - 1; i >= 0; i--) {
-        if (lastDigits[i] % 2 !== 0) count++;
-        else break;
-    }
-    return count;
-}
-
-function getTrailingEvenCount(lastDigits) {
-    let count = 0;
-    for (let i = lastDigits.length - 1; i >= 0; i--) {
-        if (lastDigits[i] % 2 === 0) count++;
-        else break;
-    }
-    return count;
-}
-
 function tryEvenEntry(evenPercentage, lastDigits) {
     if (pendingContractType) return false;
     if (contractType !== "even") return false;
     if (!Array.isArray(lastDigits) || lastDigits.length === 0) return false;
-    if (evenPercentage < 54) return false;
+    if (evenPercentage < entryThreshold) return false;
 
-    const trailingOddCount = getTrailingOddCount(lastDigits);
-    let shouldPlaceTrade   = false;
-
-    // After 3 consecutive losses only enter on strong signal (>60)
-    if (consecutiveLossCount >= 3 && evenPercentage <= 60) return false;
-
-    if (evenPercentage >= 54 && evenPercentage <= 60 && trailingOddCount >= 3) {
-        shouldPlaceTrade = true;
-    } else if (evenPercentage >= 60 && trailingOddCount >= 2) {
-        shouldPlaceTrade = true;
-    }
-
-    if (shouldPlaceTrade && typeof placeTheTrade === "function") {
+    if (typeof placeTheTrade === "function") {
         pendingContractType = "even";
         placeTheTrade(contractType);
         return true;
-    } else if (shouldPlaceTrade) {
+    } else {
         console.warn("placeTheTrade function is not available.");
     }
     return false;
@@ -700,31 +572,17 @@ function tryOddEntry(oddPercentage, lastDigits) {
     if (pendingContractType) return false;
     if (contractType !== "odd") return false;
     if (!Array.isArray(lastDigits) || lastDigits.length === 0) return false;
-    if (oddPercentage < 54) return false;
+    if (oddPercentage < entryThreshold) return false;
 
-    const trailingEvenCount = getTrailingEvenCount(lastDigits);
-    let shouldPlaceTrade    = false;
-
-    // After 3 consecutive losses only enter on strong signal (>60)
-    if (consecutiveLossCount >= 3 && oddPercentage <= 60) return false;
-
-    if (oddPercentage >= 54 && oddPercentage <= 60 && trailingEvenCount >= 3) {
-        shouldPlaceTrade = true;
-    } else if (oddPercentage >= 60 && trailingEvenCount >= 2) {
-        shouldPlaceTrade = true;
-    }
-
-    if (shouldPlaceTrade && typeof placeTheTrade === "function") {
+    if (typeof placeTheTrade === "function") {
         pendingContractType = "odd";
         placeTheTrade(contractType);
         return true;
-    } else if (shouldPlaceTrade) {
+    } else {
         console.warn("placeTheTrade function is not available.");
     }
     return false;
 }
-
-// ─── Connection Control (called by external helper scripts) ───────────────────
 
 function webSocketConnectionStop() {
     console.log("[BOT HALTED] Stake exceeds balance. Stopping.");

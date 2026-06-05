@@ -87,7 +87,7 @@ function startWebSocket() {
 
             if (response.msg_type === 'authorize') {
                 console.log('Authorization successful.');
-                initialAccBalance = response.authorize.balance;
+                initialAccBalance = response.authorize?.balance;
                 document.getElementById('initialAccBalance').innerHTML = `$${initialAccBalance}`;
                 localStorage.setItem("accountDetails", response.authorize);
 

@@ -28,7 +28,7 @@ const params = new URLSearchParams(window.location.search);
 
 let ws = null;
 let isRunning = false, intervalId;
-let last50Prices = [];
+let lastPrices = [];
 let hasRequestedTickHistory = false;
 let pendingContractType = null;
 let ticksWithoutTrade = 0;
@@ -69,7 +69,16 @@ let sessionTargetPercentage = 1 / startingAmount,
 
 let market, apiToken, stake, tickCount, contractType;
 let authSuccess = false, automation = false;
-let currentPayoutRate = 0.75;
+let currentPayoutRate = 0.80;
+let multiplierDuration = 60;
+let multiplierValue = 50;
+
+const multiplierSelectElement = document.getElementById("multiplier_select");
+if (multiplierSelectElement) {
+    multiplierSelectElement.addEventListener("change", () => {
+        multiplierValue = Number(multiplierSelectElement.value);
+    });
+}
 
 accounts.forEach((item) => {
     const option = document.createElement("option");
@@ -132,16 +141,16 @@ async function fetchAuthenticatedConnectionUrl(token) {
         const accountData = await accountDetailsResponse.json();
 
         let activeAccount = null;
-        console.log(accountData);
-
         if (accountData.data && accountData.data.length > 0) {
-            activeAccount = accountData.data.find(acc => acc.account_type === ACCOUNT_TYPE);
+            if (ACCOUNT_TYPE === "demo") {
+                activeAccount = accountData.data.find(acc => acc.account_type === "demo");
+            } else {
+                activeAccount = accountData.data.find(acc => acc.account_type === "real");
+            }
         }
 
-        
-
         if (!activeAccount) {
-            console.log(`No demo account found. Creating one...`);
+            console.log(`No ${ACCOUNT_TYPE} account found. Creating one...`);
             const createResponse = await fetch(
                 "https://api.derivws.com/trading/v1/options/accounts",
                 {
@@ -154,13 +163,13 @@ async function fetchAuthenticatedConnectionUrl(token) {
                     body: JSON.stringify({
                         currency: "USD",
                         group: "row",
-                        account_type: "demo",
+                        account_type: ACCOUNT_TYPE,
                     }),
                 }
             );
 
             if (!createResponse.ok) {
-                throw new Error(`Failed to create demo account: ${createResponse.statusText}`);
+                throw new Error(`Failed to create ${ACCOUNT_TYPE} account: ${createResponse.statusText}`);
             }
 
             const createData = await createResponse.json();
@@ -170,16 +179,16 @@ async function fetchAuthenticatedConnectionUrl(token) {
                 activeAccount = createData.data;
             }
             if (typeof setFlashNotification === "function") {
-                setFlashNotification(`Demo account created: ${activeAccount.account_id}`, 3);
+                setFlashNotification(`${ACCOUNT_TYPE} account created: ${activeAccount.account_id}`, 3);
             }
-            console.log("Demo account created:", activeAccount);
+            console.log(`${ACCOUNT_TYPE} account created:`, activeAccount);
         }
 
         if (!activeAccount) {
-            throw new Error("No demo account available.");
+            throw new Error(`No ${ACCOUNT_TYPE} account available.`);
         }
 
-        console.log(`Using Demo Account ID: ${activeAccount.account_id}`);
+        console.log(`Using ${ACCOUNT_TYPE} Account ID: ${activeAccount.account_id}`);
 
         const otpEndpointUrl = `https://api.derivws.com/trading/v1/options/accounts/${activeAccount.account_id}/otp`;
 
@@ -353,7 +362,6 @@ function handleServerMessage(event) {
                 console.error('Error initializing day target:', e);
             }
 
-            // Check persistent consecutive loss streak
             try {
                 const savedStreak = parseInt(localStorage.getItem('consecutiveLossStreak')) || 0;
                 const streakDate = localStorage.getItem('consecutiveLossDate');
@@ -368,7 +376,6 @@ function handleServerMessage(event) {
                     if (scriptButton) { scriptButton.disabled = true; scriptButton.innerText = 'Stopped (3 losses)'; }
                     return;
                 } else if (streakDate !== today) {
-                    // New day, clear streak
                     localStorage.removeItem('consecutiveLossStreak');
                     localStorage.removeItem('consecutiveLossDate');
                 }
@@ -386,16 +393,16 @@ function handleServerMessage(event) {
     }
 
     if (wsResponse.msg_type === "history" && wsResponse.history && Array.isArray(wsResponse.history.prices)) {
-        last50Prices = wsResponse.history.prices.slice(-50);
-        logEvenOddPercentages(last50Prices);
+        lastPrices = wsResponse.history.prices.slice(-100);
+        analyzePriceTrend(lastPrices);
     }
 
     if (wsResponse.msg_type === "tick" && wsResponse.tick && typeof wsResponse.tick.quote !== "undefined") {
-        last50Prices.push(wsResponse.tick.quote);
-        if (last50Prices.length > 50) {
-            last50Prices = last50Prices.slice(-50);
+        lastPrices.push(wsResponse.tick.quote);
+        if (lastPrices.length > 100) {
+            lastPrices = lastPrices.slice(-100);
         }
-        logEvenOddPercentages(last50Prices);
+        analyzePriceTrend(lastPrices);
     }
 
     if (wsResponse.msg_type === "proposal") {
@@ -404,7 +411,6 @@ function handleServerMessage(event) {
         } else {
             tradeProposal = wsResponse;
             console.log('tradeProposal: ', tradeProposal);
-            // Extract actual payout rate from the proposal
             try {
                 if (tradeProposal.proposal && tradeProposal.proposal.payout && tradeProposal.proposal.ask_price && tradeProposal.proposal.ask_price > 0) {
                     currentPayoutRate = (tradeProposal.proposal.payout - tradeProposal.proposal.ask_price) / tradeProposal.proposal.ask_price;
@@ -430,10 +436,16 @@ function handleServerMessage(event) {
             isTradeOpen = true;
             automation = true;
 
-            if (wsResponse.buy.shortcode.includes("DIGITEVEN")) {
-                tradeTypeDisplay = "Even";
-            } else if (wsResponse.buy.shortcode.includes("DIGITODD")) {
-                tradeTypeDisplay = "Odd";
+            if (wsResponse.buy.shortcode) {
+                if (wsResponse.buy.shortcode.includes("MULTIPLIER_UP")) {
+                    tradeTypeDisplay = "MULTIPLIER_UP";
+                } else if (wsResponse.buy.shortcode.includes("MULTIPLIER_DOWN")) {
+                    tradeTypeDisplay = "MULTIPLIER_DOWN";
+                } else {
+                    tradeTypeDisplay = wsResponse.buy.contract_type || "Multiplier";
+                }
+            } else {
+                tradeTypeDisplay = "Multiplier";
             }
 
             if (typeof setResultNotification === "function") setResultNotification(lastTradeId, tradeTypeDisplay, market, wsResponse.buy.buy_price);
@@ -478,7 +490,6 @@ function handleServerMessage(event) {
 
                 if (profit < 0) {
                     consecutiveLossCount += 1;
-                    // Persist loss streak across page reloads
                     try {
                         localStorage.setItem('consecutiveLossStreak', consecutiveLossCount);
                         localStorage.setItem('consecutiveLossDate', new Date().toISOString().slice(0, 10));
@@ -503,11 +514,10 @@ function handleServerMessage(event) {
 
                 let setTimeInterval = 0;
 
-                // Progressive cooldown based on consecutive loss count
                 if (consecutiveLossCount === 0) {
-                    setTimeInterval = (typeof getRandomNumber === "function" ? getRandomNumber(0, 5) : 2) * 1000;
+                    setTimeInterval = (typeof getRandomNumber === "function" ? getRandomNumber(5, 15) : 10) * 1000;
                 } else if (consecutiveLossCount === 1) {
-                    setTimeInterval = (typeof getRandomNumber === "function" ? getRandomNumber(10, 30) : 15) * 1000;
+                    setTimeInterval = (typeof getRandomNumber === "function" ? getRandomNumber(15, 30) : 20) * 1000;
                 } else if (consecutiveLossCount === 2) {
                     setTimeInterval = (typeof getRandomNumber === "function" ? getRandomNumber(30, 60) : 45) * 1000;
                 }
@@ -532,10 +542,10 @@ function handleServerMessage(event) {
 
 function runScript() {
     isRunning = true;
-    analizeForEvenOdd();
+    subscribeToTicks();
 }
 
-function analizeForEvenOdd() {
+function subscribeToTicks() {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
     if (hasRequestedTickHistory) return;
 
@@ -544,73 +554,11 @@ function analizeForEvenOdd() {
         JSON.stringify({
             ticks_history: market,
             style: "ticks",
-            count: 50,
+            count: 100,
             end: "latest",
             subscribe: 1,
         })
     );
-}
-
-function getDecimalPlaces(value) {
-    const parts = String(value).split(".");
-    return parts[1] ? parts[1].length : 0;
-}
-
-function getLastDigitByPrecision(value, precision) {
-    const fixed = Number(value).toFixed(precision);
-    return Number(fixed.charAt(fixed.length - 1));
-}
-
-function logEvenOddPercentages(prices) {
-    if (!Array.isArray(prices) || prices.length === 0) return;
-
-    const precision = prices.reduce((maxPrecision, price) => {
-        const currentPrecision = getDecimalPlaces(price);
-        return currentPrecision > maxPrecision ? currentPrecision : maxPrecision;
-    }, 0);
-
-    const lastDigits = prices.map((price) => getLastDigitByPrecision(price, precision));
-    const evenCount = lastDigits.filter((digit) => digit % 2 === 0).length;
-    const oddCount = lastDigits.length - evenCount;
-
-    const evenPercentage = Number(((evenCount / lastDigits.length) * 100).toFixed(2));
-    const oddPercentage = Number(((oddCount / lastDigits.length) * 100).toFixed(2));
-    const lastThreeDigits = lastDigits.slice(-3);
-
-    const last10Digits = lastDigits.slice(-10);
-    const evenCount10 = last10Digits.filter((d) => d % 2 === 0).length;
-    const oddCount10 = last10Digits.length - evenCount10;
-    const even10Percentage = Number(((evenCount10 / last10Digits.length) * 100).toFixed(2));
-    const odd10Percentage = Number(((oddCount10 / last10Digits.length) * 100).toFixed(2));
-
-    contractType = null;
-    // Dual-window confirmation: both 50-tick and 10-tick must show same bias
-    if (evenPercentage >= 54 && even10Percentage >= 52) {
-        contractType = "even";
-    } else if (oddPercentage >= 54 && odd10Percentage >= 52) {
-        contractType = "odd";
-    }
-
-    console.log(
-        `[${market}] Even: ${evenPercentage}% (last10: ${even10Percentage}%) | Odd: ${oddPercentage}% (last10: ${odd10Percentage}%) | ContractType: ${contractType} | Last3: [${lastThreeDigits.join(",")}]`
-    );
-
-    const evenTriggered = tryEvenEntry(evenPercentage, lastDigits);
-    const oddTriggered = tryOddEntry(oddPercentage, lastDigits);
-    const tradeTriggered = evenTriggered || oddTriggered;
-
-    if (tradeTriggered) {
-        ticksWithoutTrade = 0;
-        return;
-    }
-
-    if (isTradeOpen || pendingContractType) return;
-
-    ticksWithoutTrade += 1;
-
-    if (ticksWithoutTrade >= NO_TRADE_TICK_LIMIT && lossTradeCount === 0) {
-        changeMarketAfterNoTrade();
-    }
 }
 
 function changeMarketAfterNoTrade() {
@@ -627,7 +575,7 @@ function changeMarketAfterNoTrade() {
     market = nextMarket;
     marketSelectElement.value = nextMarket;
     ticksWithoutTrade = 0;
-    last50Prices = [];
+    lastPrices = [];
     hasRequestedTickHistory = false;
     pendingContractType = null;
     contractType = null;
@@ -636,120 +584,115 @@ function changeMarketAfterNoTrade() {
 
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ forget_all: "ticks" }));
-        analizeForEvenOdd();
+        subscribeToTicks();
     }
 }
 
-function getTrailingOddCount(lastDigits) {
-    let trailingOddCount = 0;
-    for (let i = lastDigits.length - 1; i >= 0; i--) {
-        if (lastDigits[i] % 2 !== 0) {
-            trailingOddCount++;
-        } else {
-            break;
+function calculateSMA(prices, period) {
+    if (prices.length < period) return 0;
+    const slice = prices.slice(-period);
+    return slice.reduce((a, b) => a + b, 0) / period;
+}
+
+function analyzePriceTrend(prices) {
+    if (!Array.isArray(prices) || prices.length < 30) return;
+
+    const shortPeriod = 10;
+    const longPeriod = 30;
+
+    if (prices.length < longPeriod) return;
+
+    const shortSMA = calculateSMA(prices, shortPeriod);
+    const longSMA = calculateSMA(prices, longPeriod);
+    const smaDiff = ((shortSMA - longSMA) / longSMA) * 100;
+
+    const lastN = 10;
+    const recent = prices.slice(-lastN);
+    let upCount = 0, downCount = 0;
+    for (let i = 1; i < recent.length; i++) {
+        if (recent[i] > recent[i - 1]) upCount++;
+        else if (recent[i] < recent[i - 1]) downCount++;
+    }
+    const momentumRatio = upCount / Math.max(1, upCount + downCount);
+
+    let detectedDirection = null;
+    let strength = 0;
+
+    if (smaDiff > 0.05 && momentumRatio > 0.55) {
+        detectedDirection = "up";
+        strength = Math.min(Math.abs(smaDiff) * 20, 100);
+    } else if (smaDiff < -0.05 && momentumRatio < 0.45) {
+        detectedDirection = "down";
+        strength = Math.min(Math.abs(smaDiff) * 20, 100);
+    }
+
+    console.log(
+        `[${market}] Trend: ${detectedDirection || 'neutral'} | SMA diff: ${smaDiff.toFixed(4)}% | Momentum: ${(momentumRatio * 100).toFixed(1)}% | Strength: ${strength.toFixed(1)}`
+    );
+
+    if (isTradeOpen || pendingContractType) {
+        ticksWithoutTrade = 0;
+        return;
+    }
+
+    if (detectedDirection) {
+        const tradePlaced = tryMultiplierEntry(detectedDirection, strength);
+        if (tradePlaced) {
+            ticksWithoutTrade = 0;
+            return;
         }
     }
-    return trailingOddCount;
+
+    ticksWithoutTrade += 1;
+    if (ticksWithoutTrade >= NO_TRADE_TICK_LIMIT && lossTradeCount === 0) {
+        changeMarketAfterNoTrade();
+    }
 }
 
-function tryEvenEntry(evenPercentage, lastDigits) {
+function tryMultiplierEntry(direction, strength) {
     if (pendingContractType) return false;
-    if (contractType !== "even") return false;
-    if (!Array.isArray(lastDigits) || lastDigits.length === 0) return false;
+    if (isTradeOpen) return false;
 
-    const trailingOddCount = getTrailingOddCount(lastDigits);
-    let shouldPlaceTrade = false;
+    let minStrength;
+    if (consecutiveLossCount === 0) minStrength = 20;
+    else if (consecutiveLossCount === 1) minStrength = 35;
+    else if (consecutiveLossCount === 2) minStrength = 50;
+    else return false;
 
-    // Progressive thresholds based on consecutive loss count
-    let minPercentage, minTrailing;
-    if (consecutiveLossCount === 0) {
-        minPercentage = 54;
-        minTrailing = 3;
-    } else if (consecutiveLossCount === 1) {
-        minPercentage = 56;
-        minTrailing = 3;
-    } else if (consecutiveLossCount === 2) {
-        minPercentage = 60;
-        minTrailing = 4;
-    } else {
-        return false; // 3+ losses - hard stop
-    }
+    if (strength < minStrength) return false;
 
-    if (evenPercentage < minPercentage) return false;
+    console.log(`[ENTRY] ${direction.toUpperCase()} | Strength: ${strength.toFixed(1)} >= ${minStrength} | Multiplier: ${multiplierValue}x | Duration: ${multiplierDuration}t`);
 
-    if (evenPercentage >= minPercentage && evenPercentage <= 60 && trailingOddCount >= minTrailing) {
-        shouldPlaceTrade = true;
-    } else if (evenPercentage > 60 && trailingOddCount >= 2) {
-        shouldPlaceTrade = true;
-    }
-
-    if (shouldPlaceTrade) {
-        if (typeof placeTheTrade === "function") {
-            pendingContractType = "even";
-            placeTheTrade(contractType);
-            return true;
-        } else {
-            console.warn("placeTheTrade function is not available.");
-        }
+    if (typeof placeMultiplierTrade === "function") {
+        pendingContractType = direction === "up" ? "MULTIPLIER_UP" : "MULTIPLIER_DOWN";
+        placeMultiplierTrade(direction);
+        return true;
     }
 
     return false;
 }
 
-function getTrailingEvenCount(lastDigits) {
-    let trailingEvenCount = 0;
-    for (let i = lastDigits.length - 1; i >= 0; i--) {
-        if (lastDigits[i] % 2 === 0) {
-            trailingEvenCount++;
-        } else {
-            break;
-        }
-    }
-    return trailingEvenCount;
-}
+function placeMultiplierTrade(direction) {
+    if (isTradeOpen) return;
 
-function tryOddEntry(oddPercentage, lastDigits) {
-    if (pendingContractType) return false;
-    if (contractType !== "odd") return false;
-    if (!Array.isArray(lastDigits) || lastDigits.length === 0) return false;
+    const contractType = direction === "up" ? "MULTIPLIER_UP" : "MULTIPLIER_DOWN";
+    stake = Number(stake);
+    stake < 0.35 ? (stake = 0.35) : (stake = stake);
 
-    const trailingEvenCount = getTrailingEvenCount(lastDigits);
-    let shouldPlaceTrade = false;
+    const tradeRequest = {
+        proposal: 1,
+        amount: stake.toFixed(2),
+        basis: "stake",
+        contract_type: contractType,
+        currency: "USD",
+        multiplier: multiplierValue,
+        duration: multiplierDuration,
+        duration_unit: "t",
+        underlying_symbol: market,
+    };
 
-    // Progressive thresholds based on consecutive loss count
-    let minPercentage, minTrailing;
-    if (consecutiveLossCount === 0) {
-        minPercentage = 54;
-        minTrailing = 3;
-    } else if (consecutiveLossCount === 1) {
-        minPercentage = 56;
-        minTrailing = 3;
-    } else if (consecutiveLossCount === 2) {
-        minPercentage = 60;
-        minTrailing = 4;
-    } else {
-        return false; // 3+ losses - hard stop
-    }
-
-    if (oddPercentage < minPercentage) return false;
-
-    if (oddPercentage >= minPercentage && oddPercentage <= 60 && trailingEvenCount >= minTrailing) {
-        shouldPlaceTrade = true;
-    } else if (oddPercentage > 60 && trailingEvenCount >= 2) {
-        shouldPlaceTrade = true;
-    }
-
-    if (shouldPlaceTrade) {
-        if (typeof placeTheTrade === "function") {
-            pendingContractType = "odd";
-            placeTheTrade(contractType);
-            return true;
-        } else {
-            console.warn("placeTheTrade function is not available.");
-        }
-    }
-
-    return false;
+    console.log("Sending Multiplier trade request:", tradeRequest);
+    ws.send(JSON.stringify(tradeRequest));
 }
 
 function webSocketConnectionStop() {

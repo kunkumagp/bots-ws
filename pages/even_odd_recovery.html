@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WebSocket Trigger</title>
+    <title>Even Odd Recovery Bot</title>
     <link
       rel="stylesheet"
       href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css"
@@ -15,7 +15,7 @@
   <body>
     <a class="btn btn-default btn-back" href="../index.html">< Back</a>
     <div class="container" style="text-align: center">
-      <h1>Even Odd - New</h1>
+      <h1>Even Odd - Recovery (52/58)</h1>
 
       <div class="row">
         <div class="col-md-6">
@@ -64,10 +64,7 @@
                 Start Bot
               </button>
             </div>
-            <div class="flash-notification">
-              <!-- Bot will run again in <span class="number">10</span> seconds. -->
-              <!-- Trade will close in <span class="number">10</span> tick. -->
-            </div>
+            <div class="flash-notification"></div>
           </div>
         </div>
         <div class="col-md-6">
@@ -77,7 +74,7 @@
               ><span id="initialAccountBalance">-</span>
             </div>
             <div class="field">
-              <span>Traget : </span><span id="targetAmount">-</span>
+              <span>Target : </span><span id="targetAmount">-</span>
             </div>
             <div class="field">
               <span>Amount put for trading : </span
@@ -126,7 +123,6 @@
               <span>Current Loss Amount : </span
               ><span id="currentLossAmount">-</span>
             </div>
-            <!-- <div class="field"><span>xxxxxxxxxx : </span><span id="xxxxxxxxxx">-</span></div> -->
           </div>
         </div>
       </div>
@@ -142,126 +138,8 @@
         </div>
       </div>
     </div>
+
     <script src="../scripts/common.js"></script>
-
- 
-
-    <!-- <script src="../scripts/main.js"></script> -->
-    <!-- <script src="../scripts/even_odd_copy.js"></script> -->
-    <!-- <script src="../scripts/authentication.js"></script> -->
-    <!-- <script src="../scripts/even_odd_new.js"></script> -->
-
-
-    <!-- <script src="../scripts/new_eo_nonstop.js"></script> -->
-    <!-- <script src="../scripts/new_eo_double_check.js"></script> -->
-    <!-- <script src="../scripts/new_eo.js"></script> -->
-    <!-- <script src="../scripts/new_eo_2.js"></script> -->
-    <script src="../scripts/new_eo_new_update.js"></script>
-    <!-- <script src="../scripts/new_eo_2_deriv.js"></script> -->
-    <!-- <script src="../scripts/new_multiplier_deriv.js"></script> -->
-    <!-- <script src="../scripts/new_multiplier_2.js"></script> -->
-
-    <!-- <script src="../scripts/even_odd_const.js"></script> -->
-
-
-    
-    <!-- <script src="../even_odd_scripts/main.js"></script>
-    <script src="../even_odd_scripts/authenticate.js"></script>
-    <script src="../even_odd_scripts/even_odd.js"></script> -->
-
-    <!-- <script>
-      const accounts = [
-      { name: "KunkumaGP", value: "lkUxtOopvUhCpIX" },
-      { name: "KUNKUMAGP Real", value: "Y71P0GIOxz3YYvr" },
-      { name: "Kunkuma Trading", value: "hJfU1x5xpoSTwHe" },
-      { name: "W H K G Prasanna 85", value: "iVOpdm24hBhw3JI" },
-  ];
-  
-  const marketArray = [
-      { value: "R_10", name: "Volatility 10 Index" },
-      { value: "R_25", name: "Volatility 25 Index" },
-      { value: "R_50", name: "Volatility 50 Index" },
-      { value: "R_75", name: "Volatility 75 Index" },
-      { value: "R_100", name: "Volatility 100 Index" },
-  ];
-  
-  const accountSelectElement = document.getElementById("account_select");
-  const marketSelectElement = document.getElementById("market");
-  const targetProfitInputElement = document.getElementById("target_profit");
-  const initialStakeInputElement = document.getElementById("initial_stake");
-  const authenticateButton = document.getElementById("authenticateButton");
-  const scriptButton = document.getElementById("scriptButton");
-  const infoOutput = document.getElementById("info_output");
-  
-  const martingaleMultiplier = 2.07112;
-  
-  let isRunning = false, intervalId;
-  
-  let targetPercentage = 5;
-  let amountPercentage = 6;
-  
-  let initialAccountBalance = 0;
-  let updatedAccountBalance = 0;
-  
-  let targetAmount = 0;
-  let amountPutForTrading = 0;
-  
-  let currentProfitAmount = 0;
-  let currentLossAmount = 0;
-  let netProfit = 0;
-  
-  let stake = 0;
-  let onTradeCount = 0;
-  
-  let totalProfitAmount = 0;
-  let totalLossAmount = 0;
-  
-  let totalTradeCount = 0;
-  let winTradeCount = 0;
-  let lossTradeCount = 0;
-  
-  let lostCountInRow = 0;
-  
-  let lastTradeId = null;
-  let tradeTypeDisplay = null;
-  let tradeType = "even";
-  let apiToken = null;
-  let authSuccess = false;
-  let isTradeOpen = false;
-  let automation = false;
-  let tradeProposal = null;
-  
-  let stopTimer = false;
-  let ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=1089");
-  
-  accounts.forEach((item) => {
-      const option = document.createElement("option");
-      option.value = item.value; // Set the value
-      option.textContent = item.name; // Set the display text
-      accountSelectElement.appendChild(option); // Append to the <select>
-  });
-  
-  marketArray.forEach((item) => {
-      const option = document.createElement("option");
-      option.value = item.value; // Set the value
-      option.textContent = item.name; // Set the display text
-      marketSelectElement.appendChild(option); // Append to the <select>
-  });
-  
-  accountSelectElement.value = "iVOpdm24hBhw3JI";
-  marketSelectElement.value = "R_10";
-  apiToken = accountSelectElement.value;
-  
-  
-  accountSelectElement.addEventListener("change", () => {
-      apiToken = accountSelectElement.value;
-  });
-  
-  market = marketSelectElement.value;
-  
-  if(isRunning){
-    authenticateButton.addEventListener("click", authenticate());
-  }
-     </script> -->
+    <script src="../scripts/new_eo_recovery.js"></script>
   </body>
 </html>
