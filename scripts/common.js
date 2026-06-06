@@ -246,7 +246,7 @@ function setInfo(contract, lastTradeProfit) {
 
     setResultNotification(
         lastTradeId,
-        contractType === "DIGITODD" ? "Odd" : "Even",
+        tradeTypeDisplay || (contractType === "DIGITODD" ? "Odd" : "Even"),
         market,
         contract.buy_price,
         lastTradeProfit

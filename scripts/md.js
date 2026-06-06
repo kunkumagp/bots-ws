@@ -1,8 +1,6 @@
 const accounts = [
+    { name: "KUNKUMAGP Testing", value: "pat_3264356d90def52f0033ef61272dcf6f26cf9076f839ac8dabcf43446932dfe9" },
     { name: "KunkumaGP", value: "pat_75687aeb556fbcef179dfe7fa307bd403a28ec334dcbe0a45323c3d92a7c7aae" },
-    { name: "KUNKUMAGP Real", value: "Y71P0GIOxz3YYvr" },
-    { name: "Kunkuma Trading", value: "hJfU1x5xpoSTwHe" },
-    { name: "W H K G Prasanna 85", value: "iVOpdm24hBhw3JI" },
 ];
 
 const marketArray = [
@@ -13,8 +11,14 @@ const marketArray = [
     { value: "R_100", name: "Volatility 100 Index" },
 ];
 
+// const ACCOUNT_CATEGORY = "options";
+// const ACCOUNT_CATEGORY = "cfds";
+const ACCOUNT_CATEGORY = "ctrader";
+
 const ACCOUNT_TYPE = "demo";
 // const ACCOUNT_TYPE = "real";
+
+const MULTIPLIER_VALUE = 15;
 
 // ─── Configuration & Global Constant Declarations ────────────────────────────
 const APP_ID = "33jLZ26mnkXNN8GI4mJBI";
@@ -35,6 +39,8 @@ let pendingContractType = null;
 let ticksWithoutTrade = 0;
 let consecutiveLossCount = 0;
 const NO_TRADE_TICK_LIMIT = 120;
+let predictedDigit = null;
+let isMonitoring = false;
 
 const martingaleMultiplier = 2.07112;
 let dayTarget = 0;
@@ -322,10 +328,9 @@ function handleServerMessage(event) {
             try {
                 const storedLost = parseFloat(localStorage.getItem("totalLostAmount")) || 0;
                 if (storedLost !== 0) {
-                    const PAYOUT_RATE  = 0.80; // Deriv digit even/odd ~80%
-                    stake = Number((Math.abs(storedLost) / PAYOUT_RATE).toFixed(2));
+                    stake = Number((Math.abs(storedLost) * MULTIPLIER_VALUE).toFixed(2));
+                    // stake = Number((Math.abs(storedLost) * 1).toFixed(2));
                     try { if (initialStakeInputElement) initialStakeInputElement.value = stake; } catch (e) {}
-                    // Safety cap: stake must not exceed available balance
                     if (stake > initialAccountBalance) {
                         stake = Number(initialAccountBalance.toFixed(2));
                         try { if (initialStakeInputElement) initialStakeInputElement.value = stake; } catch (e) {}
@@ -337,6 +342,10 @@ function handleServerMessage(event) {
                             setFlashNotification(`Recovered pending loss ${storedLost.toFixed(2)} — stake adjusted to ${stake}`, 5);
                         }
                     }
+                } else {
+                    stake = Number((initialAccountBalance * 0.01).toFixed(2));
+                    if (stake < 0.35) stake = 0.35;
+                    try { if (initialStakeInputElement) initialStakeInputElement.value = stake; } catch (e) {}
                 }
             } catch (e) {}
 
@@ -397,14 +406,26 @@ function handleServerMessage(event) {
     // ── TICK HISTORY ─────────────────────────────────────────────────────────
     if (wsResponse.msg_type === "history" && wsResponse.history && Array.isArray(wsResponse.history.prices)) {
         last50Prices = wsResponse.history.prices.slice(-50);
-        logEvenOddPercentages(last50Prices);
+        analyzeLastDigits(last50Prices);
     }
 
     // ── LIVE TICK ─────────────────────────────────────────────────────────────
     if (wsResponse.msg_type === "tick" && wsResponse.tick && typeof wsResponse.tick.quote !== "undefined") {
         last50Prices.push(wsResponse.tick.quote);
         if (last50Prices.length > 50) last50Prices = last50Prices.slice(-50);
-        logEvenOddPercentages(last50Prices);
+
+        if (predictedDigit !== null && isMonitoring && !isTradeOpen && !pendingContractType) {
+            ticksWithoutTrade++;
+            checkTickForTrade(wsResponse.tick.quote);
+
+            if (ticksWithoutTrade >= NO_TRADE_TICK_LIMIT) {
+                isMonitoring = false;
+                predictedDigit = null;
+                ticksWithoutTrade = 0;
+                hasRequestedTickHistory = false;
+                requestTickHistory();
+            }
+        }
     }
 
     // ── PROPOSAL ─────────────────────────────────────────────────────────────
@@ -435,7 +456,9 @@ function handleServerMessage(event) {
             isTradeOpen     = true;
             automation      = true; // flag for external helper scripts
 
-            if (wsResponse.buy.shortcode.includes("DIGITEVEN")) {
+            if (wsResponse.buy.shortcode.includes("DIGITDIFF")) {
+                tradeTypeDisplay = `Differ ${predictedDigit}`;
+            } else if (wsResponse.buy.shortcode.includes("DIGITEVEN")) {
                 tradeTypeDisplay = "Even";
             } else if (wsResponse.buy.shortcode.includes("DIGITODD")) {
                 tradeTypeDisplay = "Odd";
@@ -476,46 +499,16 @@ function handleServerMessage(event) {
                 } catch (e) {}
 
                 isTradeOpen = false;
-                if (typeof stakeChange === "function") stakeChangeForTotal(result);
                 pendingContractType = null;
 
-                if (profit < 0) {
-                    consecutiveLossCount += 1;
-
-                    if (consecutiveLossCount >= 3) {
-                        const cooldownSec = (typeof getRandomNumber === "function" ? getRandomNumber(900, 1800) : 1200);
-                        if (typeof setFlashNotification === "function") {
-                            setFlashNotification(`3 losses in a row. Restarting in ${Math.round(cooldownSec / 60)} min...`, 0);
-                        }
-                        if (typeof setTimer === "function") setTimer(cooldownSec * 1000);
-                        isTradeOpen = false;
-                        pendingContractType = null;
-                        setTimeout(() => {
-                            if (typeof reload === "function") reload();
-                        }, cooldownSec * 1000);
-                        return;
-                    }
-                } else {
-                    consecutiveLossCount = 0;
+                if (profit >= 0) {
+                    try { localStorage.removeItem('totalLostAmount'); } catch (e) {}
                 }
 
-                // ── After-trade delay / next action ──────────────────────────
-                let setTimeInterval = 0;
-
-                if (consecutiveLossCount >= 3) {
-                    // Should never reach here (handled above), but kept as safety net
-                    setTimeInterval = getRandomNumber(30, 180) * 1000;
-                    console.log(`[LOSS STREAK] ${consecutiveLossCount} losses. Waiting ${setTimeInterval / 1000}s.`);
-                    if (typeof setTimer === "function") setTimer(setTimeInterval);
-                    setTimeout(() => { runScript(); }, setTimeInterval);
-                } else {
-                    if (netProfit >= targetAmount) {
-                        if (typeof reload === "function") reload();
-                    } else {
-                        if (typeof setTimer === "function") setTimer(setTimeInterval);
-                        setTimeout(() => { runScript(); }, setTimeInterval);
-                    }
-                }
+                predictedDigit = null;
+                isMonitoring = false;
+                hasRequestedTickHistory = false;
+                if (typeof reload === "function") reload();
             } else {
                 // Contract still open — poll again in 1 s
                 setTimeout(() => {
@@ -533,10 +526,10 @@ function handleServerMessage(event) {
 
 function runScript() {
     isRunning = true;
-    analizeForEvenOdd();
+    requestTickHistory();
 }
 
-function analizeForEvenOdd() {
+function requestTickHistory() {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
     if (hasRequestedTickHistory) return;
 
@@ -579,144 +572,115 @@ function changeMarketAfterNoTrade() {
 
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ forget_all: "ticks" }));
-        analizeForEvenOdd();
+        requestTickHistory();
     }
 }
 
-// ─── Even/Odd Analysis ────────────────────────────────────────────────────────
+// ─── Digit Prediction Analysis ────────────────────────────────────────────────
 
-function getDecimalPlaces(value) {
-    const parts = String(value).split(".");
-    return parts[1] ? parts[1].length : 0;
+function getMajorityDecimalCount(prices) {
+    const counts = {};
+    prices.forEach(price => {
+        const parts = String(price).split(".");
+        const decimals = parts[1] ? parts[1].length : 0;
+        counts[decimals] = (counts[decimals] || 0) + 1;
+    });
+    let maxCount = 0, majorityDecimals = 0;
+    for (const [decimals, count] of Object.entries(counts)) {
+        if (count > maxCount) {
+            maxCount = count;
+            majorityDecimals = Number(decimals);
+        }
+    }
+    return majorityDecimals;
 }
 
-function getLastDigitByPrecision(value, precision) {
-    const fixed = Number(value).toFixed(precision);
-    return Number(fixed.charAt(fixed.length - 1));
+function normalizePrice(price, decimalCount) {
+    return Number(price).toFixed(decimalCount);
 }
 
-function logEvenOddPercentages(prices) {
+function getLastDigit(normalizedPrice) {
+    return Number(normalizedPrice.charAt(normalizedPrice.length - 1));
+}
+
+function analyzeLastDigits(prices) {
     if (!Array.isArray(prices) || prices.length === 0) return;
 
-    const precision = prices.reduce((max, price) => {
-        const p = getDecimalPlaces(price);
-        return p > max ? p : max;
-    }, 0);
+    const decimalCount = getMajorityDecimalCount(prices);
+    const normalizedPrices = prices.map(p => normalizePrice(p, decimalCount));
+    const lastDigits = normalizedPrices.map(p => getLastDigit(p));
 
-    const lastDigits       = prices.map((price) => getLastDigitByPrecision(price, precision));
-    const evenCount        = lastDigits.filter((d) => d % 2 === 0).length;
-    const oddCount         = lastDigits.length - evenCount;
-    const evenPercentage   = Number(((evenCount / lastDigits.length) * 100).toFixed(2));
-    const oddPercentage    = Number(((oddCount  / lastDigits.length) * 100).toFixed(2));
-    const lastThreeDigits  = lastDigits.slice(-3);
+    const digitCounts = Array(10).fill(0);
+    lastDigits.forEach(d => digitCounts[d]++);
 
-    const last10Digits     = lastDigits.slice(-10);
-    const evenCount10      = last10Digits.filter((d) => d % 2 === 0).length;
-    const oddCount10       = last10Digits.length - evenCount10;
-    const even10Percentage = Number(((evenCount10 / last10Digits.length) * 100).toFixed(2));
-    const odd10Percentage  = Number(((oddCount10  / last10Digits.length) * 100).toFixed(2));
+    const total = lastDigits.length;
+    const percentages = digitCounts.map(count => Number(((count / total) * 100).toFixed(2)));
 
-    contractType = null;
-    if      (evenPercentage >= 54) contractType = "even";
-    else if (oddPercentage  >= 54) contractType = "odd";
+    let output = `[${market}] Digit percentages: `;
+    for (let i = 0; i < 10; i++) {
+        output += `${i}=${percentages[i]}% `;
+    }
+    console.log(output);
 
-    console.log(
-        `[${market}] Even: ${evenPercentage}% (last10: ${even10Percentage}%) | ` +
-        `Odd: ${oddPercentage}% (last10: ${odd10Percentage}%) | ` +
-        `ContractType: ${contractType} | Last3: [${lastThreeDigits.join(",")}]`
-    );
+    let minPercentage = 100, lowestDigit = 0;
+    for (let i = 0; i < 10; i++) {
+        if (percentages[i] < minPercentage) {
+            minPercentage = percentages[i];
+            lowestDigit = i;
+        }
+    }
 
-    const evenTriggered  = tryEvenEntry(evenPercentage, lastDigits);
-    const oddTriggered   = tryOddEntry(oddPercentage, lastDigits);
-    const tradeTriggered = evenTriggered || oddTriggered;
-
-    if (tradeTriggered) {
-        ticksWithoutTrade = 0;
+    const tiedDigits = percentages.filter(p => p === minPercentage).length;
+    if (tiedDigits > 1) {
+        console.log(`[TIE] Multiple digits (${tiedDigits}) at ${minPercentage}%. Reloading for different market.`);
+        if (typeof reload === "function") reload();
         return;
     }
 
+    predictedDigit = lowestDigit;
+    isMonitoring = true;
+    ticksWithoutTrade = 0;
+
+    if (typeof setFlashNotification === "function") {
+        setFlashNotification(`Lowest digit: ${predictedDigit} (${percentages[lowestDigit]}%). Waiting for match...`, 0);
+    }
+    console.log(`[PREDICTION] Waiting for tick with last digit ${predictedDigit} (${percentages[lowestDigit]}%)`);
+}
+
+// ─── Tick Monitoring & Trade Entry ───────────────────────────────────────────
+
+function checkTickForTrade(quote) {
+    const decimalCount = getMajorityDecimalCount(last50Prices);
+    const normalized = normalizePrice(quote, decimalCount);
+    const lastDigit = getLastDigit(normalized);
+
+    if (lastDigit === predictedDigit) {
+        console.log(`[TICK MATCH] Last digit ${lastDigit} matches prediction. Placing DIGITDIFF trade with stake $${stake}.`);
+
+        isMonitoring = false;
+        placeDifferTrade(predictedDigit);
+    }
+}
+
+function placeDifferTrade(digit) {
     if (isTradeOpen || pendingContractType) return;
 
-    ticksWithoutTrade += 1;
-    if (ticksWithoutTrade >= NO_TRADE_TICK_LIMIT && lossTradeCount === 0) {
-        changeMarketAfterNoTrade();
-    }
-}
+    pendingContractType = "differ";
 
-// ─── Trade Entry Logic ────────────────────────────────────────────────────────
+    const tradeRequest = {
+        proposal: 1,
+        amount: stake.toFixed(2),
+        basis: "stake",
+        contract_type: "DIGITDIFF",
+        currency: "USD",
+        duration: 1,
+        duration_unit: "t",
+        barrier: digit,
+        underlying_symbol: market,
+    };
 
-function getTrailingOddCount(lastDigits) {
-    let count = 0;
-    for (let i = lastDigits.length - 1; i >= 0; i--) {
-        if (lastDigits[i] % 2 !== 0) count++;
-        else break;
-    }
-    return count;
-}
-
-function getTrailingEvenCount(lastDigits) {
-    let count = 0;
-    for (let i = lastDigits.length - 1; i >= 0; i--) {
-        if (lastDigits[i] % 2 === 0) count++;
-        else break;
-    }
-    return count;
-}
-
-function tryEvenEntry(evenPercentage, lastDigits) {
-    if (pendingContractType) return false;
-    if (contractType !== "even") return false;
-    if (!Array.isArray(lastDigits) || lastDigits.length === 0) return false;
-    if (evenPercentage < 54) return false;
-
-    const trailingOddCount = getTrailingOddCount(lastDigits);
-    let shouldPlaceTrade   = false;
-
-    // After 3 consecutive losses only enter on strong signal (>60)
-    if (consecutiveLossCount >= 3 && evenPercentage <= 60) return false;
-
-    if (evenPercentage >= 54 && evenPercentage <= 60 && trailingOddCount >= 3) {
-        shouldPlaceTrade = true;
-    } else if (evenPercentage >= 60 && trailingOddCount >= 2) {
-        shouldPlaceTrade = true;
-    }
-
-    if (shouldPlaceTrade && typeof placeTheTrade === "function") {
-        pendingContractType = "even";
-        placeTheTrade(contractType);
-        return true;
-    } else if (shouldPlaceTrade) {
-        console.warn("placeTheTrade function is not available.");
-    }
-    return false;
-}
-
-function tryOddEntry(oddPercentage, lastDigits) {
-    if (pendingContractType) return false;
-    if (contractType !== "odd") return false;
-    if (!Array.isArray(lastDigits) || lastDigits.length === 0) return false;
-    if (oddPercentage < 54) return false;
-
-    const trailingEvenCount = getTrailingEvenCount(lastDigits);
-    let shouldPlaceTrade    = false;
-
-    // After 3 consecutive losses only enter on strong signal (>60)
-    if (consecutiveLossCount >= 3 && oddPercentage <= 60) return false;
-
-    if (oddPercentage >= 54 && oddPercentage <= 60 && trailingEvenCount >= 3) {
-        shouldPlaceTrade = true;
-    } else if (oddPercentage >= 60 && trailingEvenCount >= 2) {
-        shouldPlaceTrade = true;
-    }
-
-    if (shouldPlaceTrade && typeof placeTheTrade === "function") {
-        pendingContractType = "odd";
-        placeTheTrade(contractType);
-        return true;
-    } else if (shouldPlaceTrade) {
-        console.warn("placeTheTrade function is not available.");
-    }
-    return false;
+    console.log("Sending DIGITDIFF trade request:", tradeRequest);
+    ws.send(JSON.stringify(tradeRequest));
 }
 
 // ─── Connection Control (called by external helper scripts) ───────────────────
