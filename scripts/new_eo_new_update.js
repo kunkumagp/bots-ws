@@ -1,8 +1,6 @@
 const accounts = [
+    { name: "KUNKUMAGP Testing", value: "pat_3264356d90def52f0033ef61272dcf6f26cf9076f839ac8dabcf43446932dfe9" },
     { name: "KunkumaGP", value: "pat_75687aeb556fbcef179dfe7fa307bd403a28ec334dcbe0a45323c3d92a7c7aae" },
-    { name: "KUNKUMAGP Real", value: "Y71P0GIOxz3YYvr" },
-    { name: "Kunkuma Trading", value: "hJfU1x5xpoSTwHe" },
-    { name: "W H K G Prasanna 85", value: "iVOpdm24hBhw3JI" },
 ];
 
 const marketArray = [

@@ -324,30 +324,11 @@ function handleServerMessage(event) {
             }
             if (typeof resetParams === "function") resetParams();
 
-            // ── Recover persisted loss into stake ────────────────────────────
-            try {
-                const storedLost = parseFloat(localStorage.getItem("totalLostAmount")) || 0;
-                if (storedLost !== 0) {
-                    stake = Number((Math.abs(storedLost) * MULTIPLIER_VALUE).toFixed(2));
-                    // stake = Number((Math.abs(storedLost) * 1).toFixed(2));
-                    try { if (initialStakeInputElement) initialStakeInputElement.value = stake; } catch (e) {}
-                    if (stake > initialAccountBalance) {
-                        stake = Number(initialAccountBalance.toFixed(2));
-                        try { if (initialStakeInputElement) initialStakeInputElement.value = stake; } catch (e) {}
-                        if (typeof setFlashNotification === "function") {
-                            setFlashNotification(`Stake capped to balance: ${stake}`, 5);
-                        }
-                    } else {
-                        if (typeof setFlashNotification === "function") {
-                            setFlashNotification(`Recovered pending loss ${storedLost.toFixed(2)} — stake adjusted to ${stake}`, 5);
-                        }
-                    }
-                } else {
-                    stake = Number((initialAccountBalance * 0.01).toFixed(2));
-                    if (stake < 0.35) stake = 0.35;
-                    try { if (initialStakeInputElement) initialStakeInputElement.value = stake; } catch (e) {}
-                }
-            } catch (e) {}
+            // ── Set stake to 1% of capital ────────────────────────────────────
+            stake = Number((initialAccountBalance * 0.01).toFixed(2));
+            if (stake < 0.35) stake = 0.35;
+            try { if (initialStakeInputElement) initialStakeInputElement.value = stake; } catch (e) {}
+            try { localStorage.removeItem('totalLostAmount'); } catch (e) {}
 
             // ── Day-target initialisation / persistence ──────────────────────
             try {
@@ -500,11 +481,6 @@ function handleServerMessage(event) {
 
                 isTradeOpen = false;
                 pendingContractType = null;
-
-                if (profit >= 0) {
-                    try { localStorage.removeItem('totalLostAmount'); } catch (e) {}
-                }
-
                 predictedDigit = null;
                 isMonitoring = false;
                 hasRequestedTickHistory = false;
