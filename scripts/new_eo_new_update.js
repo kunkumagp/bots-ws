@@ -4,11 +4,19 @@ const accounts = [
 ];
 
 const marketArray = [
-    { value: "R_10", name: "Volatility 10 Index" },
-    { value: "R_25", name: "Volatility 25 Index" },
-    { value: "R_50", name: "Volatility 50 Index" },
-    { value: "R_75", name: "Volatility 75 Index" },
-    { value: "R_100", name: "Volatility 100 Index" },
+    { value: "R_10", name: "Volatility 10 Index"},
+    { value: "R_25", name: "Volatility 25 Index"},
+    { value: "R_50", name: "Volatility 50 Index"},
+    { value: "R_75", name: "Volatility 75 Index"},
+    { value: "R_100", name: "Volatility 100 Index"},
+    { value: "1HZ10V", name: "Volatility 10 ( 1s ) Index"},
+    { value: "1HZ15V", name: "Volatility 15 ( 1s ) Index"},
+    { value: "1HZ25V", name: "Volatility 25 ( 1s ) Index"},
+    { value: "1HZ30V", name: "Volatility 30 ( 1s ) Index"},
+    { value: "1HZ50V", name: "Volatility 50 ( 1s ) Index"},
+    { value: "1HZ75V", name: "Volatility 75 ( 1s ) Index"},
+    { value: "1HZ90V", name: "Volatility 90 ( 1s ) Index"},
+    { value: "1HZ100V", name: "Volatility 100 ( 1s ) Index"},
 ];
 
 const ACCOUNT_TYPE = "demo";
@@ -115,6 +123,52 @@ Object.defineProperty(window, "updatedAccountBalance", {
     configurable: true,
 });
 
+// ─── SharedWorker WebSocket Proxy ──────────────────────────────────
+
+function createWsProxy(worker) {
+    const proxy = {
+        _worker: worker,
+        _callbacks: {},
+        readyState: WebSocket.CONNECTING,
+        send: function (data) { worker.port.postMessage({ type: "send", data: data }); },
+        close: function () { worker.port.postMessage({ type: "close" }); proxy.readyState = WebSocket.CLOSED; },
+    };
+    Object.defineProperty(proxy, "onopen", {
+        get: function () { return proxy._callbacks.open; },
+        set: function (fn) { proxy._callbacks.open = fn; },
+    });
+    Object.defineProperty(proxy, "onclose", {
+        get: function () { return proxy._callbacks.close; },
+        set: function (fn) { proxy._callbacks.close = fn; },
+    });
+    Object.defineProperty(proxy, "onerror", {
+        get: function () { return proxy._callbacks.error; },
+        set: function (fn) { proxy._callbacks.error = fn; },
+    });
+    Object.defineProperty(proxy, "onmessage", {
+        get: function () { return proxy._callbacks.message; },
+        set: function (fn) { proxy._callbacks.message = fn; },
+    });
+    worker.port.onmessage = function (event) {
+        const msg = event.data;
+        if (msg.type === "open") {
+            proxy.readyState = WebSocket.OPEN;
+            if (proxy._callbacks.open) proxy._callbacks.open();
+        } else if (msg.type === "message") {
+            if (proxy._callbacks.message) proxy._callbacks.message({ data: msg.data });
+        } else if (msg.type === "close") {
+            proxy.readyState = WebSocket.CLOSED;
+            if (proxy._callbacks.close) proxy._callbacks.close();
+        } else if (msg.type === "error") {
+            if (proxy._callbacks.error) proxy._callbacks.error();
+        } else if (msg.type === "need_auth") {
+            if (proxy._callbacks.needAuth) proxy._callbacks.needAuth();
+        }
+    };
+    worker.port.start();
+    return proxy;
+}
+
 // ─── NEW DERIV AUTH: REST → WebSocket ────────────────────────────────────────
 
 async function fetchAuthenticatedConnectionUrl(token) {
@@ -215,38 +269,27 @@ async function fetchAuthenticatedConnectionUrl(token) {
 
 async function initializeTradingSession() {
     if (ws) {
+        ws._callbacks.close = null;
         try { ws.close(); } catch (e) {}
     }
 
-    console.log("Requesting single-use token authorization channel...");
-    const authorizedUrl = await fetchAuthenticatedConnectionUrl(apiToken);
-
-    if (!authorizedUrl) {
-        console.error("Halting. Cannot secure authenticated WebSocket link.");
+    let worker;
+    try {
+        if (typeof SharedWorker === "undefined") throw new Error("SharedWorker API not available in this browser.");
+        if (location.protocol === "file:") throw new Error("SharedWorker requires HTTP/HTTPS protocol (page is file://).");
+        worker = new SharedWorker("../scripts/persistent-ws.js");
+    } catch (e) {
+        console.error("SharedWorker failed:", e.message);
+        console.error("Falling back to direct WebSocket connection.");
+        await initializeDirectWebSocket();
         return;
     }
 
-    console.log("Connecting to validated stream pipeline...");
-    ws = new WebSocket(authorizedUrl);
-
-    // Intercept send() to remap 'symbol' → 'underlying_symbol' for proposal requests
-    const originalSend = ws.send.bind(ws);
-    ws.send = function (data) {
-        try {
-            let parsed = JSON.parse(data);
-            if (parsed.proposal && parsed.symbol) {
-                parsed.underlying_symbol = parsed.symbol;
-                delete parsed.symbol;
-                data = JSON.stringify(parsed);
-            }
-        } catch (e) {}
-        originalSend(data);
-    };
+    ws = createWsProxy(worker);
 
     ws.onopen = function () {
         console.log("WebSocket connected successfully.");
         startPing();
-        // Request balance subscription — replaces the old 'authorize' handshake
         ws.send(JSON.stringify({ balance: 1, subscribe: 1 }));
     };
 
@@ -263,6 +306,58 @@ async function initializeTradingSession() {
     };
 
     ws.onmessage = handleServerMessage;
+
+    ws._callbacks.needAuth = async function () {
+        console.log("Requesting single-use token authorization channel...");
+        const authorizedUrl = await fetchAuthenticatedConnectionUrl(apiToken);
+        if (!authorizedUrl) {
+            console.error("Halting. Cannot secure authenticated WebSocket link.");
+            return;
+        }
+        worker.port.postMessage({ type: "connect", url: authorizedUrl });
+    };
+
+    worker.port.postMessage({ type: "connect" });
+}
+
+async function initializeDirectWebSocket() {
+    console.log("Requesting single-use token authorization channel...");
+    const authorizedUrl = await fetchAuthenticatedConnectionUrl(apiToken);
+    if (!authorizedUrl) {
+        console.error("Halting. Cannot secure authenticated WebSocket link.");
+        return;
+    }
+    console.log("Connecting to validated stream pipeline...");
+    const directWs = new WebSocket(authorizedUrl);
+    const originalSend = directWs.send.bind(directWs);
+    directWs.send = function (data) {
+        try {
+            let parsed = JSON.parse(data);
+            if (parsed.proposal && parsed.symbol) {
+                parsed.underlying_symbol = parsed.symbol;
+                delete parsed.symbol;
+                data = JSON.stringify(parsed);
+            }
+        } catch (e) {}
+        originalSend(data);
+    };
+    directWs.onopen = function () {
+        console.log("WebSocket connected successfully.");
+        ws = directWs;
+        startPing();
+        ws.send(JSON.stringify({ balance: 1, subscribe: 1 }));
+    };
+    directWs.onclose = function () {
+        console.log("Connection closed.");
+        stopPing();
+        setTimeout(() => {
+            if (typeof reload === "function") reload();
+        }, 30000);
+    };
+    directWs.onerror = function (err) {
+        console.error("WebSocket error:", err);
+    };
+    directWs.onmessage = handleServerMessage;
 }
 
 if (authenticateButton) {
@@ -474,45 +569,27 @@ function handleServerMessage(event) {
                 } catch (e) {}
 
                 isTradeOpen = false;
-                if (typeof stakeChange === "function") stakeChangeForTotal(result);
                 pendingContractType = null;
 
                 if (profit < 0) {
-                    consecutiveLossCount += 1;
+                    consecutiveLossCount++;
 
                     if (consecutiveLossCount >= 3) {
-                        const cooldownSec = (typeof getRandomNumber === "function" ? getRandomNumber(900, 1800) : 1200);
+                        try { ws.send(JSON.stringify({ forget_all: "ticks" })); } catch (e) {}
+                        const cooldownMs = getRandomNumber(15, 30) * 60 * 1000;
                         if (typeof setFlashNotification === "function") {
-                            setFlashNotification(`3 losses in a row. Restarting in ${Math.round(cooldownSec / 60)} min...`, 0);
+                            setFlashNotification(`3 losses in a row. Restarting in ${Math.round(cooldownMs / 60000)} min...`, 0);
                         }
-                        if (typeof setTimer === "function") setTimer(cooldownSec * 1000);
-                        isTradeOpen = false;
-                        pendingContractType = null;
-                        setTimeout(() => {
-                            if (typeof reload === "function") reload();
-                        }, cooldownSec * 1000);
-                        return;
+                        if (typeof setTimer === "function") setTimer(cooldownMs);
+                        setTimeout(() => { if (typeof reload === "function") reload(); }, cooldownMs);
+                    } else {
+                        const cooldownMs = getRandomNumber(30, 60) * 1000;
+                        if (typeof setTimer === "function") setTimer(cooldownMs);
+                        setTimeout(() => { runScript(); }, cooldownMs);
                     }
                 } else {
                     consecutiveLossCount = 0;
-                }
-
-                // ── After-trade delay / next action ──────────────────────────
-                let setTimeInterval = 0;
-
-                if (consecutiveLossCount >= 3) {
-                    // Should never reach here (handled above), but kept as safety net
-                    setTimeInterval = getRandomNumber(30, 180) * 1000;
-                    console.log(`[LOSS STREAK] ${consecutiveLossCount} losses. Waiting ${setTimeInterval / 1000}s.`);
-                    if (typeof setTimer === "function") setTimer(setTimeInterval);
-                    setTimeout(() => { runScript(); }, setTimeInterval);
-                } else {
-                    if (netProfit >= targetAmount) {
-                        if (typeof reload === "function") reload();
-                    } else {
-                        if (typeof setTimer === "function") setTimer(setTimeInterval);
-                        setTimeout(() => { runScript(); }, setTimeInterval);
-                    }
+                    if (typeof reload === "function") reload();
                 }
             } else {
                 // Contract still open — poll again in 1 s
