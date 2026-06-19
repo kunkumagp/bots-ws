@@ -24,10 +24,12 @@ const authenticateButton     = document.getElementById("authenticateButton");
 const scriptButton           = document.getElementById("scriptButton");
 const infoOutput             = document.getElementById("info_output");
 const params                 = new URLSearchParams(window.location.search);
+let tickCount             = 50;
 
 let ws = null;
 let isRunning = false, intervalId;
-let last50Prices = [];
+let lastPrices = [];
+let lastDigitsArray = [];
 let hasRequestedTickHistory = false;
 let pendingContractType = null;
 let ticksWithoutTrade = 0;
@@ -35,6 +37,7 @@ let consecutiveLossCount = 0;
 const NO_TRADE_TICK_LIMIT = 120;
 
 const martingaleMultiplier = 2.07112;
+const PREDICTION_CONFIDENCE_THRESHOLD = 0.65;
 let dayTarget = 0;
 
 if (params.get("target")) {
@@ -66,7 +69,8 @@ let sessionTargetPercentage  = 1 / startingAmount,
     currentLossAmount        = 0,
     stopTimer                = false;
 
-let market, apiToken, stake, tickCount, contractType;
+let market, apiToken, stake, contractType;
+let lastPrediction = null;
 
 // Flags expected by external helper scripts
 let authSuccess = false;
@@ -394,15 +398,21 @@ function handleServerMessage(event) {
 
     // ── TICK HISTORY ─────────────────────────────────────────────────────────
     if (wsResponse.msg_type === "history" && wsResponse.history && Array.isArray(wsResponse.history.prices)) {
-        last50Prices = wsResponse.history.prices.slice(-50);
-        logEvenOddPercentages(last50Prices);
+
+        
+        lastPrices = wsResponse.history.prices.slice(-tickCount);
+        lastDigitsArray = getLastDigits(lastPrices);
+        // console.log("lastPrices: ", lastPrices);
+        // console.log("lastDigitsArray: ", lastDigitsArray);
+
+        logEvenOddPercentages(lastDigitsArray);
     }
 
     // ── LIVE TICK ─────────────────────────────────────────────────────────────
     if (wsResponse.msg_type === "tick" && wsResponse.tick && typeof wsResponse.tick.quote !== "undefined") {
-        last50Prices.push(wsResponse.tick.quote);
-        if (last50Prices.length > 50) last50Prices = last50Prices.slice(-50);
-        logEvenOddPercentages(last50Prices);
+        lastDigitsArray = tickValuePushToArray(wsResponse.tick.quote);
+        // console.log("lastDigitsArray: ", lastDigitsArray);
+        logEvenOddPercentages(lastDigitsArray);
     }
 
     // ── PROPOSAL ─────────────────────────────────────────────────────────────
@@ -474,45 +484,55 @@ function handleServerMessage(event) {
                 } catch (e) {}
 
                 isTradeOpen = false;
-                if (typeof stakeChange === "function") stakeChangeForTotal(result);
+                {
+                    const payoutRate = 1 / 2.07112;
+                    let pendingRecovery = parseFloat(localStorage.getItem("pendingRecovery") || "0");
+                    if (result === "Loss") {
+                        pendingRecovery += Math.abs(profit);
+                    } else {
+                        pendingRecovery -= profit;
+                        if (pendingRecovery < 0) pendingRecovery = 0;
+                    }
+                    localStorage.setItem("pendingRecovery", String(pendingRecovery));
+                    const recoveryStake = pendingRecovery / (3 * payoutRate);
+                    stake = Number((recoveryStake > amountPutForTrading ? recoveryStake : amountPutForTrading).toFixed(2));
+                }
                 pendingContractType = null;
 
                 if (profit < 0) {
                     consecutiveLossCount += 1;
 
-                    if (consecutiveLossCount >= 3) {
-                        const cooldownSec = (typeof getRandomNumber === "function" ? getRandomNumber(900, 1800) : 1200);
+                    if (consecutiveLossCount >= 4) {
+                        try { ws.send(JSON.stringify({ forget_all: "ticks" })); } catch (e) {}
+                        hasRequestedTickHistory = false;
+                        lastPrices = [];
+
                         if (typeof setFlashNotification === "function") {
-                            setFlashNotification(`3 losses in a row. Restarting in ${Math.round(cooldownSec / 60)} min...`, 0);
+                            setFlashNotification("4 losses in a row. Stopping for today.", 0);
                         }
-                        if (typeof setTimer === "function") setTimer(cooldownSec * 1000);
-                        isTradeOpen = false;
-                        pendingContractType = null;
-                        setTimeout(() => {
-                            if (typeof reload === "function") reload();
-                        }, cooldownSec * 1000);
+                        try { localStorage.setItem("tradingStoppedForDay", "1"); } catch (e) {}
+                        isRunning = false;
+                        stopPing();
+                        try { if (ws) ws.close(); } catch (e) {}
+                        if (scriptButton) { scriptButton.disabled = true; scriptButton.innerText = "Stopped for day"; }
                         return;
                     }
+
+                    try { ws.send(JSON.stringify({ forget_all: "ticks" })); } catch (e) {}
+                    hasRequestedTickHistory = false;
+                    lastPrices = [];
+
+                    const multiplier = Math.min(consecutiveLossCount, 10);
+                    const cooldownMs = getRandomNumber(30, 60) * multiplier * 1000;
+
+                    if (typeof setFlashNotification === "function") {
+                        setFlashNotification(`Loss #${consecutiveLossCount}. Retrying in ${Math.round(cooldownMs / 1000)}s...`, 0);
+                    }
+                    if (typeof setTimer === "function") setTimer(cooldownMs);
+                    setTimeout(() => { runScript(); }, cooldownMs);
                 } else {
                     consecutiveLossCount = 0;
-                }
-
-                // ── After-trade delay / next action ──────────────────────────
-                let setTimeInterval = 0;
-
-                if (consecutiveLossCount >= 3) {
-                    // Should never reach here (handled above), but kept as safety net
-                    setTimeInterval = getRandomNumber(30, 180) * 1000;
-                    console.log(`[LOSS STREAK] ${consecutiveLossCount} losses. Waiting ${setTimeInterval / 1000}s.`);
-                    if (typeof setTimer === "function") setTimer(setTimeInterval);
-                    setTimeout(() => { runScript(); }, setTimeInterval);
-                } else {
-                    if (netProfit >= targetAmount) {
-                        if (typeof reload === "function") reload();
-                    } else {
-                        if (typeof setTimer === "function") setTimer(setTimeInterval);
-                        setTimeout(() => { runScript(); }, setTimeInterval);
-                    }
+                    if (typeof reload === "function") reload();
                 }
             } else {
                 // Contract still open — poll again in 1 s
@@ -543,7 +563,7 @@ function analizeForEvenOdd() {
         JSON.stringify({
             ticks_history: market,
             style:         "ticks",
-            count:         50,
+            count:         tickCount,
             end:           "latest",
             subscribe:     1,
         })
@@ -568,7 +588,7 @@ function changeMarketAfterNoTrade() {
     market = nextMarket;
     marketSelectElement.value   = nextMarket;
     ticksWithoutTrade           = 0;
-    last50Prices                = [];
+    lastPrices                = [];
     hasRequestedTickHistory     = false;
     pendingContractType         = null;
     contractType                = null;
@@ -593,22 +613,75 @@ function getLastDigitByPrecision(value, precision) {
     return Number(fixed.charAt(fixed.length - 1));
 }
 
-function logEvenOddPercentages(prices) {
-    if (!Array.isArray(prices) || prices.length === 0) return;
+function predictNextDigit(digits) {
+    if (!Array.isArray(digits) || digits.length < 3) return null;
 
-    const precision = prices.reduce((max, price) => {
-        const p = getDecimalPlaces(price);
-        return p > max ? p : max;
-    }, 0);
+    const transitionCounts = {};
+    for (let i = 0; i < digits.length - 2; i++) {
+        const key = digits[i] + "," + digits[i + 1];
+        const next = digits[i + 2];
+        if (!transitionCounts[key]) transitionCounts[key] = {};
+        transitionCounts[key][next] = (transitionCounts[key][next] || 0) + 1;
+    }
 
-    const lastDigits       = prices.map((price) => getLastDigitByPrecision(price, precision));
-    const evenCount        = lastDigits.filter((d) => d % 2 === 0).length;
-    const oddCount         = lastDigits.length - evenCount;
-    const evenPercentage   = Number(((evenCount / lastDigits.length) * 100).toFixed(2));
-    const oddPercentage    = Number(((oddCount  / lastDigits.length) * 100).toFixed(2));
-    const lastThreeDigits  = lastDigits.slice(-3);
+    const lastKey = digits[digits.length - 2] + "," + digits[digits.length - 1];
+    const followers = transitionCounts[lastKey];
 
-    const last10Digits     = lastDigits.slice(-10);
+    if (!followers) {
+        const key1 = digits[digits.length - 1];
+        let fallback = {};
+        for (let i = 0; i < digits.length - 1; i++) {
+            if (digits[i] === key1) {
+                const next = digits[i + 1];
+                fallback[next] = (fallback[next] || 0) + 1;
+            }
+        }
+        if (Object.keys(fallback).length === 0) return null;
+        let total = 0, evenProb = 0;
+        for (const [digit, count] of Object.entries(fallback)) {
+            total += count;
+            if (Number(digit) % 2 === 0) evenProb += count;
+        }
+        return {
+            mostLikely: Number(Object.entries(fallback).sort((a, b) => b[1] - a[1])[0][0]),
+            evenProbability: evenProb / total,
+            oddProbability: 1 - evenProb / total,
+            order: 1,
+        };
+    }
+
+    let total = 0, evenProb = 0;
+    for (const [digit, count] of Object.entries(followers)) {
+        total += count;
+        if (Number(digit) % 2 === 0) evenProb += count;
+    }
+
+    return {
+        mostLikely: Number(Object.entries(followers).sort((a, b) => b[1] - a[1])[0][0]),
+        evenProbability: evenProb / total,
+        oddProbability: 1 - evenProb / total,
+        order: 2,
+    };
+}
+
+function logEvenOddPercentages(digits) {
+    if (!Array.isArray(digits) || digits.length === 0) return;
+
+    const newDigit = digits[digits.length - 1];
+    let accuracyStr = "";
+    if (lastPrediction) {
+        const evenPredicted = lastPrediction.evenProbability > lastPrediction.oddProbability;
+        const actualEven = newDigit % 2 === 0;
+        accuracyStr = evenPredicted === actualEven ? " ✅" : " ❌";
+    }
+
+    const evenCount        = digits.filter((d) => d % 2 === 0).length;
+    const oddCount         = digits.length - evenCount;
+    const evenPercentage   = Number(((evenCount / digits.length) * 100).toFixed(2));
+    const oddPercentage    = Number(((oddCount  / digits.length) * 100).toFixed(2));
+    const lastThreeDigits  = digits.slice(-3);
+
+    const last10Digits     = digits.slice(-10);
     const evenCount10      = last10Digits.filter((d) => d % 2 === 0).length;
     const oddCount10       = last10Digits.length - evenCount10;
     const even10Percentage = Number(((evenCount10 / last10Digits.length) * 100).toFixed(2));
@@ -618,14 +691,26 @@ function logEvenOddPercentages(prices) {
     if      (evenPercentage >= 54) contractType = "even";
     else if (oddPercentage  >= 54) contractType = "odd";
 
+    const prediction = predictNextDigit(digits);
+    lastPrediction = prediction;
+    let predStr = "";
+    if (prediction) {
+        predStr = ` | Next: ${prediction.mostLikely} (E:${(prediction.evenProbability*100).toFixed(0)}% O:${(prediction.oddProbability*100).toFixed(0)}%)`;
+    }
     console.log(
-        `[${market}] Even: ${evenPercentage}% (last10: ${even10Percentage}%) | ` +
-        `Odd: ${oddPercentage}% (last10: ${odd10Percentage}%) | ` +
-        `ContractType: ${contractType} | Last3: [${lastThreeDigits.join(",")}]`
+        `[${market}] Even: ${evenPercentage}% | ` +
+        `Odd: ${oddPercentage}% | ` +
+        `ContractType: ${contractType}`
     );
 
-    const evenTriggered  = tryEvenEntry(evenPercentage, lastDigits);
-    const oddTriggered   = tryOddEntry(oddPercentage, lastDigits);
+    // console.log(
+    //     `[${market}] Even: ${evenPercentage}% (last10: ${even10Percentage}%) | ` +
+    //     `Odd: ${oddPercentage}% (last10: ${odd10Percentage}%) | ` +
+    //     `ContractType: ${contractType} | Last3: [${lastThreeDigits.join(",")}]${predStr}${accuracyStr}`
+    // );
+
+    const evenTriggered  = tryEvenEntry(evenPercentage, digits);
+    const oddTriggered   = tryOddEntry(oddPercentage, digits);
     const tradeTriggered = evenTriggered || oddTriggered;
 
     if (tradeTriggered) {
@@ -664,27 +749,12 @@ function getTrailingEvenCount(lastDigits) {
 function tryEvenEntry(evenPercentage, lastDigits) {
     if (pendingContractType) return false;
     if (contractType !== "even") return false;
-    if (!Array.isArray(lastDigits) || lastDigits.length === 0) return false;
     if (evenPercentage < 54) return false;
 
-    const trailingOddCount = getTrailingOddCount(lastDigits);
-    let shouldPlaceTrade   = false;
-
-    // After 3 consecutive losses only enter on strong signal (>60)
-    if (consecutiveLossCount >= 3 && evenPercentage <= 60) return false;
-
-    if (evenPercentage >= 54 && evenPercentage <= 60 && trailingOddCount >= 3) {
-        shouldPlaceTrade = true;
-    } else if (evenPercentage >= 60 && trailingOddCount >= 2) {
-        shouldPlaceTrade = true;
-    }
-
-    if (shouldPlaceTrade && typeof placeTheTrade === "function") {
+    if (typeof placeTheTrade === "function") {
         pendingContractType = "even";
         placeTheTrade(contractType);
         return true;
-    } else if (shouldPlaceTrade) {
-        console.warn("placeTheTrade function is not available.");
     }
     return false;
 }
@@ -692,27 +762,12 @@ function tryEvenEntry(evenPercentage, lastDigits) {
 function tryOddEntry(oddPercentage, lastDigits) {
     if (pendingContractType) return false;
     if (contractType !== "odd") return false;
-    if (!Array.isArray(lastDigits) || lastDigits.length === 0) return false;
     if (oddPercentage < 54) return false;
 
-    const trailingEvenCount = getTrailingEvenCount(lastDigits);
-    let shouldPlaceTrade    = false;
-
-    // After 3 consecutive losses only enter on strong signal (>60)
-    if (consecutiveLossCount >= 3 && oddPercentage <= 60) return false;
-
-    if (oddPercentage >= 54 && oddPercentage <= 60 && trailingEvenCount >= 3) {
-        shouldPlaceTrade = true;
-    } else if (oddPercentage >= 60 && trailingEvenCount >= 2) {
-        shouldPlaceTrade = true;
-    }
-
-    if (shouldPlaceTrade && typeof placeTheTrade === "function") {
+    if (typeof placeTheTrade === "function") {
         pendingContractType = "odd";
         placeTheTrade(contractType);
         return true;
-    } else if (shouldPlaceTrade) {
-        console.warn("placeTheTrade function is not available.");
     }
     return false;
 }
@@ -747,4 +802,20 @@ function webSocketConnectionStart() {
     }
     console.log("[BRIDGE] Socket closed. Re-connecting...");
     initializeTradingSession();
+}
+
+function getLastDigits(arr) {
+  // Step 1 & 2: Remove decimal, find max length, pad with zeros
+  const stripped = arr.map(n => n.toString().replace('.', ''));
+  const maxLen = Math.max(...stripped.map(s => s.length));
+  const padded = stripped.map(s => s.padEnd(maxLen, '0'));
+  
+  // Step 3: Get last digit of each
+  return padded.map(s => Number(s[s.length - 1]));
+}
+
+function tickValuePushToArray(newValue) {
+  lastPrices.push(newValue);
+  lastPrices.splice(0, lastPrices.length - tickCount);
+  return getLastDigits(lastPrices);
 }

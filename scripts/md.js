@@ -4,11 +4,19 @@ const accounts = [
 ];
 
 const marketArray = [
-    { value: "R_10", name: "Volatility 10 Index" },
-    { value: "R_25", name: "Volatility 25 Index" },
-    { value: "R_50", name: "Volatility 50 Index" },
-    { value: "R_75", name: "Volatility 75 Index" },
-    { value: "R_100", name: "Volatility 100 Index" },
+    { value: "R_10", name: "Volatility 10 Index"},
+    { value: "R_25", name: "Volatility 25 Index"},
+    { value: "R_50", name: "Volatility 50 Index"},
+    { value: "R_75", name: "Volatility 75 Index"},
+    { value: "R_100", name: "Volatility 100 Index"},
+    { value: "1HZ10V", name: "Volatility 10 ( 1s ) Index"},
+    { value: "1HZ15V", name: "Volatility 15 ( 1s ) Index"},
+    { value: "1HZ25V", name: "Volatility 25 ( 1s ) Index"},
+    { value: "1HZ30V", name: "Volatility 30 ( 1s ) Index"},
+    { value: "1HZ50V", name: "Volatility 50 ( 1s ) Index"},
+    { value: "1HZ75V", name: "Volatility 75 ( 1s ) Index"},
+    { value: "1HZ90V", name: "Volatility 90 ( 1s ) Index"},
+    { value: "1HZ100V", name: "Volatility 100 ( 1s ) Index"},
 ];
 
 // const ACCOUNT_CATEGORY = "options";
@@ -41,6 +49,8 @@ let consecutiveLossCount = 0;
 const NO_TRADE_TICK_LIMIT = 120;
 let predictedDigit = null;
 let isMonitoring = false;
+let lastPricePrediction = null;
+let predictionChecked = false;
 
 const martingaleMultiplier = 2.07112;
 let dayTarget = 0;
@@ -96,7 +106,7 @@ marketArray.forEach((item) => {
 });
 
 accountSelectElement.value = accounts[0].value;
-marketSelectElement.value  = "R_100";
+marketSelectElement.value  = marketArray[Math.floor(Math.random() * marketArray.length)].value;
 apiToken = accountSelectElement.value;
 
 accountSelectElement.addEventListener("change", () => {
@@ -386,6 +396,13 @@ function handleServerMessage(event) {
 
     // ── TICK HISTORY ─────────────────────────────────────────────────────────
     if (wsResponse.msg_type === "history" && wsResponse.history && Array.isArray(wsResponse.history.prices)) {
+        console.log("Tick history received:", wsResponse.history.prices);
+
+        lastPricePrediction = predictNext(wsResponse.history.prices);
+        predictionChecked = false;
+        console.log("prediction : ", lastPricePrediction.value);
+        
+
         last50Prices = wsResponse.history.prices.slice(-50);
         analyzeLastDigits(last50Prices);
     }
@@ -393,6 +410,19 @@ function handleServerMessage(event) {
     // ── LIVE TICK ─────────────────────────────────────────────────────────────
     if (wsResponse.msg_type === "tick" && wsResponse.tick && typeof wsResponse.tick.quote !== "undefined") {
         last50Prices.push(wsResponse.tick.quote);
+        console.log("Tick : ", wsResponse.tick.quote);
+
+        if (lastPricePrediction && !predictionChecked) {
+            predictionChecked = true;
+            const decimalCount = getMajorityDecimalCount(last50Prices);
+            const predNormalized = normalizePrice(lastPricePrediction.value, decimalCount);
+            const actualNormalized = normalizePrice(wsResponse.tick.quote, decimalCount);
+            const predLastDigit = getLastDigit(predNormalized);
+            const actualLastDigit = getLastDigit(actualNormalized);
+            const correct = predLastDigit === actualLastDigit;
+            console.log(`[PREDICTION CHECK] Predicted: ${lastPricePrediction.value} (last digit ${predLastDigit}), Actual: ${wsResponse.tick.quote} (last digit ${actualLastDigit}), ${correct ? 'CORRECT' : 'WRONG'}`);
+        }
+        
         if (last50Prices.length > 50) last50Prices = last50Prices.slice(-50);
 
         if (predictedDigit !== null && isMonitoring && !isTradeOpen && !pendingContractType) {
@@ -484,7 +514,7 @@ function handleServerMessage(event) {
                 predictedDigit = null;
                 isMonitoring = false;
                 hasRequestedTickHistory = false;
-                if (typeof reload === "function") reload();
+                restartCycle();
             } else {
                 // Contract still open — poll again in 1 s
                 setTimeout(() => {
@@ -503,6 +533,13 @@ function handleServerMessage(event) {
 function runScript() {
     isRunning = true;
     requestTickHistory();
+}
+
+function restartCycle() {
+    market = marketArray[Math.floor(Math.random() * marketArray.length)].value;
+    marketSelectElement.value = market;
+    try { ws.send(JSON.stringify({ forget_all: "ticks" })); } catch (e) {}
+    setTimeout(() => { runScript(); }, 1000);
 }
 
 function requestTickHistory() {
@@ -690,3 +727,75 @@ function webSocketConnectionStart() {
     console.log("[BRIDGE] Socket closed. Re-connecting...");
     initializeTradingSession();
 }
+
+function predictNext(nums) {
+  if (nums.length < 3) throw new Error("Need at least 3 numbers");
+
+  const n = nums.length;
+  const isClose = (a, b) => Math.abs(a - b) < 1e-9;
+
+  function stdDev(arr) {
+    const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+    return Math.sqrt(arr.reduce((s, v) => s + (v - mean) ** 2, 0) / arr.length);
+  }
+
+  const results = [];
+  const diffs = nums.slice(1).map((v, i) => v - nums[i]);
+
+  // 1. Arithmetic (constant difference)
+  const avgDiff = diffs.reduce((a, b) => a + b, 0) / diffs.length;
+  const isArith = diffs.every(d => isClose(d, diffs[0]));
+  results.push({
+    pattern: "arithmetic",
+    value: nums[n - 1] + avgDiff,
+    confidence: isArith ? 1.0 : Math.max(0, 1 - stdDev(diffs) / (Math.abs(avgDiff) + 1) * 0.5)
+  });
+
+  // 2. Geometric (constant ratio)
+  if (nums.every(v => v !== 0)) {
+    const ratios = nums.slice(1).map((v, i) => v / nums[i]);
+    const avgRatio = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+    const isGeo = ratios.every(r => isClose(r, ratios[0]));
+    results.push({
+      pattern: "geometric",
+      value: nums[n - 1] * avgRatio,
+      confidence: isGeo ? 1.0 : Math.max(0, 1 - stdDev(ratios) / (Math.abs(avgRatio) + 0.01) * 0.5)
+    });
+  }
+
+  // 3. Quadratic (constant 2nd difference)
+  if (n >= 4) {
+    const d2 = diffs.slice(1).map((v, i) => v - diffs[i]);
+    const avgD2 = d2.reduce((a, b) => a + b, 0) / d2.length;
+    const isQuad = d2.every(d => isClose(d, d2[0]));
+    results.push({
+      pattern: "quadratic",
+      value: nums[n - 1] + diffs[diffs.length - 1] + avgD2,
+      confidence: isQuad ? 0.95 : Math.max(0, 0.7 - stdDev(d2) * 0.1)
+    });
+  }
+
+  // 4. Linear regression
+  const xs = nums.map((_, i) => i);
+  const xm = xs.reduce((a, b) => a + b) / n;
+  const ym = nums.reduce((a, b) => a + b) / n;
+  const slope = xs.reduce((s, x, i) => s + (x - xm) * (nums[i] - ym), 0)
+               / xs.reduce((s, x) => s + (x - xm) ** 2, 0);
+  const intercept = ym - slope * xm;
+  const rmse = Math.sqrt(nums.reduce((s, y, i) => s + (y - (slope * i + intercept)) ** 2, 0) / n);
+  const range = Math.max(...nums) - Math.min(...nums) || 1;
+  results.push({
+    pattern: "linear",
+    value: slope * n + intercept,
+    confidence: Math.max(0, 1 - rmse / range)
+  });
+
+  // Return best match by confidence
+  results.sort((a, b) => b.confidence - a.confidence);
+  return results[0]; // { pattern, value, confidence }
+}
+
+// Usage
+// predictNext([2, 4, 8, 16, 32]);  // { pattern: "geometric", value: 64, confidence: 1 }
+// predictNext([1, 4, 9, 16, 25]);  // { pattern: "quadratic", value: 36, confidence: 0.95 }
+// predictNext([3, 6, 9, 12]);      // { pattern: "arithmetic", value: 15, confidence: 1 }
