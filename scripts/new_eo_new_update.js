@@ -30,7 +30,6 @@ let ticksWithoutTrade = 0;
 let consecutiveLossCount = 0;
 const NO_TRADE_TICK_LIMIT = 120;
 
-const martingaleMultiplier = 2.07112;
 let dayTarget = 0;
 
 if (params.get("target")) {
@@ -44,7 +43,7 @@ let startingAmount = 100;
 let sessionTargetPercentage  = 1 / startingAmount,
     targetPercentage         = 0.4 / startingAmount,
     amountPercentage         = 0.5 / 100,
-    finishTargetPercentagePerDay = 3 / 100,
+    finishTargetPercentagePerDay = 1 / 100,
     isTradeOpen              = false,
     netProfit                = 0,
     targetAmount             = 0,
@@ -425,13 +424,12 @@ function handleServerMessage(event) {
                 } catch (e) {}
 
                 isTradeOpen = false;
-                if (typeof stakeChange === "function") stakeChangeForTotal(result);
                 pendingContractType = null;
 
                 if (profit < 0) {
                     consecutiveLossCount += 1;
 
-                    // ── 3 consecutive losses: hard stop (old behaviour) ───────
+                    // ── 3 consecutive losses: hard stop ──────────────────────
                     if (consecutiveLossCount >= 3) {
                         if (typeof setFlashNotification === "function") {
                             setFlashNotification("Stopped: 3 consecutive losses. Manual restart required.", 0);
@@ -448,25 +446,20 @@ function handleServerMessage(event) {
                         } catch (e) {}
                         return;
                     }
+
+                    // ── Loss: wait 30-45 minutes before next trade ────────────
+                    let lossDelay = getRandomNumber(1800, 2700) * 1000;
+                    console.log(`[LOSS] Waiting ${lossDelay / 60000} minutes before next trade.`);
+                    if (typeof setTimer === "function") setTimer(lossDelay);
+                    setTimeout(() => { runScript(); }, lossDelay);
                 } else {
                     consecutiveLossCount = 0;
-                }
 
-                // ── After-trade delay / next action ──────────────────────────
-                let setTimeInterval = 0;
-
-                if (consecutiveLossCount >= 3) {
-                    // Should never reach here (handled above), but kept as safety net
-                    setTimeInterval = getRandomNumber(30, 180) * 1000;
-                    console.log(`[LOSS STREAK] ${consecutiveLossCount} losses. Waiting ${setTimeInterval / 1000}s.`);
-                    if (typeof setTimer === "function") setTimer(setTimeInterval);
-                    setTimeout(() => { runScript(); }, setTimeInterval);
-                } else {
+                    // ── Win: continue ─────────────────────────────────────────
                     if (netProfit >= targetAmount) {
                         if (typeof reload === "function") reload();
                     } else {
-                        if (typeof setTimer === "function") setTimer(setTimeInterval);
-                        setTimeout(() => { runScript(); }, setTimeInterval);
+                        setTimeout(() => { runScript(); }, 0);
                     }
                 }
             } else {

@@ -1,8 +1,6 @@
 const accounts = [
+    { name: "KUNKUMAGP Testing", value: "pat_5e757adf550768449c92c663114e4af7ba8c3dd3fd9d62f3faebb55b77ac3786" },
     { name: "KunkumaGP", value: "pat_75687aeb556fbcef179dfe7fa307bd403a28ec334dcbe0a45323c3d92a7c7aae" },
-    { name: "KUNKUMAGP Real", value: "Y71P0GIOxz3YYvr" },
-    { name: "Kunkuma Trading", value: "hJfU1x5xpoSTwHe" },
-    { name: "W H K G Prasanna 85", value: "iVOpdm24hBhw3JI" },
 ];
 
 const marketArray = [
@@ -13,8 +11,8 @@ const marketArray = [
     { value: "R_100", name: "Volatility 100 Index" },
 ];
 
-// const ACCOUNT_TYPE = "demo";
-const ACCOUNT_TYPE = "real";
+const ACCOUNT_TYPE = "demo";
+// const ACCOUNT_TYPE = "real";
 
 const APP_ID = "33oWYOQxAL3YJYtTvBRep";
 const accountSelectElement = document.getElementById("account_select");
@@ -444,15 +442,6 @@ function handleServerMessage(event) {
                 } catch (e) { }
 
                 isTradeOpen = false;
-                if (result === "Loss") {
-                    const storedLost = parseFloat(localStorage.getItem('totalLostAmount')) || 0;
-                    if (storedLost !== 0) {
-                        stake = Number((Math.abs(storedLost) / currentPayoutRate).toFixed(2));
-                    }
-                } else if (result === "Win") {
-                    stake = amountPutForTrading;
-                }
-                try { if (initialStakeInputElement) initialStakeInputElement.value = Number(stake).toFixed(2); } catch (e) { }
                 pendingContractType = null;
 
                 if (profit < 0) {
@@ -466,27 +455,20 @@ function handleServerMessage(event) {
                         try { if (scriptButton) { scriptButton.disabled = true; scriptButton.innerText = 'Stopped (3 losses)'; } } catch (e) { }
                         return;
                     }
+
+                    // ── Loss: wait 30-45 minutes before next trade ────────────
+                    let lossDelay = (typeof getRandomNumber === "function" ? getRandomNumber(1800, 2700) : 1800) * 1000;
+                    console.log(`[LOSS] Waiting ${lossDelay / 60000} minutes before next trade.`);
+                    if (typeof setTimer === "function") setTimer(lossDelay);
+                    setTimeout(() => { runScript(); }, lossDelay);
                 } else {
                     consecutiveLossCount = 0;
-                }
 
-                let setTimeInterval = 0;
-
-                if (consecutiveLossCount >= 3) {
-                    setTimeInterval = (typeof getRandomNumber === "function" ? getRandomNumber(30, 180) : 30) * 1000;
-                    console.log(`[LOSS STREAK] ${consecutiveLossCount} losses in a row. Waiting 30 seconds.`);
-                    if (typeof setTimer === "function") setTimer(setTimeInterval);
-                    setTimeout(() => {
-                        runScript();
-                    }, setTimeInterval);
-                } else {
+                    // ── Win: continue ─────────────────────────────────────────
                     if (netProfit >= targetAmount) {
                         if (typeof reload === "function") reload();
                     } else {
-                        if (typeof setTimer === "function") setTimer(setTimeInterval);
-                        setTimeout(() => {
-                            runScript();
-                        }, setTimeInterval);
+                        setTimeout(() => { runScript(); }, 0);
                     }
                 }
             } else {
