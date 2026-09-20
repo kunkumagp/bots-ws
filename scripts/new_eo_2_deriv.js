@@ -5,9 +5,9 @@ const accounts = [
 
 const marketArray = [
     { value: "R_10", name: "Volatility 10 Index" },
-    { value: "R_25", name: "Volatility 25 Index" },
+    // { value: "R_25", name: "Volatility 25 Index" },
     { value: "R_50", name: "Volatility 50 Index" },
-    { value: "R_75", name: "Volatility 75 Index" },
+    // { value: "R_75", name: "Volatility 75 Index" },
     { value: "R_100", name: "Volatility 100 Index" },
 ];
 
@@ -46,8 +46,8 @@ let startingAmount = 250;
 
 let sessionTargetPercentage = 1 / startingAmount,
     targetPercentage = 1 / startingAmount,
-    amountPercentage = 0.5 / 100,
-    finishTargetPercentagePerDay = 3 / 100,
+    amountPercentage = 2 / 100,
+    finishTargetPercentagePerDay = 5 / 100,
     isTradeOpen = false,
     netProfit = 0,
     targetAmount = 0,
@@ -63,7 +63,8 @@ let sessionTargetPercentage = 1 / startingAmount,
     totalLossAmount = 0,
     currentProfitAmount = 0,
     currentLossAmount = 0,
-    stopTimer = false;
+    stopTimer = false,
+    isCooldown = false;
 
 let market, apiToken, stake, tickCount, contractType;
 let authSuccess = false, automation = false;
@@ -444,6 +445,18 @@ function handleServerMessage(event) {
                 isTradeOpen = false;
                 pendingContractType = null;
 
+                // ── Stop for the day if total losses reach 5% of capital ────────
+                const dailyLossLimit = initialAccountBalance * 0.05;
+                if (Math.abs(totalLossAmount) >= dailyLossLimit) {
+                    if (typeof setFlashNotification === "function") setFlashNotification(`Stopped: Daily loss limit of 5% ($${dailyLossLimit.toFixed(2)}) reached. Stopping for today.`, 0);
+                    try { localStorage.setItem('tradingStoppedForDay', '1'); } catch (e) { }
+                    isRunning = false;
+                    stopPing();
+                    try { if (ws) ws.close(); } catch (e) { }
+                    try { if (scriptButton) { scriptButton.disabled = true; scriptButton.innerText = 'Stopped (loss limit)'; } } catch (e) { }
+                    return;
+                }
+
                 if (profit < 0) {
                     consecutiveLossCount += 1;
                     if (consecutiveLossCount >= 3) {
@@ -455,21 +468,20 @@ function handleServerMessage(event) {
                         try { if (scriptButton) { scriptButton.disabled = true; scriptButton.innerText = 'Stopped (3 losses)'; } } catch (e) { }
                         return;
                     }
-
-                    // ── Loss: wait 30-45 minutes before next trade ────────────
-                    let lossDelay = (typeof getRandomNumber === "function" ? getRandomNumber(1800, 2700) : 1800) * 1000;
-                    console.log(`[LOSS] Waiting ${lossDelay / 60000} minutes before next trade.`);
-                    if (typeof setTimer === "function") setTimer(lossDelay);
-                    setTimeout(() => { runScript(); }, lossDelay);
                 } else {
                     consecutiveLossCount = 0;
+                }
 
-                    // ── Win: continue ─────────────────────────────────────────
-                    if (netProfit >= targetAmount) {
-                        if (typeof reload === "function") reload();
-                    } else {
-                        setTimeout(() => { runScript(); }, 0);
-                    }
+                // ── Wait a random 5-10 minute interval between every trade ─────
+                let nextTradeDelay = (typeof getRandomNumber === "function" ? getRandomNumber(300, 600) : 300) * 1000;
+                console.log(`[${profit > 0 ? "WIN" : "LOSS"}] Waiting ${nextTradeDelay / 60000} minutes before next trade.`);
+                if (typeof setTimer === "function") setTimer(nextTradeDelay);
+
+                if (netProfit >= targetAmount && profit > 0) {
+                    if (typeof reload === "function") reload();
+                } else {
+                    isCooldown = true;
+                    setTimeout(() => { isCooldown = false; runScript(); }, nextTradeDelay);
                 }
             } else {
                 setTimeout(() => {
@@ -535,9 +547,9 @@ function logEvenOddPercentages(prices) {
     const odd10Percentage = Number(((oddCount10 / last10Digits.length) * 100).toFixed(2));
 
     contractType = null;
-    if (evenPercentage >= 54) {
+    if (evenPercentage >= 52) {
         contractType = "even";
-    } else if (oddPercentage >= 54) {
+    } else if (oddPercentage >= 52) {
         contractType = "odd";
     }
 
@@ -603,10 +615,11 @@ function getTrailingOddCount(lastDigits) {
 }
 
 function tryEvenEntry(evenPercentage, lastDigits) {
+    if (isCooldown) return false;
     if (pendingContractType) return false;
     if (contractType !== "even") return false;
     if (!Array.isArray(lastDigits) || lastDigits.length === 0) return false;
-    if (evenPercentage < 54) return false;
+    if (evenPercentage < 52) return false;
 
     const trailingOddCount = getTrailingOddCount(lastDigits);
     let shouldPlaceTrade = false;
@@ -615,7 +628,7 @@ function tryEvenEntry(evenPercentage, lastDigits) {
         if (evenPercentage <= 60) return false;
     }
 
-    if (evenPercentage >= 54 && evenPercentage <= 60 && trailingOddCount >= 3) {
+    if (evenPercentage >= 52 && evenPercentage <= 60 && trailingOddCount >= 3) {
         shouldPlaceTrade = true;
     } else if (evenPercentage >= 60 && trailingOddCount >= 2) {
         shouldPlaceTrade = true;
@@ -647,10 +660,11 @@ function getTrailingEvenCount(lastDigits) {
 }
 
 function tryOddEntry(oddPercentage, lastDigits) {
+    if (isCooldown) return false;
     if (pendingContractType) return false;
     if (contractType !== "odd") return false;
     if (!Array.isArray(lastDigits) || lastDigits.length === 0) return false;
-    if (oddPercentage < 54) return false;
+    if (oddPercentage < 52) return false;
 
     const trailingEvenCount = getTrailingEvenCount(lastDigits);
     let shouldPlaceTrade = false;
@@ -659,7 +673,7 @@ function tryOddEntry(oddPercentage, lastDigits) {
         if (oddPercentage <= 60) return false;
     }
 
-    if (oddPercentage >= 54 && oddPercentage <= 60 && trailingEvenCount >= 3) {
+    if (oddPercentage >= 52 && oddPercentage <= 60 && trailingEvenCount >= 3) {
         shouldPlaceTrade = true;
     } else if (oddPercentage >= 60 && trailingEvenCount >= 2) {
         shouldPlaceTrade = true;
