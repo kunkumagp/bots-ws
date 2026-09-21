@@ -20,7 +20,6 @@ const authenticateButton = document.getElementById("authenticateButton");
 const scriptButton = document.getElementById("scriptButton");
 
 const WINDOW_SIZE = 100;
-const COOLDOWN_MS = 60000;
 const MIN_LOWEST_PERCENT = 6;
 const RECHECK_MS = 180000;
 let recheckTimer = null;
@@ -29,7 +28,6 @@ let ws = null;
 let intervalId;
 let isRunning = false;
 let stopTimer = false;
-let isCooldown = false;
 
 let marketStats = [];
 let marketsToAnalyze = [];
@@ -351,14 +349,7 @@ function handleServerMessage(event) {
                 isTradeOpen = false;
                 pendingContractType = null;
 
-                forgetAllTickSubscriptions();
-                isCooldown = true;
-                console.log(`[COOLDOWN] Waiting 1 minute before reloading.`);
-                if (typeof setTimer === "function") setTimer(COOLDOWN_MS);
-                setTimeout(() => {
-                    isCooldown = false;
-                    if (typeof reload === "function") reload();
-                }, COOLDOWN_MS);
+                console.log(`[RESULT] Trade settled. Profit: ${profit.toFixed(2)}. Placing next trade on next tick...`);
             } else {
                 setTimeout(() => {
                     if (typeof setTickCountDown === "function") setTickCountDown(contract.tick_count, contract.tick_stream.length);
@@ -513,13 +504,10 @@ function handleLiveTick(tickMarket, quote) {
 
     console.log(`[TICK] ${tickMarket} current last digit: ${getLastDigit(quote)} | selected: ${selectedMarket} digit ${predictionDigit} (${selectedLowestPercent}%)`);
 
-    if (isCooldown || isTradeOpen || pendingContractType) return;
+    if (isTradeOpen || pendingContractType) return;
     if (selectedLowestPercent >= MIN_LOWEST_PERCENT) return;
 
-    if (getLastDigit(quote) === predictionDigit) {
-        console.log(`[MATCH] ${tickMarket} last digit ${getLastDigit(quote)} == prediction ${predictionDigit} → placing DIFFER trade.`);
-        placeDifferTrade();
-    }
+    placeDifferTrade();
 }
 
 function updateMarketStats(tickMarket) {
@@ -626,6 +614,15 @@ function setInfo(contract, lastTradeProfit) {
     if (currentLossAmount >= 0) { currentLossAmount = 0; }
 
     netProfit = updatedAccountBalance - initialAccountBalance;
+
+    if (targetAmount > 0 && netProfit >= targetAmount) {
+        console.log(`Target reached. Net profit: ${netProfit.toFixed(2)} / Target: ${targetAmount}`);
+        if (typeof setFlashNotification === "function") setFlashNotification("Target reached. Reloading page...", 0);
+        setTimeout(() => {
+            if (typeof reload === "function") reload();
+        }, 1000);
+        return;
+    }
 
     if (lastTradeProfit > 0) {
         winTradeCount = winTradeCount + 1;
