@@ -26,12 +26,14 @@ const params = new URLSearchParams(window.location.search);
 
 let ws = null;
 let isRunning = false, intervalId;
-let last50Prices = [];
+let last100Prices = [];
 let hasRequestedTickHistory = false;
 let pendingContractType = null;
-let ticksWithoutTrade = 0;
 let consecutiveLossCount = 0;
-const NO_TRADE_TICK_LIMIT = 120;
+let marketStats = [];
+let marketsToAnalyze = [];
+let isAnalyzingMarkets = false;
+let tradingDirection = null;
 
 const martingaleMultiplier = 2.07112;
 let dayTarget = 0;
@@ -42,7 +44,7 @@ if (params.get("target")) {
     dayTarget = Number(targetProfitInputElement.value);
 }
 
-let startingAmount = 250;
+let startingAmount = 100;
 
 let sessionTargetPercentage = 1 / startingAmount,
     targetPercentage = 1 / startingAmount,
@@ -103,7 +105,7 @@ if (targetProfitInputElement) {
     });
 }
 
-market = (typeof getRandomMarket === "function") ? getRandomMarket(marketArray, "") : marketSelectElement.value;
+market = marketSelectElement.value;
 
 Object.defineProperty(window, "updatedAccountBalance", {
     get: function () { return window._underlyingBalance || 0; },
@@ -299,24 +301,6 @@ function handleServerMessage(event) {
             try { if (initialStakeInputElement) initialStakeInputElement.value = Number(stake).toFixed(2); } catch (e) { }
 
             try {
-                const storedLost = parseFloat(localStorage.getItem('totalLostAmount')) || 0;
-                if (storedLost !== 0) {
-                    const calcStake = Number((Math.abs(storedLost) / currentPayoutRate).toFixed(2));
-                    stake = calcStake;
-                    try { if (initialStakeInputElement) initialStakeInputElement.value = stake; } catch (e) { }
-                    if (typeof setFlashNotification === "function") setFlashNotification(`Recovered pending loss ${storedLost.toFixed(2)} — adjusting stake to ${stake}`, 5);
-                }
-            } catch (e) { }
-
-            try {
-                if (typeof stake === 'number' && initialAccountBalance > 0 && stake > initialAccountBalance) {
-                    stake = Number(initialAccountBalance.toFixed(2));
-                    try { if (initialStakeInputElement) initialStakeInputElement.value = stake; } catch (e) { }
-                    if (typeof setFlashNotification === "function") setFlashNotification(`Stake adjusted to initial account balance: ${stake}`, 5);
-                }
-            } catch (e) { }
-
-            try {
                 const today = new Date().toISOString().slice(0, 10);
                 const storedDate = localStorage.getItem('date');
                 let storedDayTarget = localStorage.getItem('dayTarget');
@@ -356,7 +340,7 @@ function handleServerMessage(event) {
                 if (typeof setFlashNotification === "function") setFlashNotification("Day target is done", 0);
                 console.log("Day target is done");
             } else {
-                runScript();
+                analyzeAllMarkets();
             }
         } else {
             if (typeof reload === "function") reload();
@@ -364,16 +348,22 @@ function handleServerMessage(event) {
     }
 
     if (wsResponse.msg_type === "history" && wsResponse.history && Array.isArray(wsResponse.history.prices)) {
-        last50Prices = wsResponse.history.prices.slice(-50);
-        logEvenOddPercentages(last50Prices);
+        if (isAnalyzingMarkets) {
+            const analyzedMarket = wsResponse.echo_req && wsResponse.echo_req.ticks_history ? wsResponse.echo_req.ticks_history : market;
+            computeMarketStats(analyzedMarket, wsResponse.history.prices);
+            analyzeNextMarket();
+        } else {
+            last100Prices = wsResponse.history.prices.slice(-100);
+            logLastDigitPercentages(last100Prices);
+        }
     }
 
     if (wsResponse.msg_type === "tick" && wsResponse.tick && typeof wsResponse.tick.quote !== "undefined") {
-        last50Prices.push(wsResponse.tick.quote);
-        if (last50Prices.length > 50) {
-            last50Prices = last50Prices.slice(-50);
+        last100Prices.push(wsResponse.tick.quote);
+        if (last100Prices.length > 100) {
+            last100Prices = last100Prices.slice(-100);
         }
-        logEvenOddPercentages(last50Prices);
+        logLastDigitPercentages(last100Prices);
     }
 
     if (wsResponse.msg_type === "proposal") {
@@ -433,15 +423,6 @@ function handleServerMessage(event) {
 
                 if (typeof setInfo === "function") setInfo(contract, profit);
 
-                try {
-                    const sessionTargetAmount = initialAccountBalance * sessionTargetPercentage;
-                    if (sessionTargetAmount > 0 && netProfit >= sessionTargetAmount) {
-                        if (typeof setFlashNotification === "function") setFlashNotification('Session target reached. Reloading.', 0);
-                        if (typeof reload === "function") reload();
-                        return;
-                    }
-                } catch (e) { }
-
                 isTradeOpen = false;
                 pendingContractType = null;
 
@@ -477,12 +458,8 @@ function handleServerMessage(event) {
                 console.log(`[${profit > 0 ? "WIN" : "LOSS"}] Waiting ${nextTradeDelay / 60000} minutes before next trade.`);
                 if (typeof setTimer === "function") setTimer(nextTradeDelay);
 
-                if (netProfit >= targetAmount && profit > 0) {
-                    if (typeof reload === "function") reload();
-                } else {
-                    isCooldown = true;
-                    setTimeout(() => { isCooldown = false; runScript(); }, nextTradeDelay);
-                }
+                isCooldown = true;
+                setTimeout(() => { isCooldown = false; runScript(); }, nextTradeDelay);
             } else {
                 setTimeout(() => {
                     if (typeof setTickCountDown === "function") setTickCountDown(contract.tick_count, contract.tick_stream.length);
@@ -507,7 +484,7 @@ function analizeForEvenOdd() {
         JSON.stringify({
             ticks_history: market,
             style: "ticks",
-            count: 50,
+            count: 100,
             end: "latest",
             subscribe: 1,
         })
@@ -524,8 +501,85 @@ function getLastDigitByPrecision(value, precision) {
     return Number(fixed.charAt(fixed.length - 1));
 }
 
-function logEvenOddPercentages(prices) {
+function analyzeAllMarkets() {
+    isAnalyzingMarkets = true;
+    marketStats = [];
+    marketsToAnalyze = marketArray.map((item) => item.value);
+    console.log(`[ANALYSIS] Analyzing ${marketsToAnalyze.length} markets for last-digit percentages...`);
+    analyzeNextMarket();
+}
+
+function analyzeNextMarket() {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+    if (marketsToAnalyze.length === 0) {
+        finalizeMarketSelection();
+        return;
+    }
+
+    const marketToAnalyze = marketsToAnalyze.shift();
+    console.log(`[ANALYSIS] Fetching ${marketToAnalyze} history...`);
+    ws.send(
+        JSON.stringify({
+            ticks_history: marketToAnalyze,
+            style: "ticks",
+            count: 100,
+            end: "latest",
+        })
+    );
+}
+
+function computeMarketStats(marketName, prices) {
+    const precision = prices.reduce((maxPrecision, price) => {
+        const currentPrecision = getDecimalPlaces(price);
+        return currentPrecision > maxPrecision ? currentPrecision : maxPrecision;
+    }, 0);
+
+    const lastDigits = prices.map((price) => getLastDigitByPrecision(price, precision));
+    const counts = new Array(10).fill(0);
+    lastDigits.forEach((digit) => { counts[digit]++; });
+    const percents = counts.map((count) => Number(((count / lastDigits.length) * 100).toFixed(2)));
+
+    let highestDigit = 0, highestPercent = 0;
+    percents.forEach((percent, digit) => {
+        if (percent > highestPercent) {
+            highestPercent = percent;
+            highestDigit = digit;
+        }
+    });
+
+    console.log(`[ANALYSIS] ${marketName} → ${percents.join(" | ")} | Highest: digit ${highestDigit} (${highestPercent}%)`);
+
+    marketStats.push({ market: marketName, percents, highestDigit, highestPercent });
+}
+
+function finalizeMarketSelection() {
+    isAnalyzingMarkets = false;
+
+    if (marketStats.length === 0) {
+        console.error("[ANALYSIS] No market stats collected.");
+        return;
+    }
+
+    let best = marketStats[0];
+    marketStats.forEach((stats) => {
+        if (stats.highestPercent > best.highestPercent) {
+            best = stats;
+        }
+    });
+
+    market = best.market;
+    marketSelectElement.value = market;
+
+    console.log(`[SELECTED] ${market} — highest digit ${best.highestDigit} (${best.highestPercent}%).`);
+    if (typeof setFlashNotification === "function") setFlashNotification(`${market}: digit ${best.highestDigit} (${best.highestPercent}%) selected`, 5);
+
+    runScript();
+}
+
+function logLastDigitPercentages(prices) {
     if (!Array.isArray(prices) || prices.length === 0) return;
+    if (isCooldown) return;
 
     const precision = prices.reduce((maxPrecision, price) => {
         const currentPrecision = getDecimalPlaces(price);
@@ -533,163 +587,42 @@ function logEvenOddPercentages(prices) {
     }, 0);
 
     const lastDigits = prices.map((price) => getLastDigitByPrecision(price, precision));
+
+    const counts = new Array(10).fill(0);
+    lastDigits.forEach((digit) => { counts[digit]++; });
+    const percents = counts.map((count) => Number(((count / lastDigits.length) * 100).toFixed(2)));
+
     const evenCount = lastDigits.filter((digit) => digit % 2 === 0).length;
     const oddCount = lastDigits.length - evenCount;
-
     const evenPercentage = Number(((evenCount / lastDigits.length) * 100).toFixed(2));
     const oddPercentage = Number(((oddCount / lastDigits.length) * 100).toFixed(2));
-    const lastThreeDigits = lastDigits.slice(-3);
 
-    const last10Digits = lastDigits.slice(-10);
-    const evenCount10 = last10Digits.filter((d) => d % 2 === 0).length;
-    const oddCount10 = last10Digits.length - evenCount10;
-    const even10Percentage = Number(((evenCount10 / last10Digits.length) * 100).toFixed(2));
-    const odd10Percentage = Number(((oddCount10 / last10Digits.length) * 100).toFixed(2));
+    let maxDigit = 0, maxPercentage = 0;
+    percents.forEach((percent, digit) => {
+        if (percent > maxPercentage) {
+            maxPercentage = percent;
+            maxDigit = digit;
+        }
+    });
 
-    contractType = null;
-    if (evenPercentage >= 52) {
-        contractType = "even";
-    } else if (oddPercentage >= 52) {
-        contractType = "odd";
-    }
+    tradingDirection = maxDigit % 2 === 0 ? "even" : "odd";
 
-    console.log(
-        `[${market}] Even: ${evenPercentage}% (last10: ${even10Percentage}%) | Odd: ${oddPercentage}% (last10: ${odd10Percentage}%) | ContractType: ${contractType} | Last3: [${lastThreeDigits.join(",")}]`
-    );
-
-    const evenTriggered = tryEvenEntry(evenPercentage, lastDigits);
-    const oddTriggered = tryOddEntry(oddPercentage, lastDigits);
-    const tradeTriggered = evenTriggered || oddTriggered;
-
-    if (tradeTriggered) {
-        ticksWithoutTrade = 0;
-        return;
-    }
+    const lastTwo = lastDigits.slice(-2);
+    console.log(`[${market}] digits: ${percents.join(" | ")} | Even: ${evenPercentage}% | Odd: ${oddPercentage}% | Max: digit ${maxDigit} (${maxPercentage}%) | Last2: [${lastTwo.join(",")}] | Trade: ${tradingDirection}`);
 
     if (isTradeOpen || pendingContractType) return;
+    if (lastTwo.length < 2) return;
 
-    ticksWithoutTrade += 1;
+    const secondLast = lastTwo[0];
+    const last = lastTwo[1];
 
-    if (ticksWithoutTrade >= NO_TRADE_TICK_LIMIT && lossTradeCount === 0) {
-        changeMarketAfterNoTrade();
+    if (tradingDirection === "odd" && oddPercentage > 52 && maxPercentage >= 15 && maxDigit % 2 !== 0 && secondLast % 2 === 0 && last % 2 === 0) {
+        console.log(`[ENTRY] Odd ${oddPercentage}% > 52% + max digit ${maxPercentage}% >= 15% (digit ${maxDigit} is odd) + two even digits [${lastTwo.join(",")}] → placing ODD trade.`);
+        if (typeof placeTheTrade === "function") placeTheTrade("odd");
+    } else if (tradingDirection === "even" && evenPercentage > 52 && maxPercentage >= 15 && maxDigit % 2 === 0 && secondLast % 2 !== 0 && last % 2 !== 0) {
+        console.log(`[ENTRY] Even ${evenPercentage}% > 52% + max digit ${maxPercentage}% >= 15% (digit ${maxDigit} is even) + two odd digits [${lastTwo.join(",")}] → placing EVEN trade.`);
+        if (typeof placeTheTrade === "function") placeTheTrade("even");
     }
-}
-
-function changeMarketAfterNoTrade() {
-    if (lossTradeCount !== 0) return;
-
-    const previousMarket = market;
-    const nextMarket = (typeof getRandomMarket === "function") ? getRandomMarket(marketArray, previousMarket) : marketArray[0].value;
-
-    if (!nextMarket || nextMarket === previousMarket) {
-        ticksWithoutTrade = 0;
-        return;
-    }
-
-    market = nextMarket;
-    marketSelectElement.value = nextMarket;
-    ticksWithoutTrade = 0;
-    last50Prices = [];
-    hasRequestedTickHistory = false;
-    pendingContractType = null;
-    contractType = null;
-
-    console.log(`[MARKET SWITCH] No trade in ${NO_TRADE_TICK_LIMIT} ticks. ${previousMarket} -> ${nextMarket}`);
-
-    if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ forget_all: "ticks" }));
-        analizeForEvenOdd();
-    }
-}
-
-function getTrailingOddCount(lastDigits) {
-    let trailingOddCount = 0;
-    for (let i = lastDigits.length - 1; i >= 0; i--) {
-        if (lastDigits[i] % 2 !== 0) {
-            trailingOddCount++;
-        } else {
-            break;
-        }
-    }
-    return trailingOddCount;
-}
-
-function tryEvenEntry(evenPercentage, lastDigits) {
-    if (isCooldown) return false;
-    if (pendingContractType) return false;
-    if (contractType !== "even") return false;
-    if (!Array.isArray(lastDigits) || lastDigits.length === 0) return false;
-    if (evenPercentage < 52) return false;
-
-    const trailingOddCount = getTrailingOddCount(lastDigits);
-    let shouldPlaceTrade = false;
-
-    if (consecutiveLossCount >= 3) {
-        if (evenPercentage <= 60) return false;
-    }
-
-    if (evenPercentage >= 52 && evenPercentage <= 60 && trailingOddCount >= 3) {
-        shouldPlaceTrade = true;
-    } else if (evenPercentage >= 60 && trailingOddCount >= 2) {
-        shouldPlaceTrade = true;
-    }
-
-    if (shouldPlaceTrade) {
-        if (typeof placeTheTrade === "function") {
-            pendingContractType = "even";
-            placeTheTrade(contractType);
-            return true;
-        } else {
-            console.warn("placeTheTrade function is not available.");
-        }
-    }
-
-    return false;
-}
-
-function getTrailingEvenCount(lastDigits) {
-    let trailingEvenCount = 0;
-    for (let i = lastDigits.length - 1; i >= 0; i--) {
-        if (lastDigits[i] % 2 === 0) {
-            trailingEvenCount++;
-        } else {
-            break;
-        }
-    }
-    return trailingEvenCount;
-}
-
-function tryOddEntry(oddPercentage, lastDigits) {
-    if (isCooldown) return false;
-    if (pendingContractType) return false;
-    if (contractType !== "odd") return false;
-    if (!Array.isArray(lastDigits) || lastDigits.length === 0) return false;
-    if (oddPercentage < 52) return false;
-
-    const trailingEvenCount = getTrailingEvenCount(lastDigits);
-    let shouldPlaceTrade = false;
-
-    if (consecutiveLossCount >= 3) {
-        if (oddPercentage <= 60) return false;
-    }
-
-    if (oddPercentage >= 52 && oddPercentage <= 60 && trailingEvenCount >= 3) {
-        shouldPlaceTrade = true;
-    } else if (oddPercentage >= 60 && trailingEvenCount >= 2) {
-        shouldPlaceTrade = true;
-    }
-
-    if (shouldPlaceTrade) {
-        if (typeof placeTheTrade === "function") {
-            pendingContractType = "odd";
-            placeTheTrade(contractType);
-            return true;
-        } else {
-            console.warn("placeTheTrade function is not available.");
-        }
-    }
-
-    return false;
 }
 
 function webSocketConnectionStop() {
