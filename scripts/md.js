@@ -22,7 +22,14 @@ const scriptButton = document.getElementById("scriptButton");
 const WINDOW_SIZE = 100;
 const MIN_LOWEST_PERCENT = 6;
 const RECHECK_MS = 180000;
+const LOSS_WAIT_MS = 15000;
+const PATTERN_HISTORY_SIZE = 300;
+const PATTERN_LOOKBACK = 20;
+const MIN_COLD_STREAK = 5;
+const PATTERN_WARMUP = 30;
 let recheckTimer = null;
+let lossWaitTimer = null;
+let isLossWait = false;
 
 let ws = null;
 let intervalId;
@@ -38,6 +45,9 @@ let tickSubscriptions = {};
 let selectedMarket = null;
 let predictionDigit = null;
 let selectedLowestPercent = Infinity;
+let digitPatternHistory = {};
+let patternStreak = 0;
+let isPatternSafe = false;
 
 let pendingContractType = null;
 let isTradeOpen = false;
@@ -349,7 +359,19 @@ function handleServerMessage(event) {
                 isTradeOpen = false;
                 pendingContractType = null;
 
-                console.log(`[RESULT] Trade settled. Profit: ${profit.toFixed(2)}. Placing next trade on next tick...`);
+                if (profit < 0) {
+                    isLossWait = true;
+                    console.log(`[LOSS] Trade lost. Waiting ${LOSS_WAIT_MS / 1000} seconds before next trade...`);
+                    if (typeof setFlashNotification === "function") setFlashNotification(`Trade lost. Waiting <span class="number">${LOSS_WAIT_MS / 1000}</span> seconds before next trade...`, 0);
+                    if (typeof setTimer === "function") setTimer(LOSS_WAIT_MS);
+                    if (lossWaitTimer) clearTimeout(lossWaitTimer);
+                    lossWaitTimer = setTimeout(() => {
+                        isLossWait = false;
+                        console.log(`[LOSS] Wait over. Resuming trades.`);
+                    }, LOSS_WAIT_MS);
+                } else {
+                    console.log(`[RESULT] Trade settled. Profit: ${profit.toFixed(2)}. Placing next trade on next tick...`);
+                }
             } else {
                 setTimeout(() => {
                     if (typeof setTickCountDown === "function") setTickCountDown(contract.tick_count, contract.tick_stream.length);
@@ -365,6 +387,7 @@ function analyzeAllMarkets() {
     isAnalyzingMarkets = true;
     marketStats = [];
     priceHistory = {};
+    digitPatternHistory = {};
     marketsToAnalyze = marketArray.map((item) => item.value);
     console.log(`[ANALYSIS] Analyzing ${marketsToAnalyze.length} markets for lowest last-digit percentage...`);
     analyzeNextMarket();
@@ -401,6 +424,8 @@ function computeMarketStats(marketName, prices) {
     const counts = new Array(10).fill(0);
     lastDigits.forEach((digit) => { counts[digit]++; });
     const percents = counts.map((count) => Number(((count / lastDigits.length) * 100).toFixed(2)));
+
+    digitPatternHistory[marketName] = lastDigits.slice(-PATTERN_HISTORY_SIZE);
 
     let lowestDigit = 0, lowestPercent = Infinity;
     percents.forEach((percent, digit) => {
@@ -498,16 +523,61 @@ function handleLiveTick(tickMarket, quote) {
         priceHistory[tickMarket] = priceHistory[tickMarket].slice(-WINDOW_SIZE);
     }
 
+    const lastDigit = getLastDigit(quote);
+    if (!digitPatternHistory[tickMarket]) digitPatternHistory[tickMarket] = [];
+    digitPatternHistory[tickMarket].push(lastDigit);
+    if (digitPatternHistory[tickMarket].length > PATTERN_HISTORY_SIZE) {
+        digitPatternHistory[tickMarket] = digitPatternHistory[tickMarket].slice(-PATTERN_HISTORY_SIZE);
+    }
+
     if (!isAnalyzingMarkets && marketStats.length >= marketArray.length) {
         updateMarketStats(tickMarket);
     }
 
-    console.log(`[TICK] ${tickMarket} current last digit: ${getLastDigit(quote)} | selected: ${selectedMarket} digit ${predictionDigit} (${selectedLowestPercent}%)`);
+    console.log(`[TICK] ${tickMarket} current last digit: ${lastDigit} | history: ${digitPatternHistory[tickMarket].slice(-PATTERN_LOOKBACK).join("")} | selected digit ${predictionDigit}`);
 
     if (isTradeOpen || pendingContractType) return;
+    if (isLossWait) return;
     if (selectedLowestPercent >= MIN_LOWEST_PERCENT) return;
 
+    updatePatternSelection();
+
+    console.log(`[PATTERN] best digit ${predictionDigit} streak ${patternStreak} ticks | safe: ${isPatternSafe}`);
+
+    if (!isPatternSafe) return;
+
     placeDifferTrade();
+}
+
+function updatePatternSelection() {
+    const history = digitPatternHistory[selectedMarket];
+    if (!history || history.length < PATTERN_WARMUP) {
+        isPatternSafe = false;
+        return;
+    }
+
+    let bestDigit = -1;
+    let bestStreak = -1;
+    for (let digit = 0; digit < 10; digit++) {
+        let streak = 0;
+        for (let i = history.length - 1; i >= 0; i--) {
+            if (history[i] === digit) break;
+            streak++;
+        }
+        if (streak > bestStreak) {
+            bestStreak = streak;
+            bestDigit = digit;
+        }
+    }
+
+    if (bestDigit < 0) {
+        isPatternSafe = false;
+        return;
+    }
+
+    predictionDigit = bestDigit;
+    patternStreak = bestStreak;
+    isPatternSafe = bestStreak >= MIN_COLD_STREAK;
 }
 
 function updateMarketStats(tickMarket) {
