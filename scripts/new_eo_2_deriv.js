@@ -26,6 +26,7 @@ const params = new URLSearchParams(window.location.search);
 
 let ws = null;
 let isRunning = false, intervalId;
+let isCooldown = false, cooldownTimeoutId = null;
 let last50Prices = [];
 let hasRequestedTickHistory = false;
 let pendingContractType = null;
@@ -34,7 +35,10 @@ let consecutiveLossCount = 0;
 const NO_TRADE_TICK_LIMIT = 120;
 
 const martingaleMultiplier = 2.07112;
+const dailyTargetPercentage = 3 / 100;
+const dailyLossLimitPercentage = 5 / 100;
 let dayTarget = 0;
+let dayStartBalance = 0;
 
 if (params.get("target")) {
     dayTarget = Number(params.get("target"));
@@ -42,12 +46,12 @@ if (params.get("target")) {
     dayTarget = Number(targetProfitInputElement.value);
 }
 
-let startingAmount = 250;
+let startingAmount = 100;
 
 let sessionTargetPercentage = 1 / startingAmount,
     targetPercentage = 1 / startingAmount,
-    amountPercentage = 0.5 / 100,
-    finishTargetPercentagePerDay = 3 / 100,
+    amountPercentage = 2 / 100,
+    finishTargetPercentagePerDay = dailyTargetPercentage,
     isTradeOpen = false,
     netProfit = 0,
     targetAmount = 0,
@@ -277,6 +281,52 @@ function stopPing() {
     }
 }
 
+function scheduleTradeCooldown(cooldownUntil) {
+    const remaining = cooldownUntil - Date.now();
+    if (remaining <= 0) {
+        try { localStorage.removeItem('tradeCooldownUntil'); } catch (e) { }
+        isCooldown = false;
+        cooldownTimeoutId = null;
+        return;
+    }
+
+    isCooldown = true;
+    if (cooldownTimeoutId) clearTimeout(cooldownTimeoutId);
+    cooldownTimeoutId = setTimeout(() => {
+        if (Date.now() < cooldownUntil) {
+            scheduleTradeCooldown(cooldownUntil);
+            return;
+        }
+
+        try { localStorage.removeItem('tradeCooldownUntil'); } catch (e) { }
+        cooldownTimeoutId = null;
+        isCooldown = false;
+        if (authSuccess && ws && ws.readyState === WebSocket.OPEN && localStorage.getItem('tradingStoppedForDay') !== '1') {
+            runScript();
+        }
+    }, remaining);
+}
+
+function startTradeCooldown(delay) {
+    const cooldownUntil = Date.now() + delay;
+    try { localStorage.setItem('tradeCooldownUntil', String(cooldownUntil)); } catch (e) { }
+    scheduleTradeCooldown(cooldownUntil);
+}
+
+function resumeTradeCooldown() {
+    try {
+        const cooldownUntil = Number(localStorage.getItem('tradeCooldownUntil'));
+        if (Number.isFinite(cooldownUntil) && cooldownUntil > Date.now()) {
+            scheduleTradeCooldown(cooldownUntil);
+        } else {
+            localStorage.removeItem('tradeCooldownUntil');
+            isCooldown = false;
+        }
+    } catch (e) {
+        isCooldown = false;
+    }
+}
+
 function handleServerMessage(event) {
     const wsResponse = JSON.parse(event.data);
     if (!wsResponse) return;
@@ -318,18 +368,51 @@ function handleServerMessage(event) {
             try {
                 const today = new Date().toISOString().slice(0, 10);
                 const storedDate = localStorage.getItem('date');
-                let storedDayTarget = localStorage.getItem('dayTarget');
+                const storedDayTarget = localStorage.getItem('dayTarget');
+                const storedDayStartBalance = Number(localStorage.getItem('dayStartBalance')) || 0;
+                const storedTargetPercentage = localStorage.getItem('dayTargetPercentage');
 
-                if (!storedDate || !storedDayTarget || storedDate !== today) {
-                    const computedTarget = Number((initialAccountBalance + (finishTargetPercentagePerDay * initialAccountBalance)).toFixed(2));
+                if (storedDate !== today) {
+                    localStorage.removeItem('tradingStoppedForDay');
+                }
+
+                const isNewTradingDay = storedDate !== today;
+                dayStartBalance = isNewTradingDay
+                    ? initialAccountBalance
+                    : storedDayStartBalance > 0
+                        ? storedDayStartBalance
+                        : storedDayTarget
+                            ? Number((Number(storedDayTarget) / (1 + dailyTargetPercentage)).toFixed(2))
+                            : initialAccountBalance;
+
+                if (isNewTradingDay || storedDayStartBalance <= 0) {
                     localStorage.setItem('date', today);
-                    localStorage.setItem('dayTarget', String(computedTarget));
-                    dayTarget = computedTarget;
+                    localStorage.setItem('dayStartBalance', String(dayStartBalance));
+                }
+
+                if (isNewTradingDay || !storedDayTarget || storedTargetPercentage !== String(dailyTargetPercentage) || storedDayStartBalance <= 0) {
+                    dayTarget = Number((dayStartBalance * (1 + dailyTargetPercentage)).toFixed(2));
+                    localStorage.setItem('dayTarget', String(dayTarget));
+                    localStorage.setItem('dayTargetPercentage', String(dailyTargetPercentage));
                 } else {
                     dayTarget = Number(storedDayTarget);
                 }
 
                 if (typeof setAccountInfo === "function") setAccountInfo("targetAmount", `$ ${dayTarget}`);
+
+                const dailyLossLimit = dayStartBalance * dailyLossLimitPercentage;
+                if (dayStartBalance > 0 && updatedAccountBalance <= dayStartBalance - dailyLossLimit) {
+                    localStorage.setItem('tradingStoppedForDay', '1');
+                }
+
+                if (localStorage.getItem('tradingStoppedForDay') === '1') {
+                    if (typeof setFlashNotification === "function") setFlashNotification('Trading is stopped for today. Manual restart tomorrow.', 0);
+                    isRunning = false;
+                    stopPing();
+                    try { if (ws) { ws.onclose = null; ws.close(); } } catch (e) { }
+                    if (scriptButton) { scriptButton.disabled = true; scriptButton.innerText = 'Stopped for day'; }
+                    return;
+                }
 
                 try {
                     targetAmount = Number((initialAccountBalance * sessionTargetPercentage).toFixed(2));
@@ -355,6 +438,7 @@ function handleServerMessage(event) {
                 if (typeof setFlashNotification === "function") setFlashNotification("Day target is done", 0);
                 console.log("Day target is done");
             } else {
+                resumeTradeCooldown();
                 runScript();
             }
         } else {
@@ -432,6 +516,19 @@ function handleServerMessage(event) {
 
                 if (typeof setInfo === "function") setInfo(contract, profit);
 
+                const dailyLossLimit = dayStartBalance * dailyLossLimitPercentage;
+                if (dayStartBalance > 0 && updatedAccountBalance <= dayStartBalance - dailyLossLimit) {
+                    if (typeof setFlashNotification === "function") setFlashNotification(`Stopped: Daily loss limit of 5% ($${dailyLossLimit.toFixed(2)}) reached. Stopping for today.`, 0);
+                    try { localStorage.setItem('tradingStoppedForDay', '1'); } catch (e) { }
+                    isRunning = false;
+                    isTradeOpen = false;
+                    pendingContractType = null;
+                    stopPing();
+                    try { if (ws) { ws.onclose = null; ws.close(); } } catch (e) { }
+                    if (scriptButton) { scriptButton.disabled = true; scriptButton.innerText = 'Stopped (loss limit)'; }
+                    return;
+                }
+
                 try {
                     const sessionTargetAmount = initialAccountBalance * sessionTargetPercentage;
                     if (sessionTargetAmount > 0 && netProfit >= sessionTargetAmount) {
@@ -456,11 +553,11 @@ function handleServerMessage(event) {
                         return;
                     }
 
-                    // ── Loss: wait 30-45 minutes before next trade ────────────
-                    let lossDelay = (typeof getRandomNumber === "function" ? getRandomNumber(1800, 2700) : 1800) * 1000;
+                    // Keep the cooldown deadline across reloads and reconnects.
+                    const lossDelay = (Math.floor(Math.random() * 6) + 5) * 60 * 1000;
                     console.log(`[LOSS] Waiting ${lossDelay / 60000} minutes before next trade.`);
                     if (typeof setTimer === "function") setTimer(lossDelay);
-                    setTimeout(() => { runScript(); }, lossDelay);
+                    startTradeCooldown(lossDelay);
                 } else {
                     consecutiveLossCount = 0;
 
@@ -482,6 +579,7 @@ function handleServerMessage(event) {
 }
 
 function runScript() {
+    if (isCooldown) return;
     isRunning = true;
     analizeForEvenOdd();
 }
@@ -514,6 +612,7 @@ function getLastDigitByPrecision(value, precision) {
 
 function logEvenOddPercentages(prices) {
     if (!Array.isArray(prices) || prices.length === 0) return;
+    if (isCooldown) return;
 
     const precision = prices.reduce((maxPrecision, price) => {
         const currentPrecision = getDecimalPlaces(price);

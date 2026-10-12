@@ -69,13 +69,14 @@ const placeEvenOddTrade = (selectedContractType = "even") => {
 };
 
 function placeTheTrade(contractType) {
-    if (isTradeOpen) return;
+    if (isTradeOpen || (typeof isCooldown !== "undefined" && isCooldown)) return;
     pendingContractType = contractType;
     console.log('Preparing proposal for contract type :', contractType);
     placeEvenOddTrade(contractType);
 }
 
 const makeTheTrade = (tradeProposal, contractType) => {
+    if (typeof isCooldown !== "undefined" && isCooldown) return;
     if (
         tradeProposal.proposal == undefined ||
         tradeProposal.proposal.id == undefined
@@ -202,7 +203,7 @@ function setInfo(contract, lastTradeProfit) {
 
     netProfit = updatedAccountBalance - initialAccountBalance;
 
-    if (dayTarget > 0 && netProfit >= dayTarget) {
+    if (dayTarget > 0 && updatedAccountBalance >= dayTarget) {
         console.log(`Day target reached. Net profit: ${netProfit.toFixed(2)} / Target: ${dayTarget}`);
         setFlashNotification("Day target reached. Reloading page...", 0);
         setTimeout(() => {
