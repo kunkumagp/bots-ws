@@ -4,9 +4,9 @@ const accounts = [
 ];
 
 const marketArray = [
-    { value: "R_10", name: "Volatility 10 Index" },
+    // { value: "R_10", name: "Volatility 10 Index" },
     // { value: "R_25", name: "Volatility 25 Index" },
-    { value: "R_50", name: "Volatility 50 Index" },
+    // { value: "R_50", name: "Volatility 50 Index" },
     // { value: "R_75", name: "Volatility 75 Index" },
     { value: "R_100", name: "Volatility 100 Index" },
 ];
@@ -28,10 +28,22 @@ let ws = null;
 let isRunning = false, intervalId;
 let last50Prices = [];
 let hasRequestedTickHistory = false;
+let tickPrecision = null;
+let precisionWarningShown = false;
 let pendingContractType = null;
 let ticksWithoutTrade = 0;
 let consecutiveLossCount = 0;
 const NO_TRADE_TICK_LIMIT = 120;
+// Use a fixed, prospective sample so trade eligibility is not decided by repeated early checks.
+const VALIDATION_MIN_SAMPLES = 500;
+const VALIDATION_MAX_SAMPLES = 500;
+const VALIDATION_SIGNAL_SPACING = 50;
+const VALIDATION_CONFIDENCE_Z = 2.576;
+const VALIDATION_INDEPENDENCE_Z = 2.576;
+const validationSamplesByKey = new Map();
+const validationStorageErrors = new Set();
+let pendingValidationPrediction = null;
+let validationTicksUntilNextSignal = 0;
 
 const martingaleMultiplier = 2.07112;
 let dayTarget = 0;
@@ -47,7 +59,7 @@ let startingAmount = 250;
 let sessionTargetPercentage = 1 / startingAmount,
     targetPercentage = 1 / startingAmount,
     amountPercentage = 2 / 100,
-    finishTargetPercentagePerDay = 5 / 100,
+    finishTargetPercentagePerDay = 2 / 100,
     isTradeOpen = false,
     netProfit = 0,
     targetAmount = 0,
@@ -364,16 +376,30 @@ function handleServerMessage(event) {
     }
 
     if (wsResponse.msg_type === "history" && wsResponse.history && Array.isArray(wsResponse.history.prices)) {
+        const historyPrecision = Number(wsResponse.history.pip_size || wsResponse.pip_size);
+        if (Number.isInteger(historyPrecision) && historyPrecision >= 0 && historyPrecision <= 10) {
+            tickPrecision = historyPrecision;
+        }
         last50Prices = wsResponse.history.prices.slice(-50);
-        logEvenOddPercentages(last50Prices);
+        logEvenOddPercentages(last50Prices, false);
     }
 
     if (wsResponse.msg_type === "tick" && wsResponse.tick && typeof wsResponse.tick.quote !== "undefined") {
+        const receivedPrecision = Number(wsResponse.tick.pip_size);
+        if (Number.isInteger(receivedPrecision) && receivedPrecision >= 0 && receivedPrecision <= 10) {
+            if (tickPrecision !== null && tickPrecision !== receivedPrecision) {
+                last50Prices = [];
+                pendingValidationPrediction = null;
+                validationTicksUntilNextSignal = 0;
+            }
+            tickPrecision = receivedPrecision;
+            precisionWarningShown = false;
+        }
         last50Prices.push(wsResponse.tick.quote);
         if (last50Prices.length > 50) {
             last50Prices = last50Prices.slice(-50);
         }
-        logEvenOddPercentages(last50Prices);
+        logEvenOddPercentages(last50Prices, true);
     }
 
     if (wsResponse.msg_type === "proposal") {
@@ -384,19 +410,39 @@ function handleServerMessage(event) {
             console.log('tradeProposal: ', tradeProposal);
             // Extract actual payout rate from the proposal
             try {
-                if (tradeProposal.proposal && tradeProposal.proposal.payout && tradeProposal.proposal.ask_price && tradeProposal.proposal.ask_price > 0) {
+                if (tradeProposal.proposal && Number(tradeProposal.proposal.payout) > 0 && Number(tradeProposal.proposal.ask_price) > 0) {
                     currentPayoutRate = (tradeProposal.proposal.payout - tradeProposal.proposal.ask_price) / tradeProposal.proposal.ask_price;
                     currentPayoutRate = Number(currentPayoutRate.toFixed(4));
                 }
             } catch (e) { }
             if (pendingContractType && isTradeOpen === false) {
-                if (typeof makeTheTrade === "function") makeTheTrade(tradeProposal, pendingContractType);
+                const askPrice = Number(tradeProposal.proposal && tradeProposal.proposal.ask_price);
+                const payout = Number(tradeProposal.proposal && tradeProposal.proposal.payout);
+                const breakEvenProbability = payout > 0 ? askPrice / payout : 1;
+                const evidence = getValidationEvidence(market, pendingContractType);
+
+                if (evidence && evidence.isReliable && evidence.lowerBound > breakEvenProbability) {
+                    if (typeof makeTheTrade === "function") makeTheTrade(tradeProposal, pendingContractType);
+                } else {
+                    console.log(
+                        `[VALIDATION BLOCK] ${market} ${pendingContractType}: ` +
+                        `samples=${evidence ? evidence.sampleCount : 0}, ` +
+                        `99.5% lower bound=${evidence ? (evidence.lowerBound * 100).toFixed(2) : "n/a"}%, ` +
+                        `break-even=${(breakEvenProbability * 100).toFixed(2)}%.`
+                    );
+                    pendingContractType = null;
+                    tradeProposal = null;
+                }
             }
         }
     }
 
     if (wsResponse.msg_type === "error") {
         console.error("API error:", wsResponse.error);
+        if (pendingContractType) {
+            pendingContractType = null;
+            tradeProposal = null;
+        }
     }
 
     if (wsResponse.msg_type === "buy") {
@@ -514,56 +560,211 @@ function analizeForEvenOdd() {
     );
 }
 
-function getDecimalPlaces(value) {
-    const parts = String(value).split(".");
-    return parts[1] ? parts[1].length : 0;
-}
-
 function getLastDigitByPrecision(value, precision) {
-    const fixed = Number(value).toFixed(precision);
-    return Number(fixed.charAt(fixed.length - 1));
+    const numericPrice = Number(value);
+    if (!Number.isFinite(numericPrice) || !Number.isInteger(precision) || precision < 0 || precision > 10) {
+        return null;
+    }
+
+    const fixedPrice = numericPrice.toFixed(precision);
+    return Number(fixedPrice.charAt(fixedPrice.length - 1));
 }
 
-function logEvenOddPercentages(prices) {
+function getValidationSamples(symbol, type) {
+    const key = `new_eo_2_deriv_validation_v1:${symbol}:${type}`;
+    if (validationStorageErrors.has(key)) return null;
+    if (validationSamplesByKey.has(key)) return validationSamplesByKey.get(key);
+
+    try {
+        const storedSamples = localStorage.getItem(key);
+        const samples = storedSamples === null ? [] : JSON.parse(storedSamples);
+        if (
+            !Array.isArray(samples) ||
+            samples.length > VALIDATION_MAX_SAMPLES ||
+            samples.some((sample) => typeof sample !== "boolean")
+        ) {
+            throw new Error(`Invalid saved validation data for ${symbol} ${type}.`);
+        }
+
+        validationSamplesByKey.set(key, samples);
+        return samples;
+    } catch (error) {
+        validationStorageErrors.add(key);
+        console.error(`[VALIDATION STORAGE] Cannot load ${symbol} ${type} results; trading is disabled.`, error);
+        return null;
+    }
+}
+
+function getValidationDiagnostics(samples) {
+    const sampleCount = samples.length;
+    const wins = samples.filter(Boolean).length;
+    const losses = sampleCount - wins;
+    const winRate = sampleCount > 0 ? wins / sampleCount : 0;
+    const z = VALIDATION_CONFIDENCE_Z;
+    const zSquared = z * z;
+    const denominator = sampleCount > 0 ? 1 + zSquared / sampleCount : 1;
+    const lowerBound = sampleCount > 0
+        ? (winRate + zSquared / (2 * sampleCount) -
+            z * Math.sqrt((winRate * (1 - winRate) + zSquared / (4 * sampleCount)) / sampleCount)) /
+            denominator
+        : 0;
+
+    if (sampleCount < 2 || wins === 0 || losses === 0) {
+        return { sampleCount, wins, winRate, lowerBound, runsZ: Infinity, lagOneCorrelation: Infinity, isIndependent: false };
+    }
+
+    let runs = 1;
+    let lagProduct = 0;
+    for (let i = 1; i < sampleCount; i++) {
+        if (samples[i] !== samples[i - 1]) runs++;
+        lagProduct += (Number(samples[i - 1]) - winRate) * (Number(samples[i]) - winRate);
+    }
+
+    const expectedRuns = (2 * wins * losses) / sampleCount + 1;
+    const runVariance =
+        (2 * wins * losses * (2 * wins * losses - sampleCount)) /
+        (sampleCount * sampleCount * (sampleCount - 1));
+    const runsZ = runVariance > 0 ? (runs - expectedRuns) / Math.sqrt(runVariance) : Infinity;
+    const lagOneCorrelation =
+        lagProduct / ((sampleCount - 1) * winRate * (1 - winRate));
+    const correlationLimit = 1.96 / Math.sqrt(sampleCount - 1);
+    const isIndependent =
+        Number.isFinite(runsZ) &&
+        Math.abs(runsZ) <= VALIDATION_INDEPENDENCE_Z &&
+        Number.isFinite(lagOneCorrelation) &&
+        Math.abs(lagOneCorrelation) <= correlationLimit;
+
+    return { sampleCount, wins, winRate, lowerBound, runsZ, lagOneCorrelation, isIndependent };
+}
+
+function getValidationEvidence(symbol, type) {
+    const samples = getValidationSamples(symbol, type);
+    if (!samples) return null;
+
+    const diagnostics = getValidationDiagnostics(samples);
+    return {
+        ...diagnostics,
+        isReliable: diagnostics.sampleCount >= VALIDATION_MIN_SAMPLES && diagnostics.isIndependent,
+    };
+}
+
+function recordValidationResult(symbol, type, won) {
+    const samples = getValidationSamples(symbol, type);
+    if (!samples || samples.length >= VALIDATION_MAX_SAMPLES) return;
+
+    samples.push(won);
+    if (samples.length > VALIDATION_MAX_SAMPLES) samples.shift();
+
+    const key = `new_eo_2_deriv_validation_v1:${symbol}:${type}`;
+    try {
+        localStorage.setItem(key, JSON.stringify(samples));
+    } catch (error) {
+        validationStorageErrors.add(key);
+        console.error(`[VALIDATION STORAGE] Cannot save ${symbol} ${type} results; trading is disabled.`, error);
+    }
+
+    const evidence = getValidationEvidence(symbol, type);
+    console.log(
+        `[VALIDATION RESULT] ${symbol} ${type}: ${won ? "hit" : "miss"}; ` +
+        `samples=${evidence ? evidence.sampleCount : 0}, ` +
+        `win rate=${evidence ? (evidence.winRate * 100).toFixed(2) : "n/a"}%, ` +
+        `99.5% lower bound=${evidence ? (evidence.lowerBound * 100).toFixed(2) : "n/a"}%, ` +
+        `independent=${evidence ? evidence.isIndependent : false}.`
+    );
+}
+
+function getCandidateContractType(lastDigits) {
+    if (!Array.isArray(lastDigits) || lastDigits.length < 50) return null;
+
+    const evenCount = lastDigits.filter((digit) => digit % 2 === 0).length;
+    const evenPercentage = (evenCount / lastDigits.length) * 100;
+    const oddPercentage = 100 - evenPercentage;
+    let trailingOppositeCount = 0;
+    const candidateType = evenPercentage >= 52 ? "even" : oddPercentage >= 52 ? "odd" : null;
+    if (!candidateType) return null;
+
+    const oppositeParity = candidateType === "even" ? 1 : 0;
+    for (let i = lastDigits.length - 1; i >= 0; i--) {
+        if (lastDigits[i] % 2 === oppositeParity) {
+            trailingOppositeCount++;
+        } else {
+            break;
+        }
+    }
+
+    const selectedPercentage = candidateType === "even" ? evenPercentage : oddPercentage;
+    if (selectedPercentage <= 60 && trailingOppositeCount >= 3) return candidateType;
+    if (selectedPercentage >= 60 && trailingOppositeCount >= 2) return candidateType;
+    return null;
+}
+
+function logEvenOddPercentages(prices, isLiveTick) {
     if (!Array.isArray(prices) || prices.length === 0) return;
+    if (tickPrecision === null) {
+        if (!precisionWarningShown) {
+            console.warn(`[${market}] Waiting for tick pip_size; no digit analysis or trades will run.`);
+            precisionWarningShown = true;
+        }
+        return;
+    }
 
-    const precision = prices.reduce((maxPrecision, price) => {
-        const currentPrecision = getDecimalPlaces(price);
-        return currentPrecision > maxPrecision ? currentPrecision : maxPrecision;
-    }, 0);
-
-    const lastDigits = prices.map((price) => getLastDigitByPrecision(price, precision));
+    const lastDigits = prices
+        .map((price) => getLastDigitByPrecision(price, tickPrecision))
+        .filter((digit) => digit !== null);
+    if (lastDigits.length === 0) return;
     const evenCount = lastDigits.filter((digit) => digit % 2 === 0).length;
     const oddCount = lastDigits.length - evenCount;
-
     const evenPercentage = Number(((evenCount / lastDigits.length) * 100).toFixed(2));
     const oddPercentage = Number(((oddCount / lastDigits.length) * 100).toFixed(2));
     const lastThreeDigits = lastDigits.slice(-3);
-
     const last10Digits = lastDigits.slice(-10);
     const evenCount10 = last10Digits.filter((d) => d % 2 === 0).length;
     const oddCount10 = last10Digits.length - evenCount10;
     const even10Percentage = Number(((evenCount10 / last10Digits.length) * 100).toFixed(2));
     const odd10Percentage = Number(((oddCount10 / last10Digits.length) * 100).toFixed(2));
 
-    contractType = null;
-    if (evenPercentage >= 52) {
-        contractType = "even";
-    } else if (oddPercentage >= 52) {
-        contractType = "odd";
+    // console.log(
+    //     `[${market}] Even: ${evenPercentage}% (last10: ${even10Percentage}%) | ` +
+    //     `Odd: ${oddPercentage}% (last10: ${odd10Percentage}%) | ` +
+    //     `Last3: [${lastThreeDigits.join(",")}]`
+    // );
+
+    if (!isLiveTick) return;
+
+    const currentDigit = lastDigits[lastDigits.length - 1];
+    if (pendingValidationPrediction) {
+        if (pendingValidationPrediction.symbol === market) {
+            const won = pendingValidationPrediction.type === (currentDigit % 2 === 0 ? "even" : "odd");
+            recordValidationResult(pendingValidationPrediction.symbol, pendingValidationPrediction.type, won);
+        }
+        pendingValidationPrediction = null;
     }
 
-    console.log(
-        `[${market}] Even: ${evenPercentage}% (last10: ${even10Percentage}%) | Odd: ${oddPercentage}% (last10: ${odd10Percentage}%) | ContractType: ${contractType} | Last3: [${lastThreeDigits.join(",")}]`
-    );
+    if (validationTicksUntilNextSignal > 0) validationTicksUntilNextSignal--;
+    const candidateType = getCandidateContractType(lastDigits);
+    contractType = candidateType;
 
-    const evenTriggered = tryEvenEntry(evenPercentage, lastDigits);
-    const oddTriggered = tryOddEntry(oddPercentage, lastDigits);
-    const tradeTriggered = evenTriggered || oddTriggered;
+    if (candidateType && validationTicksUntilNextSignal === 0) {
+        validationTicksUntilNextSignal = VALIDATION_SIGNAL_SPACING;
+        const samples = getValidationSamples(market, candidateType);
+        const evidence = getValidationEvidence(market, candidateType);
+        if (samples && samples.length < VALIDATION_MAX_SAMPLES) {
+            pendingValidationPrediction = { symbol: market, type: candidateType };
+        }
 
-    if (tradeTriggered) {
-        ticksWithoutTrade = 0;
-        return;
+        const hasPreliminaryEdge = evidence && evidence.isReliable && evidence.lowerBound > 0.5;
+        if (
+            hasPreliminaryEdge &&
+            !isCooldown &&
+            !isTradeOpen &&
+            !pendingContractType &&
+            typeof placeTheTrade === "function"
+        ) {
+            pendingContractType = candidateType;
+            placeTheTrade(candidateType);
+            ticksWithoutTrade = 0;
+            return;
+        }
     }
 
     if (isTradeOpen || pendingContractType) return;
@@ -591,8 +792,12 @@ function changeMarketAfterNoTrade() {
     ticksWithoutTrade = 0;
     last50Prices = [];
     hasRequestedTickHistory = false;
+    tickPrecision = null;
+    precisionWarningShown = false;
     pendingContractType = null;
     contractType = null;
+    pendingValidationPrediction = null;
+    validationTicksUntilNextSignal = 0;
 
     console.log(`[MARKET SWITCH] No trade in ${NO_TRADE_TICK_LIMIT} ticks. ${previousMarket} -> ${nextMarket}`);
 
@@ -600,96 +805,6 @@ function changeMarketAfterNoTrade() {
         ws.send(JSON.stringify({ forget_all: "ticks" }));
         analizeForEvenOdd();
     }
-}
-
-function getTrailingOddCount(lastDigits) {
-    let trailingOddCount = 0;
-    for (let i = lastDigits.length - 1; i >= 0; i--) {
-        if (lastDigits[i] % 2 !== 0) {
-            trailingOddCount++;
-        } else {
-            break;
-        }
-    }
-    return trailingOddCount;
-}
-
-function tryEvenEntry(evenPercentage, lastDigits) {
-    if (isCooldown) return false;
-    if (pendingContractType) return false;
-    if (contractType !== "even") return false;
-    if (!Array.isArray(lastDigits) || lastDigits.length === 0) return false;
-    if (evenPercentage < 52) return false;
-
-    const trailingOddCount = getTrailingOddCount(lastDigits);
-    let shouldPlaceTrade = false;
-
-    if (consecutiveLossCount >= 3) {
-        if (evenPercentage <= 60) return false;
-    }
-
-    if (evenPercentage >= 52 && evenPercentage <= 60 && trailingOddCount >= 3) {
-        shouldPlaceTrade = true;
-    } else if (evenPercentage >= 60 && trailingOddCount >= 2) {
-        shouldPlaceTrade = true;
-    }
-
-    if (shouldPlaceTrade) {
-        if (typeof placeTheTrade === "function") {
-            pendingContractType = "even";
-            placeTheTrade(contractType);
-            return true;
-        } else {
-            console.warn("placeTheTrade function is not available.");
-        }
-    }
-
-    return false;
-}
-
-function getTrailingEvenCount(lastDigits) {
-    let trailingEvenCount = 0;
-    for (let i = lastDigits.length - 1; i >= 0; i--) {
-        if (lastDigits[i] % 2 === 0) {
-            trailingEvenCount++;
-        } else {
-            break;
-        }
-    }
-    return trailingEvenCount;
-}
-
-function tryOddEntry(oddPercentage, lastDigits) {
-    if (isCooldown) return false;
-    if (pendingContractType) return false;
-    if (contractType !== "odd") return false;
-    if (!Array.isArray(lastDigits) || lastDigits.length === 0) return false;
-    if (oddPercentage < 52) return false;
-
-    const trailingEvenCount = getTrailingEvenCount(lastDigits);
-    let shouldPlaceTrade = false;
-
-    if (consecutiveLossCount >= 3) {
-        if (oddPercentage <= 60) return false;
-    }
-
-    if (oddPercentage >= 52 && oddPercentage <= 60 && trailingEvenCount >= 3) {
-        shouldPlaceTrade = true;
-    } else if (oddPercentage >= 60 && trailingEvenCount >= 2) {
-        shouldPlaceTrade = true;
-    }
-
-    if (shouldPlaceTrade) {
-        if (typeof placeTheTrade === "function") {
-            pendingContractType = "odd";
-            placeTheTrade(contractType);
-            return true;
-        } else {
-            console.warn("placeTheTrade function is not available.");
-        }
-    }
-
-    return false;
 }
 
 function webSocketConnectionStop() {
